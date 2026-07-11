@@ -216,7 +216,6 @@ def get_location_details(request):
 
 @csrf_exempt
 def export_visits_to_excel(request):
-    # Exempted from CSRF validation checks to allow live Excel connections natively
     wb = openpyxl.Workbook()
     ws_data = wb.active
     ws_data.title = "Field Visit Database Log"
@@ -240,7 +239,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # Fetch flat product sales tracking lines across all visits
     all_products = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive').order_by('-visit__visit_date')
     
     current_row = 2
@@ -323,7 +321,9 @@ def dashboard_home(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state')
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district')
-    executive_list = User.objects.filter(is_active=True).values_list('username', flat=True).distinct().order_by('username')
+    
+    # 🎯 UPDATED: Exclude admin/staff accounts from dropdown options
+    executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username')
 
     total_farms = Farm.objects.filter(farm_filters).count()
     total_visits = FarmVisitReport.objects.filter(visit_filters).count()
@@ -467,7 +467,9 @@ def dashboard_analytics(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct()
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct() if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct()
-    executive_list = User.objects.filter(is_active=True).values_list('username', flat=True).distinct()
+    
+    # 🎯 UPDATED: Exclude admin/staff accounts from dropdown options
+    executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct()
 
     context = {
         'total_farms': total_farms,
@@ -578,7 +580,9 @@ def executive_analytics_view(request):
         'states': Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state'),
         'countries': Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else [],
         'districts': Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district'),
-        'executives': User.objects.filter(is_active=True).values_list('username', flat=True).distinct().order_by('username'),
+        
+        # 🎯 UPDATED: Exclude admin/staff accounts from dropdown options
+        'executives': User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username'),
     }
     return render(request, 'crm_core/analytics_report.html', context)
 
@@ -606,8 +610,10 @@ def get_dependent_filters(request):
         .order_by('farm__district')
     )
     
+    # 🎯 UPDATED: Exclude admin/staff entries implicitly by targeting only non-admin user values matched with logs
     available_executives = list(
         records.exclude(executive__isnull=True)
+        .filter(executive__is_staff=False, executive__is_superuser=False)
         .values_list('executive__username', flat=True)
         .distinct()
         .order_by('executive__username')
