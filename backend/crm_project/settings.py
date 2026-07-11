@@ -21,22 +21,22 @@ SECRET_KEY = 'django-insecure-yi(fw7m(n=3e%i%+m4%00imcyq8*uf(_0p)_u9pyxtmk*a3i_5
 DEBUG = True
 
 # 🚀 ALLOWED NETWORK INTERFACES & TUNNELS
-# Open to accept traffic from any interface, localhost loopbacks, or Cloudflare proxies
 ALLOWED_HOSTS = [
     '*', 
     'localhost', 
     '127.0.0.1', 
     '0.0.0.0', 
-    'crm.myagrinutritioncrm.com'  # 🚀 Added permanent production domain wrapper
+    'crm.myagrinutritioncrm.com',
+    'myagrinutrition-crm.onrender.com'
 ]
 
-# 🔒 CSRF TRUSTED ORIGINS (CRITICAL FOR MOBILE POST FORM DATA HANDLING)
-# Django security engines drop incoming form submissions over tunnels unless explicitly whitelisted.
+# 🔒 CSRF TRUSTED ORIGINS 
 CSRF_TRUSTED_ORIGINS = [
     'https://*.ngrok-free.app',
-    'https://*.trycloudflare.com',       # Auto-accepts ANY new Cloudflare random link
-    'https://trycloudflare.com',         # Fallback base domain validation
-    'https://crm.myagrinutritioncrm.com' # 🚀 Added your permanent portal origin
+    'https://*.trycloudflare.com',       
+    'https://trycloudflare.com',         
+    'https://crm.myagrinutritioncrm.com',
+    'https://myagrinutrition-crm.onrender.com'  # 🚀 Added Render URL
 ]
 
 
@@ -53,7 +53,7 @@ INSTALLED_APPS = [
     # 🔒 Two-Factor Authenticator & OTP Security Extensions
     'django_otp',
     'django_otp.plugins.otp_totp',
-    'django_otp.plugins.otp_static',  # Fixed: Static backup code mapping plugin
+    'django_otp.plugins.otp_static',  
     'two_factor',
     
     # Register local app modules here:
@@ -66,12 +66,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 Added WhiteNoise to serve static assets
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     
-    # 🔒 OTP Security Middleware (Intercepts requests to verify 6-digit rolling codes)
+    # 🔒 OTP Security Middleware
     'django_otp.middleware.OTPMiddleware',
     
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -84,7 +85,6 @@ ROOT_URLCONF = 'crm_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # 🎯 Points directly to the top-level global layout directory:
         'DIRS': [BASE_DIR / 'templates'],  
         'APP_DIRS': True,
         'OPTIONS': {
@@ -98,8 +98,6 @@ TEMPLATES = [
 ]
 
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -109,8 +107,6 @@ DATABASES = {
 
 
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -128,21 +124,15 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # 🚀 Tells Django where to collect production static files
 
 # Tell Django to use our custom user model globally
 AUTH_USER_MODEL = 'accounts.CustomUser'
@@ -151,7 +141,6 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 # ==========================================
 # 🔐 SECURE AUTHENTICATION REDIRECT SETTINGS
 # ==========================================
-# Points unauthorized requests directly to the locked 2FA workflow
 LOGIN_URL = 'two_factor:login'
 LOGIN_REDIRECT_URL = '/crm/dashboard/'
 LOGOUT_REDIRECT_URL = 'two_factor:login'
@@ -162,20 +151,20 @@ LOGOUT_REDIRECT_URL = 'two_factor:login'
 # ==========================================
 PWA_APP_NAME = 'MY AGRINUTRITION'
 PWA_APP_DESCRIPTION = "Live Management Performance & Pipeline Telemetry"
-PWA_APP_THEME_COLOR = '#0f172a'    # Matches your Power BI Dark Canvas color variable
-PWA_APP_BACKGROUND_COLOR = '#0f172a'   # Sleek splash screen initialization background
-PWA_APP_DISPLAY = 'standalone'         # Hides standard web browser URL navigation frames 
-PWA_APP_ORIENTATION = 'any'            # Allows clean responsive handling in landscape and portrait
-PWA_APP_START_URL = '/crm/dashboard/'   # Redirects users instantly to dashboard layout on execution
+PWA_APP_THEME_COLOR = '#0f172a'    
+PWA_APP_BACKGROUND_COLOR = '#0f172a'   
+PWA_APP_DISPLAY = 'standalone'         
+PWA_APP_ORIENTATION = 'any'            
+PWA_APP_START_URL = '/crm/dashboard/'   
 PWA_APP_STATUS_BAR_COLOR = 'default'
 
 PWA_APP_ICONS = [
     {
-        'src': '/static/images/icon-192.png', # Recommended size for home launchers
+        'src': '/static/images/icon-192.png', 
         'sizes': '192x192'
     },
     {
-        'src': '/static/images/icon-512.png', # Recommended size for high-res launch displays
+        'src': '/static/images/icon-512.png', 
         'sizes': '512x512'
     }
 ]
