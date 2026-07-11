@@ -78,10 +78,14 @@ def save_farm_visit(request):
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
         
-        state = request.POST.get('state', 'State')
-        district = request.POST.get('district')
-        area = request.POST.get('area')
+        district = request.POST.get('district', '').strip()
+        area = request.POST.get('area', '').strip()
         farm_problem = request.POST.get('farm_problem')
+        
+        # 🛡️ Clean State Parsing: Fallback to District or Unknown instead of storing literal 'State'
+        state = request.POST.get('state', '').strip()
+        if not state or state.lower() == 'state':
+            state = district if district else 'Unknown State'
         
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
@@ -99,9 +103,9 @@ def save_farm_visit(request):
                         'executive': current_user,
                         'contact_number': contact_number,
                         'business_type': business_type,
-                        'state': state if state else 'State',
-                        'district': district if district else '',
-                        'area': area if area else '',
+                        'state': state,
+                        'district': district,
+                        'area': area,
                         'latitude': latitude,
                         'longitude': longitude,
                     }
@@ -109,8 +113,9 @@ def save_farm_visit(request):
                 
                 if not created and business_type:
                     farm_instance.business_type = business_type
-                    if state:
-                        farm_instance.state = state
+                    farm_instance.state = state
+                    farm_instance.district = district
+                    farm_instance.area = area
                     farm_instance.save()
 
                 visit_record = FarmVisitReport.objects.create(
@@ -202,16 +207,35 @@ def get_location_details(request):
         headers = {'User-Agent': 'AgriCRM_Field_App/1.0'}
         response = requests.get(url, headers=headers).json()
         address_data = response.get('address', {})
-        area = address_data.get('suburb') or address_data.get('village') or address_data.get('county') or "Unknown Area"
-        district = address_data.get('state_district') or address_data.get('district') or address_data.get('city') or "Unknown District"
-        state = address_data.get('state') or "Unknown State"
+        
+        # 🏙️ Cascading area name parameters
+        area = (
+            address_data.get('suburb') or 
+            address_data.get('neighbourhood') or 
+            address_data.get('village') or 
+            address_data.get('town') or 
+            address_data.get('municipality') or 
+            address_data.get('county') or 
+            "Unknown Area"
+        )
+        
+        # 🗺️ Cascading district boundaries
+        district = (
+            address_data.get('state_district') or 
+            address_data.get('district') or 
+            address_data.get('city') or 
+            address_data.get('county') or 
+            "Unknown District"
+        )
+        
+        state = address_data.get('state') or address_data.get('state_code') or "Unknown State"
         return JsonResponse({'state': state, 'district': district, 'area': area})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 
 # ==========================================
-# 📥 EXCEL EXPORT ENGINE (EXEMPTED FOR LIVE SYNC)
+# 📥 EXCEL EXPORT ENGINE
 # ==========================================
 
 @csrf_exempt
@@ -321,8 +345,6 @@ def dashboard_home(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state')
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district')
-    
-    # 🎯 UPDATED: Exclude admin/staff accounts from dropdown options
     executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username')
 
     total_farms = Farm.objects.filter(farm_filters).count()
@@ -467,8 +489,6 @@ def dashboard_analytics(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct()
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct() if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct()
-    
-    # 🎯 UPDATED: Exclude admin/staff accounts from dropdown options
     executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct()
 
     context = {
@@ -580,8 +600,6 @@ def executive_analytics_view(request):
         'states': Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state'),
         'countries': Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else [],
         'districts': Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district'),
-        
-        # 🎯 UPDATED: Exclude admin/staff accounts from dropdown options
         'executives': User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username'),
     }
     return render(request, 'crm_core/analytics_report.html', context)
@@ -610,7 +628,6 @@ def get_dependent_filters(request):
         .order_by('farm__district')
     )
     
-    # 🎯 UPDATED: Exclude admin/staff entries implicitly by targeting only non-admin user values matched with logs
     available_executives = list(
         records.exclude(executive__isnull=True)
         .filter(executive__is_staff=False, executive__is_superuser=False)
