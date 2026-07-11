@@ -1,0 +1,31 @@
+{% extends "two_factor/_base.html" %}
+{% load i18n %}
+
+{% block twofactor_content %}
+  <h3 style="color: #38bdf8; margin-top: 0;">Device Synchronization Wizard</h3>
+  
+  {% if wizard.steps.current == 'welcome' %}
+    <p>To lock your account, you will need to link your phone's authenticator application (Symantec VIP, Google, or Microsoft Authenticator).</p>
+  {% elif wizard.steps.current == 'method' %}
+    <p>Please select your preferred verification token delivery method:</p>
+  {% elif wizard.steps.current == 'generator' %}
+    <p>1. Open your Authenticator app on your smartphone.</p>
+    <p>2. Scan the secure barcode display below:</p>
+    
+    <div style="background: white; padding: 15px; display: inline-block; border-radius: 8px; margin: 15px 0;">
+      <img src="{{ QR_URL }}" alt="QR Code" style="display: block; max-width: 200px;" />
+    </div>
+    
+    <p style="font-size: 13px; color: #94a3b8;">Alternatively, manually enter this security key: <br><strong style="color: #e2e8f0; font-family: monospace;">{{ secret_key }}</strong></p>
+    <p>3. Type the resulting 6-digit rolling code here to verify:</p>
+  {% endif %}
+
+  <form action="" method="post">
+    {% csrf_token %}
+    {{ wizard.management_form }}
+    
+    {{ wizard.form.as_p }}
+    
+    <input type="submit" value="{% trans 'Next Step' %}" />
+  </form>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Farm Field Visit Log</title>
+    
+    <!-- Mounting Google Maps API Bootstrap Script Dynamically -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&callback=initGeospatialMap&loading=async" defer></script>
+    
+    <style>
+        .geo-card { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); max-width: 700px; margin: 20px auto; font-family: system-ui, -apple-system, sans-serif;}
+        .geo-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .badge { background: #2563eb; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 0.85rem; color: #64748b; font-weight: 500; margin-bottom: 6px; }
+        .form-control { width: 100%; padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-size: 0.95rem; font-weight: 600; box-sizing: border-box; }
+        .btn-submit { background: #16a34a; color: white; border: none; padding: 12px 20px; font-weight: 600; border-radius: 6px; cursor: pointer; width: 100%; transition: background 0.2s; }
+        .btn-submit:hover { background: #15803d; }
+    </style>
+</head>
+<body>
+
+    <div class="geo-card">
+        <form method="POST" action="{% url 'save_farm_visit' %}">
+            {% csrf_token %}
+            
+            <div class="geo-header">
+                <h3 style="color: #0f172a; margin: 0; font-size: 1.1rem;">📍 Google Maps Telemetry</h3>
+                <span id="location_status_label" class="badge">⏳ Requesting GPS...</span>
+            </div>
+
+            <!-- Google Map DOM Anchor Point Container -->
+            <div id="map" style="height: 320px; width: 100%; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 18px;"></div>
+
+            <!-- Hidden Sync Engine Coordinates Inputs -->
+            <input type="hidden" name="latitude" id="id_latitude">
+            <input type="hidden" name="longitude" id="id_longitude">
+
+            <!-- Read-Only Telemetry Visualizer Fields -->
+            <div class="form-group">
+                <label>Automated District Representative Zone</label>
+                <input type="text" name="automated_district" id="id_district" readonly class="form-control" placeholder="Awaiting precise coordinate lock...">
+            </div>
+
+            <div class="form-group">
+                <label>Automated Operational Area / Block</label>
+                <input type="text" name="automated_area" id="id_area" readonly class="form-control" placeholder="Awaiting precise coordinate lock...">
+            </div>
+
+            <button type="submit" class="btn-submit">💾 Save Farm Field Visit Log</button>
+        </form>
+    </div>
+
+    <!-- Inject Tracker Core Code Asset Base Downstream -->
+    <script src="{% static 'crm_core/js/geo_tracker.js' %}"></script>
+</body>
+</html>

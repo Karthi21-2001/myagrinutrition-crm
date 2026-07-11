@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriCRM - Create Executive Account</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <style>
+        body { max-width: 450px; margin: 40px auto; padding: 20px; }
+        
+        /* Clean white card background with a subtle drop shadow */
+        .card { 
+            background: #ffffff; 
+            border: 1px solid #cbd5e1; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        /* Form typography formatting rules for high-contrast legibility */
+        .card form, .card p, .card ul, .card li {
+            color: #334155 !important;
+        }
+        
+        /* Targets Django's automatic password requirement blocks */
+        .card .helptext, .card span.helptext {
+            color: #64748b !important;
+            font-size: 0.85rem;
+        }
+        
+        /* Force form inputs to have readable text color */
+        .card input {
+            color: #0f172a !important;
+            background-color: #f8fafc !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+        
+        h2 { color: #10b981; text-align: center; margin-bottom: 20px; }
+        button { width: 100%; background-color: #10b981; font-weight: bold; padding: 12px; margin-top: 15px; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #059669; }
+        
+        .footer-link { text-align: center; margin-top: 15px; font-size: 0.9rem; color: #64748b; }
+        .footer-link a { color: #0284c7; text-decoration: none; font-weight: bold; }
+        .footer-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📝 Executive Sign Up</h2>
+        <form method="POST">
+            {% csrf_token %}
+            
+            {{ form.as_p }}
+            
+            <button type="submit">Register & Onboard Account</button>
+        </form>
+        <div class="footer-link">
+            Already have an active credential? <a href="/crm/login/">Sign In here</a>
+        </div>
+    </div>
+</body>
+</html>

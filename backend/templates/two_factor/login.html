@@ -1,0 +1,29 @@
+{% extends "two_factor/_base.html" %}
+{% load i18n %}
+
+{% block twofactor_content %}
+  <p style="color: #94a3b8; margin-bottom: 20px; font-size: 14px; text-align: center;">
+    {% if wizard.steps.current == 'auth' %}
+      Please enter your manager credentials to proceed.
+    {% else %}
+      🔒 Enter your 6-digit Authenticator app verification token code.
+    {% endif %}
+  </p>
+
+  <form action="" method="post" style="text-align: left;">
+    {% csrf_token %}
+    {{ wizard.management_form }}
+    
+    {% if wizard.form.errors %}
+      <div style="background: #ef4444; color: white; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 14px;">
+        Authentication failed. Please verify your entries.
+      </div>
+    {% endif %}
+
+    <div style="color: #cbd5e1;">
+        {{ wizard.form }}
+    </div>
+
+    <input type="submit" value="{% trans 'Verify & Continue' %}" style="width: 100%; background: #0284c7; color: white; padding: 12px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 25px; font-size: 15px;" />
+  </form>
+{% endblock %}

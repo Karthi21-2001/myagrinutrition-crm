@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My AgriNutrition Dashboard - Analytics Report</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #cbd5e1; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .dashboard-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+        .filter-select { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 0.875rem; transition: border-color 0.15s ease; }
+        .filter-select:focus { border-color: #38bdf8; outline: none; }
+        .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+        
+        /* 💎 PREMIUM POWER-BI STYLE METRIC CARD STYLING */
+        .metric-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-left: 5px solid #28a745; /* Agri Green accent bar */
+            transition: transform 0.2s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-3px);
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+    </style>
+</head>
+<body class="p-6 md:p-8">
+
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-wide uppercase">My AgriNutrition Dashboard</h1>
+            <p class="text-xs text-slate-400">Live Management Performance & Pipeline Telemetry</p>
+        </div>
+        <a href="{% url 'dashboard_analytics' %}" class="bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
+            ⬅ Back to Dashboard Summary
+        </a>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8 bg-[#1e293b] p-5 rounded-xl border border-[#334155]">
+        <div>
+            <label class="filter-label">🗺 State</label>
+            <select id="stateSelect" class="filter-select">
+                <option value="All">All States</option>
+            </select>
+        </div>
+        <div>
+            <label class="filter-label">🌏 Country</label>
+            <select id="countrySelect" class="filter-select">
+                <option value="All">All Countries</option>
+            </select>
+        </div>
+        <div>
+            <label class="filter-label">📍 District</label>
+            <select id="districtSelect" class="filter-select">
+                <option value="All">All Districts</option>
+            </select>
+        </div>
+        <div>
+            <label class="filter-label">👤 Executive</label>
+            <select id="executiveSelect" class="filter-select">
+                <option value="All">All Executives</option>
+            </select>
+        </div>
+        <div>
+            <label class="filter-label">📅 Month</label>
+            <select id="monthSelect" class="filter-select">
+                <option value="All">All Months</option>
+            </select>
+        </div>
+        <div>
+            <label class="filter-label">⏳ Year</label>
+            <select id="yearSelect" class="filter-select">
+                <option value="All">All Years</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">📊 Field Visit Frequency per Executive</h3>
+            <div class="relative w-full h-[320px]">
+                <canvas id="districtBarChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🎯 Zone-wise Sales Metric Breakdown (District Performance)</h3>
+            <div class="relative w-full h-[320px]">
+                <canvas id="visitPieChart"></canvas>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">📈 Year-wise Revenue Trends</h3>
+            <div class="relative w-full h-[320px]">
+                <canvas id="yearRevenueChart"></canvas>
+            </div>
+        </div>
+
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🌙 Month-wise Revenue Cycle</h3>
+            <div class="relative w-full h-[320px]">
+                <canvas id="monthRevenueChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let barChartEngine, pieChartEngine, yearChartEngine, monthChartEngine;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const ctxBar = document.getElementById('districtBarChart').getContext('2d');
+            const ctxPie = document.getElementById('visitPieChart').getContext('2d');
+            const ctxYear = document.getElementById('yearRevenueChart').getContext('2d');
+            const ctxMonth = document.getElementById('monthRevenueChart').getContext('2d');
+
+            barChartEngine = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: ['No Visits Found'],
+                    datasets: [{
+                        label: 'Visits Logged',
+                        data: [0],
+                        backgroundColor: '#38bdf8',
+                        borderColor: '#0284c7',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            pieChartEngine = new Chart(ctxPie, {
+                type: 'bar', 
+                data: {
+                    labels: ['No Data Found'],
+                    datasets: [{
+                        label: 'Revenue (₹)',
+                        data: [0],
+                        backgroundColor: '#a78bfa',
+                        borderColor: '#8b5cf6',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            yearChartEngine = new Chart(ctxYear, {
+                type: 'line',
+                data: {
+                    labels: ['No Trends'],
+                    datasets: [{
+                        label: 'Revenue Growth',
+                        data: [0],
+                        borderColor: '#fbbf24',
+                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            monthChartEngine = new Chart(ctxMonth, {
+                type: 'line',
+                data: {
+                    labels: ['No Data'],
+                    datasets: [{
+                        label: 'Monthly Cycles',
+                        data: [0],
+                        borderColor: '#34d399',
+                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            const filterSelectors = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'monthSelect', 'yearSelect'];
+            filterSelectors.forEach(id => {
+                document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
+            });
+
+            fetchFilteredCanvasMetrics();
+        });
+
+        // Forced "No Data" intercept engine loop
+        function fetchFilteredCanvasMetrics() {
+            // Overriding metrics to build a reliable and clean data-less presentation structure
+            barChartEngine.data.labels = ['No Visits Found'];
+            barChartEngine.data.datasets[0].data = [0];
+            barChartEngine.update();
+
+            pieChartEngine.data.labels = ['No Data Found'];
+            pieChartEngine.data.datasets[0].data = [0];
+            pieChartEngine.update();
+
+            yearChartEngine.data.labels = ['No Trends'];
+            yearChartEngine.data.datasets[0].data = [0];
+            yearChartEngine.update();
+
+            monthChartEngine.data.labels = ['No Data'];
+            monthChartEngine.data.datasets[0].data = [0];
+            monthChartEngine.update();
+        }
+    </script>
+</body>
+</html>

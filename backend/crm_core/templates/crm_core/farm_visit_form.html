@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Logging Form</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #0f172a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --success-hover: #059669;
+            --accent-pipeline: #6366f1;
+            --accent-pipeline-hover: #4f46e5;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --border: #334155;
+            --border-focus: #60a5fa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 850px;
+            background-color: transparent;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .header-container {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 25px;
+            gap: 15px;
+            background-color: var(--bg-card);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .export-btn {
+            background-color: #0284c7; 
+            color: white; 
+            padding: 10px 18px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            font-size: 0.875rem;
+            transition: background 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .export-btn:hover {
+            background-color: #0369a1;
+        }
+
+        /* Card Layouts */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        /* Form elements */
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        .form-group-spacing {
+            margin-bottom: 16px;
+        }
+
+        input[type="text"],
+        input[type="tel"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background-color: var(--bg-input);
+            color: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            outline: none;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        /* Location Section Specifics */
+        .location-box {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            font-family: inherit;
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-primary:disabled { background-color: #475569; cursor: not-allowed; }
+
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-success:hover { background-color: var(--success-hover); }
+
+        .btn-pipeline { background-color: var(--accent-pipeline); color: white; }
+        .btn-pipeline:hover { background-color: var(--accent-pipeline-hover); }
+
+        .btn-danger { background-color: var(--danger); color: white; padding: 10px 12px; }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+
+        #map-container {
+            display: none;
+            margin: 15px 0;
+        }
+        #map {
+            height: 250px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .map-link {
+            display: inline-block;
+            margin-top: 8px;
+            color: var(--border-focus);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        .map-link:hover {
+            text-decoration: underline;
+        }
+
+        .auto-input {
+            background-color: rgba(16, 185, 129, 0.05) !important;
+            border-color: rgba(16, 185, 129, 0.3) !important;
+            color: #34d399 !important;
+            font-weight: 500;
+        }
+
+        /* Dynamic Grid Items styling */
+        .grid-item-row {
+            background-color: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .pipeline-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .order-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        /* Poultry & Aqua Grid Layout Configurations */
+        .poultry-grid, .aqua-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .aqua-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .submit-btn-container {
+            margin-top: 30px;
+            margin-bottom: 50px;
+        }
+
+        .btn-submit {
+            background-color: var(--success);
+            color: white;
+            width: 100%;
+            font-size: 1.1rem;
+            font-weight: 700;
+            padding: 14px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+        }
+        .btn-submit:hover {
+            background-color: var(--success-hover);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 950px) {
+            .pipeline-grid, .order-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .pipeline-grid div:first-child,
+            .order-grid div:first-child {
+                grid-column: span 2;
+            }
+            .pipeline-grid div:last-child,
+            .order-grid div:last-child {
+                grid-column: span 2;
+                text-align: right;
+            }
+            .btn-danger {
+                width: 100%;
+            }
+            .poultry-grid, .aqua-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .export-btn {
+                width: 100%;
+                text-align: center;
+            }
+            .pipeline-grid, .order-grid {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .pipeline-grid div:first-child, .order-grid div:first-child {
+                grid-column: auto;
+            }
+            .pipeline-grid div:last-child, .order-grid div:last-child {
+                grid-column: auto;
+            }
+            .poultry-grid, .aqua-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            #map {
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>MY AGRINUTRITION FIELD VISITING LOG</h2>
+        
+        <div class="header-container">
+            <div>
+                <p><strong>Executive:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
+            </div>
+            <a href="/crm/export/excel/" class="export-btn">
+                📊 Export Data to Excel
+            </a>
+        </div>
+
+        <form id="farmForm" method="POST" action="/crm/save-visit/" novalidate>
+            {% csrf_token %}
+
+            <div class="card">
+                <div class="card-title" style="color: #60a5fa;">📋 General Farm Profile</div>
+                
+                <div class="form-group-spacing">
+                    <label>Farm Name</label>
+                    <input type="text" name="farm_name" required placeholder="e.g., Green Valley Rice Farm">
+                </div>
+
+                <div class="form-group-spacing">
+                    <label>Owner Name (Farmer)</label>
+                    <input type="text" name="owner_name" required placeholder="e.g., Rajesh Kumar">
+                </div>
+
+                <div class="form-group-spacing">
+                    <label>Contact Number</label>
+                    <input type="tel" name="contact_number" required placeholder="e.g., +91 98765 43210">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title" style="color: var(--primary);">📍 Geospatial Metrics</div>
+                
+                <button type="button" id="locateBtn" class="btn-action btn-primary btn-block">
+                    Fetch GPS Verification Coordinate
+                </button>
+                
+                <input type="hidden" id="lat" name="latitude">
+                <input type="hidden" id="lon" name="longitude">
+
+                <div id="map-container">
+                    <div id="map"></div>
+                    <a id="externalMapLink" class="map-link" target="_blank" href="#">🗺️ Open Live Route in Google Maps</a>
+                </div>
+
+                <div class="location-box">
+                    <div class="form-group-spacing">
+                        <label style="color: var(--text-muted);">Automated District</label>
+                        <input type="text" id="district" class="auto-input" name="district" readonly required placeholder="Awaiting location access...">
+                    </div>
+
+                    <div>
+                        <label style="color: var(--text-muted);">Automated Area</label>
+                        <input type="text" id="area" class="auto-input" name="area" readonly required placeholder="Awaiting location access...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title" style="color: #fbbf24;">🔍 Field Diagnostic Metrics</div>
+                
+                <div class="form-group-spacing">
+                    <label>Business Sector Segment</label>
+                    <select name="business_type" id="business_type_select">
+                        <option value="Poultry" selected>🐓 Poultry Sector</option>
+                        <option value="Aqua">🐟 Aqua Sector</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Farm Problem Observed</label>
+                    <textarea name="farm_problem" required rows="4" placeholder="Describe clinical symptoms, pest counts, dynamic weather stressors, or crop development indicators..."></textarea>
+                </div>
+            </div>
+
+            <div id="poultry-section" class="card" style="border-color: rgba(251, 191, 36, 0.3);">
+                <div class="card-title" style="color: #fcd34d;">
+                    <span>🐥 Poultry Shed Population Inventory</span>
+                </div>
+                <div class="poultry-grid">
+                    <div>
+                        <span class="grid-label">Chicks Count</span>
+                        <input type="number" name="chicks_count" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Grower Count</span>
+                        <input type="number" name="grower_count" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Layer Count</span>
+                        <input type="number" name="layer_count" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Culling Bird</span>
+                        <input type="number" name="culling_bird_count" value="0" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <div id="aqua-section" class="card" style="border-color: rgba(56, 189, 248, 0.3); display: none;">
+                <div class="card-title" style="color: #38bdf8;">
+                    <span>🐟 Aqua Pond Tracking Inventory</span>
+                </div>
+                <div class="aqua-grid">
+                    <div>
+                        <span class="grid-label">Acre (Pond Size)</span>
+                        <input type="number" step="0.01" name="pond_acre" value="0.00" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">DOC (Days of Culture)</span>
+                        <input type="number" name="pond_doc" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Fish Variety</span>
+                        <input type="text" name="fish_variety" placeholder="e.g., Catla, Tilapia, Shrimp">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="border-color: rgba(99, 102, 241, 0.4);">
+                <div class="card-title" style="color: #a5b4fc;">
+                    <span>🚀Pipeline Projections</span>
+                    <button type="button" id="add-pipeline-btn" class="btn-action btn-pipeline" style="padding: 6px 12px; font-size: 0.8rem;">
+                        ➕ Add Item
+                    </button>
+                </div>
+
+                <div id="pipeline-sheet-container">
+                    <div class="grid-item-row pipeline-grid">
+                        <div>
+                            <span class="grid-label">Product Name</span>
+                            <input type="text" name="pipeline_discussed_product[]" placeholder="Growth Booster">
+                        </div>
+                        <div>
+                            <span class="grid-label">Poten. Qty</span>
+                            <input type="number" name="pipeline_potential_quantity[]" value="0" min="0">
+                        </div>
+                        <div>
+                            <span class="grid-label">Target Qty</span>
+                            <input type="number" name="pipeline_target_quantity[]" value="0" min="0">
+                        </div>
+                        <div>
+                            <span class="grid-label">Units</span>
+                            <select name="pipeline_unit_type[]">
+                                <option value="KG">KG</option>
+                                <option value="Litre">Litre</option>
+                                <option value="Gram">Gram</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Process Stage</span>
+                            <select name="pipeline_process_status[]">
+                                <option value="Cold">❄️ Cold</option>
+                                <option value="Warm" selected>🔥 Warm</option>
+                                <option value="Hot">💥 Hot</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Conv (%)</span>
+                            <input type="number" name="pipeline_conversion_percentage[]" value="0" min="0" max="100">
+                        </div>
+                        <div>
+                            <button type="button" class="btn-action btn-danger remove-pipeline-btn">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+                <div class="card-title" style="color: #6ee7b7;">
+                    <span>📦 Orders</span>
+                    <button type="button" id="add-order-btn" class="btn-action btn-success" style="padding: 6px 12px; font-size: 0.8rem;">
+                        ➕ Add Order
+                    </button>
+                </div>
+
+                <div id="order-sheet-container">
+                    <div class="grid-item-row order-grid">
+                        <div>
+                            <span class="grid-label">Product Name</span>
+                            <input type="text" name="discussed_product[]" placeholder="BioShield V2">
+                        </div>
+                        <div>
+                            <span class="grid-label">Quantity</span>
+                            <input type="number" name="sale_quantity[]" value="0" min="0">
+                        </div>
+                        <div>
+                            <span class="grid-label">Units</span>
+                            <select name="unit_type[]">
+                                <option value="KG">KG</option>
+                                <option value="Litre">Litre</option>
+                                <option value="Gram">Gram</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Rate (Price)</span>
+                            <input type="number" step="0.01" name="primary_price[]" value="0.00">
+                        </div>
+                        <div>
+                            <button type="button" class="btn-action btn-danger remove-order-btn">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="submit-btn-container">
+                <button type="submit" class="btn-action btn-submit">
+                    Submit Field Report & Open Analytics
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    let map, marker;
+
+    // 🔄 Sector Switching Logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const sectorSelect = document.getElementById('business_type_select');
+        const poultrySection = document.getElementById('poultry-section');
+        const aquaSection = document.getElementById('aqua-section');
+
+        function dynamicSectorToggle() {
+            if (sectorSelect.value === 'Aqua') {
+                poultrySection.style.display = 'none';
+                aquaSection.style.display = 'block';
+                toggleInputs(poultrySection, true);
+                toggleInputs(aquaSection, false);
+            } else {
+                poultrySection.style.display = 'block';
+                aquaSection.style.display = 'none';
+                toggleInputs(poultrySection, false);
+                toggleInputs(aquaSection, true);
+            }
+        }
+
+        function toggleInputs(container, isDisabled) {
+            const inputs = container.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => {
+                input.disabled = isDisabled;
+            });
+        }
+
+        sectorSelect.addEventListener('change', dynamicSectorToggle);
+        dynamicSectorToggle(); // Initialize layout on mount
+    });
+
+    // 📦 Dynamic Row Multiplier: Confirmed Orders
+    document.getElementById('add-order-btn').addEventListener('click', function() {
+        const container = document.getElementById('order-sheet-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'grid-item-row order-grid';
+        
+        newRow.innerHTML = `
+            <div>
+                <span class="grid-label">Product Name</span>
+                <input type="text" name="discussed_product[]" placeholder="BioShield V2">
+            </div>
+            <div>
+                <span class="grid-label">Quantity</span>
+                <input type="number" name="sale_quantity[]" value="0" min="0">
+            </div>
+            <div>
+                <span class="grid-label">Units</span>
+                <select name="unit_type[]">
+                    <option value="KG">KG</option>
+                    <option value="Litre">Litre</option>
+                    <option value="Gram">Gram</option>
+                </select>
+            </div>
+            <div>
+                <span class="grid-label">Rate (Price)</span>
+                <input type="number" step="0.01" name="primary_price[]" value="0.00">
+            </div>
+            <div>
+                <button type="button" class="btn-action btn-danger remove-order-btn">🗑️</button>
+            </div>
+        `;
+        container.appendChild(newRow);
+    });
+
+    // 🚀 Dynamic Row Multiplier: Pipeline Items
+    document.getElementById('add-pipeline-btn').addEventListener('click', function() {
+        const container = document.getElementById('pipeline-sheet-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'grid-item-row pipeline-grid';
+        
+        newRow.innerHTML = `
+            <div>
+                <span class="grid-label">Product Name</span>
+                <input type="text" name="pipeline_discussed_product[]" placeholder="Growth Booster">
+            </div>
+            <div>
+                <span class="grid-label">Poten. Qty</span>
+                <input type="number" name="pipeline_potential_quantity[]" value="0" min="0">
+            </div>
+            <div>
+                <span class="grid-label">Target Qty</span>
+                <input type="number" name="pipeline_target_quantity[]" value="0" min="0">
+            </div>
+            <div>
+                <span class="grid-label">Units</span>
+                <select name="pipeline_unit_type[]">
+                    <option value="KG">KG</option>
+                    <option value="Litre">Litre</option>
+                    <option value="Gram">Gram</option>
+                </select>
+            </div>
+            <div>
+                <span class="grid-label">Process Stage</span>
+                <select name="pipeline_process_status[]">
+                    <option value="Cold">❄️ Cold</option>
+                    <option value="Warm" selected>🔥 Warm</option>
+                    <option value="Hot">💥 Hot</option>
+                </select>
+            </div>
+            <div>
+                <span class="grid-label">Conv (%)</span>
+                <input type="number" name="pipeline_conversion_percentage[]" value="0" min="0" max="100">
+            </div>
+            <div>
+                <button type="button" class="btn-action btn-danger remove-pipeline-btn">🗑️</button>
+            </div>
+        `;
+        container.appendChild(newRow);
+    });
+
+    // 🗑️ Row Cleaner Event Delegations
+    document.getElementById('order-sheet-container').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-order-btn') || e.target.parentElement.classList.contains('remove-order-btn')) {
+            const btn = e.target.classList.contains('remove-order-btn') ? e.target : e.target.parentElement;
+            const container = document.getElementById('order-sheet-container');
+            if (container.getElementsByClassName('grid-item-row').length > 1) {
+                btn.closest('.grid-item-row').remove();
+            } else {
+                const lastRow = container.querySelector('.grid-item-row');
+                lastRow.querySelector('input[name="discussed_product[]"]').value = '';
+                lastRow.querySelector('input[name="sale_quantity[]"]').value = '0';
+                lastRow.querySelector('input[name="primary_price[]"]').value = '0.00';
+                lastRow.querySelector('select[name="unit_type[]"]').value = 'KG';
+            }
+        }
+    });
+
+    document.getElementById('pipeline-sheet-container').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-pipeline-btn') || e.target.parentElement.classList.contains('remove-pipeline-btn')) {
+            const btn = e.target.classList.contains('remove-pipeline-btn') ? e.target : e.target.parentElement;
+            const container = document.getElementById('pipeline-sheet-container');
+            if (container.getElementsByClassName('grid-item-row').length > 1) {
+                btn.closest('.grid-item-row').remove();
+            } else {
+                const lastRow = container.querySelector('.grid-item-row');
+                lastRow.querySelector('input[name="pipeline_discussed_product[]"]').value = '';
+                lastRow.querySelector('input[name="pipeline_potential_quantity[]"]').value = '0';
+                lastRow.querySelector('input[name="pipeline_target_quantity[]"]').value = '0';
+                lastRow.querySelector('select[name="pipeline_unit_type[]"]').value = 'KG';
+                lastRow.querySelector('select[name="pipeline_process_status[]"]').value = 'Warm';
+                lastRow.querySelector('input[name="pipeline_conversion_percentage[]"]').value = '0';
+            }
+        }
+    });
+
+    // Mandatory Field Verification
+    document.getElementById('farmForm').addEventListener('submit', function(e) {
+        const requiredInputs = this.querySelectorAll('[required]:not([disabled])');
+        let valid = true;
+        
+        requiredInputs.forEach(input => {
+            if (!input.value.trim()) {
+                valid = false;
+                input.style.setProperty('border-color', '#ef4444', 'important');
+            } else {
+                input.style.setProperty('border-color', '', '');
+            }
+        });
+        
+        if (!valid) {
+            e.preventDefault();
+            alert("Please fill out all mandatory fields before logging data.");
+        }
+    });
+
+    // Geolocation Engine
+    document.getElementById('locateBtn').addEventListener('click', function() {
+        const btn = this;
+        btn.innerText = "⏳ Locating via GPS Grid...";
+        btn.disabled = true;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    document.getElementById('lat').value = lat;
+                    document.getElementById('lon').value = lon;
+                    document.getElementById('map-container').style.display = 'block';
+                    
+                    document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+                    
+                    if (!map) {
+                        map = L.map('map').setView([lat, lon], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '© OpenStreetMap'
+                        }).addTo(map);
+                        marker = L.marker([lat, lon]).addTo(map);
+                    } else {
+                        const newPos = new L.LatLng(lat, lon);
+                        marker.setLatLng(newPos);
+                        map.setView(newPos, 14);
+                    }
+                    
+                    fetch(`/crm/api/get-location-details/?lat=${lat}&lon=${lon}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if(!data.error) {
+                                document.getElementById('district').value = data.district;
+                                document.getElementById('area').value = data.area;
+                                btn.innerText = "✅ Location Secured";
+                            } else {
+                                alert("Failed to resolve address elements.");
+                                btn.innerText = "Retry Location Capture";
+                                btn.disabled = false;
+                            }
+                        })
+                        .catch(err => {
+                            alert("Network connection error tracking coordinates.");
+                            btn.innerText = "Retry Location Capture";
+                            btn.disabled = false;
+                        });
+                },
+                function(error) {
+                    alert("GPS hardware tracking timed out. Make sure location permissions are allowed on your device.");
+                    btn.innerText = "Retry Location Capture";
+                    btn.disabled = false;
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        } else {
+            alert("Your browser/device does not support location tracking.");
+        }
+    });
+    </script>
+</body>
+</html>
