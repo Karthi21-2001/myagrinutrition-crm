@@ -204,7 +204,8 @@ def get_location_details(request):
         return JsonResponse({'error': 'Missing coordinates'}, status=400)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
-        headers = {'User-Agent': 'AgriCRM_Field_App/1.0'}
+        # 🏷️ Renamed User-Agent context boundary string to MyAgrinutrition CRM
+        headers = {'User-Agent': 'MyAgrinutrition_CRM_Field_App/1.0'}
         response = requests.get(url, headers=headers).json()
         address_data = response.get('address', {})
         
@@ -294,7 +295,8 @@ def export_visits_to_excel(request):
         ws_data.column_dimensions[col_letter].width = max(max_len + 4, 15)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="AgriNutrition_Field_Logs_Data.xlsx"'
+    # 🏷️ Renamed output Excel attachment filename to MyAgrinutrition_CRM_Field_Logs.xlsx
+    response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
 
