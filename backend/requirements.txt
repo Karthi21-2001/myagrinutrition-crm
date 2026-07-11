@@ -11,3 +11,6 @@ requests==2.34.2
 sqlparse==0.5.5
 tzdata==2026.2
 urllib3==2.7.0
+whitenoise==6.7.0
+django-otp==1.7.0
+django-two-factor-auth==1.18.1
