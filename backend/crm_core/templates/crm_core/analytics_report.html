@@ -34,18 +34,25 @@
 </head>
 <body class="p-6 md:p-8">
 
+    <!-- TOP NAVIGATION & MANAGEMENT ACTION PANEL HEADER -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
             <h1 class="text-2xl font-bold text-white tracking-wide uppercase">My AgriNutrition Dashboard</h1>
             <p class="text-xs text-slate-400">Live Management Performance & Pipeline Telemetry</p>
         </div>
-        <a href="{% url 'dashboard_analytics' %}" class="bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
-            ⬅ Back to Dashboard Summary
-        </a>
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <!-- 📥 EXCEL EXPORT DISPATCH ANCHOR LINK -->
+            <a href="{% url 'export_visits_to_excel' %}" id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-emerald-500 transition duration-150 flex items-center gap-2 shadow-sm">
+                📥 Export Excel Log Sheet
+            </a>
+            <a href="{% url 'dashboard_analytics' %}" class="bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
+                ⬅ Back to Summary
+            </a>
+        </div>
     </div>
 
-    <!-- UPDATED: Grid expanded to grid-cols-7 to natively contain the Sector Segment droplist -->
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8 bg-[#1e293b] p-5 rounded-xl border border-[#334155]">
+    <!-- 🎛️ DYNAMIC FILTER ENGINE AND TIMELINE GRID PANEL -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8 bg-[#1e293b] p-5 rounded-xl border border-[#334155]">
         <div>
             <label class="filter-label">🗺 State</label>
             <select id="stateSelect" class="filter-select">
@@ -82,8 +89,6 @@
                 {% endfor %}
             </select>
         </div>
-
-        <!-- NEW REQUIREMENT: Sector Segment Toggle Droplist Connected to Analytics Backend -->
         <div>
             <label class="filter-label">⚓ Sector Segment</label>
             <select id="businessTypeSelect" class="filter-select border-emerald-700/60 font-semibold text-emerald-400 focus:border-emerald-500">
@@ -92,9 +97,16 @@
                 <option value="Aqua" {% if selected_business_type == 'Aqua' %}selected{% endif %}>🐟 Aqua</option>
             </select>
         </div>
-
         <div>
-            <label class="filter-label">📅 Month</label>
+            <label class="filter-label">📅 Start Date</label>
+            <input type="date" id="startDateInput" class="filter-select text-slate-400 focus:text-white" />
+        </div>
+        <div>
+            <label class="filter-label">📅 End Date</label>
+            <input type="date" id="endDateInput" class="filter-select text-slate-400 focus:text-white" />
+        </div>
+        <div>
+            <label class="filter-label">📅 Quick Month</label>
             <select id="monthSelect" class="filter-select">
                 <option value="All">All Months</option>
                 <option value="1">January</option>
@@ -111,17 +123,9 @@
                 <option value="12">December</option>
             </select>
         </div>
-        <div>
-            <label class="filter-label">⏳ Year</label>
-            <select id="yearSelect" class="filter-select">
-                <option value="All">All Years</option>
-                <option value="2024">2024</option>
-                <option value="2025">2025</option>
-                <option value="2026">2026</option>
-            </select>
-        </div>
     </div>
 
+    <!-- 📉 ANALYTICS CHART DISPLAY CANVAS SYSTEM -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="dashboard-card">
             <h3 class="text-sm font-semibold text-slate-200 mb-4">📊 Field Visit Frequency per Executive</h3>
@@ -152,6 +156,7 @@
         </div>
     </div>
 
+    <!-- ⚡ REAL-TIME INTERACTIVE SCRIPT ENGINE -->
     <script>
         let barChartEngine, pieChartEngine, yearChartEngine, monthChartEngine;
 
@@ -161,7 +166,7 @@
             const ctxYear = document.getElementById('yearRevenueChart').getContext('2d');
             const ctxMonth = document.getElementById('monthRevenueChart').getContext('2d');
 
-            // Initialize Charts with empty structures waiting for data
+            // Initialize Charts with empty structures waiting for server delivery
             barChartEngine = new Chart(ctxBar, {
                 type: 'bar',
                 data: { labels: [], datasets: [{ label: 'Visits Logged', data: [], backgroundColor: '#38bdf8', borderColor: '#0284c7', borderWidth: 1, borderRadius: 6 }] },
@@ -186,39 +191,47 @@
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
             });
 
-            // UPDATED: Added 'businessTypeSelect' to live tracking listener array
-            const filterSelectors = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'monthSelect', 'yearSelect'];
-            filterSelectors.forEach(id => {
+            // Map tracking listeners across all target elements
+            const targets = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'startDateInput', 'endDateInput', 'monthSelect'];
+            targets.forEach(id => {
                 document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
             });
 
-            // Fire initial request layout payload
+            // Run metric discovery sync query on bootstrap layout mount
             fetchFilteredCanvasMetrics();
         });
 
-        // RE-ENGINEERED: Dynamic Async API dispatcher linking components to the Django framework
+        // Async pipeline sync orchestrator
         function fetchFilteredCanvasMetrics() {
             const state = document.getElementById('stateSelect').value;
             const country = document.getElementById('countrySelect').value;
             const district = document.getElementById('districtSelect').value;
             const executive = document.getElementById('executiveSelect').value;
-            const month = document.getElementById('monthSelect').value;
-            const year = document.getElementById('yearSelect').value;
-            
-            // 🐟🐓 Target token extractor for Business Sector
             const businessType = document.getElementById('businessTypeSelect').value;
+            const startDate = document.getElementById('startDateInput').value;
+            const endDate = document.getElementById('endDateInput').value;
+            const month = document.getElementById('monthSelect').value;
 
+            // 1. Pack standard payload search tokens
             const queryParams = new URLSearchParams({
                 state: state,
                 country: country,
                 district: district,
                 executive: executive,
-                month: month,
-                year: year,
-                business_type: businessType
+                business_type: businessType,
+                start_date: startDate,
+                end_date: endDate,
+                month: month
             });
 
-            // Dispatch payload to analytics view processing url routing parameters
+            // 2. Synchronize Export File Anchor Button link query parameters
+            const exportButton = document.getElementById('exportCsvBtn');
+            if (exportButton) {
+                const baseRoute = exportButton.getAttribute('href').split('?')[0];
+                exportButton.setAttribute('href', `${baseRoute}?${queryParams.toString()}`);
+            }
+
+            // 3. Dispatch AJAX request downstream to Django Analytics Views
             fetch(`${window.location.pathname}?${queryParams.toString()}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
@@ -227,22 +240,22 @@
                 return response.json();
             })
             .then(data => {
-                // 1. Executive Performance Bar Graph
+                // Update Executive Performance Bar Graph
                 barChartEngine.data.labels = data.labels && data.labels.length ? data.labels : ['No Visits Found'];
                 barChartEngine.data.datasets[0].data = data.values && data.values.length ? data.values : [0];
                 barChartEngine.update();
 
-                // 2. Zone-wise District Performance Graph
+                // Update Zone-wise District Performance Graph
                 pieChartEngine.data.labels = data.zone_labels && data.zone_labels.length ? data.zone_labels : ['No Data Found'];
                 pieChartEngine.data.datasets[0].data = data.zone_data && data.zone_data.length ? data.zone_data : [0];
                 pieChartEngine.update();
 
-                // 3. Yearly Revenue Trend Stream
+                // Update Yearly Revenue Trend Stream
                 yearChartEngine.data.labels = data.year_labels && data.year_labels.length ? data.year_labels : ['No Trends'];
                 yearChartEngine.data.datasets[0].data = data.year_data && data.year_data.length ? data.year_data : [0];
                 yearChartEngine.update();
 
-                // 4. Seasonal Monthly Growth Loop
+                // Update Seasonal Monthly Growth Loop
                 monthChartEngine.data.labels = data.month_labels && data.month_labels.length ? data.month_labels : ['No Data'];
                 monthChartEngine.data.datasets[0].data = data.month_data && data.month_data.length ? data.month_data : [0];
                 monthChartEngine.update();
