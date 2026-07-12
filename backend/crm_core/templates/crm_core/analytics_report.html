@@ -44,41 +44,80 @@
         </a>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8 bg-[#1e293b] p-5 rounded-xl border border-[#334155]">
+    <!-- UPDATED: Grid expanded to grid-cols-7 to natively contain the Sector Segment droplist -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8 bg-[#1e293b] p-5 rounded-xl border border-[#334155]">
         <div>
             <label class="filter-label">🗺 State</label>
             <select id="stateSelect" class="filter-select">
                 <option value="All">All States</option>
+                {% for s in states %}
+                    <option value="{{ s }}" {% if selected_state == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
             </select>
         </div>
         <div>
             <label class="filter-label">🌏 Country</label>
             <select id="countrySelect" class="filter-select">
                 <option value="All">All Countries</option>
+                {% for c in countries %}
+                    <option value="{{ c }}" {% if selected_country == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
             </select>
         </div>
         <div>
             <label class="filter-label">📍 District</label>
             <select id="districtSelect" class="filter-select">
                 <option value="All">All Districts</option>
+                {% for d in districts %}
+                    <option value="{{ d }}" {% if selected_district == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
             </select>
         </div>
         <div>
             <label class="filter-label">👤 Executive</label>
             <select id="executiveSelect" class="filter-select">
                 <option value="All">All Executives</option>
+                {% for e in executives %}
+                    <option value="{{ e }}" {% if selected_executive == e %}selected{% endif %}>{{ e }}</option>
+                {% endfor %}
             </select>
         </div>
+
+        <!-- NEW REQUIREMENT: Sector Segment Toggle Droplist Connected to Analytics Backend -->
+        <div>
+            <label class="filter-label">⚓ Sector Segment</label>
+            <select id="businessTypeSelect" class="filter-select border-emerald-700/60 font-semibold text-emerald-400 focus:border-emerald-500">
+                <option value="All" {% if selected_business_type == 'All' or not selected_business_type %}selected{% endif %}>All Sectors</option>
+                <option value="Poultry" {% if selected_business_type == 'Poultry' %}selected{% endif %}>🐓 Poultry</option>
+                <option value="Aqua" {% if selected_business_type == 'Aqua' %}selected{% endif %}>🐟 Aqua</option>
+            </select>
+        </div>
+
         <div>
             <label class="filter-label">📅 Month</label>
             <select id="monthSelect" class="filter-select">
                 <option value="All">All Months</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
             </select>
         </div>
         <div>
             <label class="filter-label">⏳ Year</label>
             <select id="yearSelect" class="filter-select">
                 <option value="All">All Years</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
             </select>
         </div>
     </div>
@@ -122,130 +161,95 @@
             const ctxYear = document.getElementById('yearRevenueChart').getContext('2d');
             const ctxMonth = document.getElementById('monthRevenueChart').getContext('2d');
 
+            // Initialize Charts with empty structures waiting for data
             barChartEngine = new Chart(ctxBar, {
                 type: 'bar',
-                data: {
-                    labels: ['No Visits Found'],
-                    datasets: [{
-                        label: 'Visits Logged',
-                        data: [0],
-                        backgroundColor: '#38bdf8',
-                        borderColor: '#0284c7',
-                        borderWidth: 1,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Visits Logged', data: [], backgroundColor: '#38bdf8', borderColor: '#0284c7', borderWidth: 1, borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } }
             });
 
             pieChartEngine = new Chart(ctxPie, {
                 type: 'bar', 
-                data: {
-                    labels: ['No Data Found'],
-                    datasets: [{
-                        label: 'Revenue (₹)',
-                        data: [0],
-                        backgroundColor: '#a78bfa',
-                        borderColor: '#8b5cf6',
-                        borderWidth: 1,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Revenue (₹)', data: [], backgroundColor: '#a78bfa', borderColor: '#8b5cf6', borderWidth: 1, borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } }
             });
 
             yearChartEngine = new Chart(ctxYear, {
                 type: 'line',
-                data: {
-                    labels: ['No Trends'],
-                    datasets: [{
-                        label: 'Revenue Growth',
-                        data: [0],
-                        borderColor: '#fbbf24',
-                        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Revenue Growth', data: [], borderColor: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.1)', borderWidth: 2, tension: 0.3, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
             });
 
             monthChartEngine = new Chart(ctxMonth, {
                 type: 'line',
-                data: {
-                    labels: ['No Data'],
-                    datasets: [{
-                        label: 'Monthly Cycles',
-                        data: [0],
-                        borderColor: '#34d399',
-                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
-                        borderWidth: 2,
-                        tension: 0.3,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Monthly Cycles', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', borderWidth: 2, tension: 0.3, fill: true }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
             });
 
-            const filterSelectors = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'monthSelect', 'yearSelect'];
+            // UPDATED: Added 'businessTypeSelect' to live tracking listener array
+            const filterSelectors = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'monthSelect', 'yearSelect'];
             filterSelectors.forEach(id => {
                 document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
             });
 
+            // Fire initial request layout payload
             fetchFilteredCanvasMetrics();
         });
 
-        // Forced "No Data" intercept engine loop
+        // RE-ENGINEERED: Dynamic Async API dispatcher linking components to the Django framework
         function fetchFilteredCanvasMetrics() {
-            // Overriding metrics to build a reliable and clean data-less presentation structure
-            barChartEngine.data.labels = ['No Visits Found'];
-            barChartEngine.data.datasets[0].data = [0];
-            barChartEngine.update();
+            const state = document.getElementById('stateSelect').value;
+            const country = document.getElementById('countrySelect').value;
+            const district = document.getElementById('districtSelect').value;
+            const executive = document.getElementById('executiveSelect').value;
+            const month = document.getElementById('monthSelect').value;
+            const year = document.getElementById('yearSelect').value;
+            
+            // 🐟🐓 Target token extractor for Business Sector
+            const businessType = document.getElementById('businessTypeSelect').value;
 
-            pieChartEngine.data.labels = ['No Data Found'];
-            pieChartEngine.data.datasets[0].data = [0];
-            pieChartEngine.update();
+            const queryParams = new URLSearchParams({
+                state: state,
+                country: country,
+                district: district,
+                executive: executive,
+                month: month,
+                year: year,
+                business_type: businessType
+            });
 
-            yearChartEngine.data.labels = ['No Trends'];
-            yearChartEngine.data.datasets[0].data = [0];
-            yearChartEngine.update();
+            // Dispatch payload to analytics view processing url routing parameters
+            fetch(`${window.location.pathname}?${queryParams.toString()}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Telemetry refresh processing fault");
+                return response.json();
+            })
+            .then(data => {
+                // 1. Executive Performance Bar Graph
+                barChartEngine.data.labels = data.labels && data.labels.length ? data.labels : ['No Visits Found'];
+                barChartEngine.data.datasets[0].data = data.values && data.values.length ? data.values : [0];
+                barChartEngine.update();
 
-            monthChartEngine.data.labels = ['No Data'];
-            monthChartEngine.data.datasets[0].data = [0];
-            monthChartEngine.update();
+                // 2. Zone-wise District Performance Graph
+                pieChartEngine.data.labels = data.zone_labels && data.zone_labels.length ? data.zone_labels : ['No Data Found'];
+                pieChartEngine.data.datasets[0].data = data.zone_data && data.zone_data.length ? data.zone_data : [0];
+                pieChartEngine.update();
+
+                // 3. Yearly Revenue Trend Stream
+                yearChartEngine.data.labels = data.year_labels && data.year_labels.length ? data.year_labels : ['No Trends'];
+                yearChartEngine.data.datasets[0].data = data.year_data && data.year_data.length ? data.year_data : [0];
+                yearChartEngine.update();
+
+                // 4. Seasonal Monthly Growth Loop
+                monthChartEngine.data.labels = data.month_labels && data.month_labels.length ? data.month_labels : ['No Data'];
+                monthChartEngine.data.datasets[0].data = data.month_data && data.month_data.length ? data.month_data : [0];
+                monthChartEngine.update();
+            })
+            .catch(error => {
+                console.error("Critical error updating charts asynchronously:", error);
+            });
         }
     </script>
 </body>
