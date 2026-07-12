@@ -162,7 +162,7 @@ def save_farm_visit(request):
 
                 for i in range(len(pipeline_products)):
                     pipe_prod_name = pipeline_products[i].strip()
-                    if not pipe_prod_name:
+                    if pipe_prod_name:
                         continue
 
                     p_qty = int(p_quantities[i]) if (i < len(p_quantities) and p_quantities[i]) else 0
@@ -233,11 +233,44 @@ def get_location_details(request):
 
 
 # ==========================================
-# 📥 EXCEL EXPORT ENGINE
+# 📥 EXCEL EXPORT ENGINE (SCOPED RESTRUCTURING)
 # ==========================================
 
 @csrf_exempt
 def export_visits_to_excel(request):
+    # 1. Catch dynamic filter state vectors straight from dashboard layout query string parameters
+    start_date_str = request.GET.get('start_date', '').strip()
+    end_date_str = request.GET.get('end_date', '').strip()
+    executive_filter = request.GET.get('executive', 'All').strip()
+    state_filter = request.GET.get('state', 'All').strip()
+    district_filter = request.GET.get('district', 'All').strip()
+    business_type = request.GET.get('business_type', 'All').strip()
+
+    # 2. Build multi-conditional Q objects to mirror pipeline queries seamlessly
+    export_filters = Q()
+
+    if business_type and business_type != 'All':
+        export_filters &= Q(visit__farm__business_type__iexact=business_type)
+    if state_filter and state_filter != 'All':
+        export_filters &= Q(visit__farm__state__iexact=state_filter)
+    if district_filter and district_filter != 'All':
+        export_filters &= Q(visit__farm__district__iexact=district_filter)
+    if executive_filter and executive_filter != 'All':
+        export_filters &= Q(visit__executive__username__iexact=executive_filter)
+
+    # Apply date ranges parsed down safely inside ISO standard configuration limits
+    if start_date_str:
+        try:
+            export_filters &= Q(visit__visit_date__date__gte=start_date_str)
+        except ValueError:
+            pass
+    if end_date_str:
+        try:
+            export_filters &= Q(visit__visit_date__date__lte=end_date_str)
+        except ValueError:
+            pass
+
+    # 3. Compile layout architecture via openpyxl components
     wb = openpyxl.Workbook()
     ws_data = wb.active
     ws_data.title = "Field Visit Database Log"
@@ -261,7 +294,10 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    all_products = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive').order_by('-visit__visit_date')
+    # 4. Stream isolated records into specific worksheet tracking matrices
+    all_products = VisitedProductDetail.objects.filter(export_filters).select_related(
+        'visit__farm', 'visit__executive'
+    ).order_by('-visit__visit_date')
     
     current_row = 2
     for p in all_products:
@@ -312,13 +348,12 @@ def dashboard_home(request):
     executive = request.GET.get('executive', '').strip()
     month = request.GET.get('month', '').strip()
     year = request.GET.get('year', '').strip()
-    business_type = request.GET.get('business_type', '').strip() # 🐟🐓 Added segment value tracker
+    business_type = request.GET.get('business_type', '').strip()
 
     farm_filters = Q()
     visit_filters = Q()
     action_filters = Q()
 
-    # 🚜 Inject Sector Segment Filtering Real-time queries
     if business_type and business_type != 'All':
         farm_filters &= Q(business_type__iexact=business_type)
         visit_filters &= Q(farm__business_type__iexact=business_type)
@@ -392,7 +427,7 @@ def dashboard_home(request):
         'selected_executive': executive,
         'selected_month': month,
         'selected_year': year,
-        'selected_business_type': business_type, # Safe rendering selection key
+        'selected_business_type': business_type,
 
         'total_farms': total_farms,
         'total_visits': total_visits,
@@ -420,13 +455,12 @@ def dashboard_analytics(request):
     executive_query = request.GET.get('executive', '').strip()
     month_query = request.GET.get('month', '').strip()
     year_query = request.GET.get('year', '').strip()
-    business_type = request.GET.get('business_type', '').strip() # 🐟🐓 Added segment value tracker
+    business_type = request.GET.get('business_type', '').strip()
 
     farms_queryset = Farm.objects.all()
     reports_queryset = FarmVisitReport.objects.all().select_related('farm', 'executive')
     products_queryset = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive')
 
-    # 🚜 Inject dynamic business segment execution
     if business_type and business_type != 'All':
         farms_queryset = farms_queryset.filter(business_type__iexact=business_type)
         reports_queryset = reports_queryset.filter(farm__business_type__iexact=business_type)
@@ -525,7 +559,7 @@ def dashboard_analytics(request):
         'selected_executive': executive_query,
         'selected_month': month_query,
         'selected_year': year_query,
-        'selected_business_type': business_type, # Persist configuration field string
+        'selected_business_type': business_type,
         
         'chart_labels_js': json.dumps(district_labels),
         'chart_counts_js': json.dumps(district_counts),
@@ -548,12 +582,11 @@ def executive_analytics_view(request):
     exec_f = request.GET.get('executive', 'All').strip()
     month_f = request.GET.get('month', 'All').strip()
     year_f = request.GET.get('year', 'All').strip()
-    business_type = request.GET.get('business_type', 'All').strip() # Added tracking filter parsed from frontend
+    business_type = request.GET.get('business_type', 'All').strip()
 
     reports_qs = FarmVisitReport.objects.all().select_related('farm', 'executive')
     products_qs = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive')
 
-    # Apply Segment Filter
     if business_type != 'All' and business_type != '':
         reports_qs = reports_qs.filter(farm__business_type__iexact=business_type)
         products_qs = products_qs.filter(visit__farm__business_type__iexact=business_type)
@@ -617,7 +650,7 @@ def executive_analytics_view(request):
         'zone_labels_js': json.dumps(zone_labels), 'zone_data_js': json.dumps(zone_data),
         'year_labels_js': json.dumps(year_labels), 'year_data_js': year_data,
         'month_labels_js': json.dumps(month_labels), 'month_data_js': month_data,
-        'selected_business_type': business_type, # Context pipeline preservation 
+        'selected_business_type': business_type, 
         'states': Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state'),
         'countries': Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else [],
         'districts': Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district'),
