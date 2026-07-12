@@ -204,12 +204,10 @@ def get_location_details(request):
         return JsonResponse({'error': 'Missing coordinates'}, status=400)
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
-        # 🏷️ Renamed User-Agent context boundary string to MyAgrinutrition CRM
         headers = {'User-Agent': 'MyAgrinutrition_CRM_Field_App/1.0'}
         response = requests.get(url, headers=headers).json()
         address_data = response.get('address', {})
         
-        # 🏙️ Cascading area name parameters
         area = (
             address_data.get('suburb') or 
             address_data.get('neighbourhood') or 
@@ -220,7 +218,6 @@ def get_location_details(request):
             "Unknown Area"
         )
         
-        # 🗺️ Cascading district boundaries
         district = (
             address_data.get('state_district') or 
             address_data.get('district') or 
@@ -295,7 +292,6 @@ def export_visits_to_excel(request):
         ws_data.column_dimensions[col_letter].width = max(max_len + 4, 15)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    # 🏷️ Renamed output Excel attachment filename to MyAgrinutrition_CRM_Field_Logs.xlsx
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
@@ -316,10 +312,17 @@ def dashboard_home(request):
     executive = request.GET.get('executive', '').strip()
     month = request.GET.get('month', '').strip()
     year = request.GET.get('year', '').strip()
+    business_type = request.GET.get('business_type', '').strip() # 🐟🐓 Added segment value tracker
 
     farm_filters = Q()
     visit_filters = Q()
     action_filters = Q()
+
+    # 🚜 Inject Sector Segment Filtering Real-time queries
+    if business_type and business_type != 'All':
+        farm_filters &= Q(business_type__iexact=business_type)
+        visit_filters &= Q(farm__business_type__iexact=business_type)
+        action_filters &= Q(visit__farm__business_type__iexact=business_type)
 
     if country and country != 'All' and hasattr(Farm, 'country'):
         farm_filters &= Q(country__iexact=country)
@@ -389,6 +392,7 @@ def dashboard_home(request):
         'selected_executive': executive,
         'selected_month': month,
         'selected_year': year,
+        'selected_business_type': business_type, # Safe rendering selection key
 
         'total_farms': total_farms,
         'total_visits': total_visits,
@@ -416,10 +420,17 @@ def dashboard_analytics(request):
     executive_query = request.GET.get('executive', '').strip()
     month_query = request.GET.get('month', '').strip()
     year_query = request.GET.get('year', '').strip()
+    business_type = request.GET.get('business_type', '').strip() # 🐟🐓 Added segment value tracker
 
     farms_queryset = Farm.objects.all()
     reports_queryset = FarmVisitReport.objects.all().select_related('farm', 'executive')
     products_queryset = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive')
+
+    # 🚜 Inject dynamic business segment execution
+    if business_type and business_type != 'All':
+        farms_queryset = farms_queryset.filter(business_type__iexact=business_type)
+        reports_queryset = reports_queryset.filter(farm__business_type__iexact=business_type)
+        products_queryset = products_queryset.filter(visit__farm__business_type__iexact=business_type)
 
     if state_query and state_query != 'All':
         farms_queryset = farms_queryset.filter(state__iexact=state_query)
@@ -514,6 +525,7 @@ def dashboard_analytics(request):
         'selected_executive': executive_query,
         'selected_month': month_query,
         'selected_year': year_query,
+        'selected_business_type': business_type, # Persist configuration field string
         
         'chart_labels_js': json.dumps(district_labels),
         'chart_counts_js': json.dumps(district_counts),
@@ -536,9 +548,15 @@ def executive_analytics_view(request):
     exec_f = request.GET.get('executive', 'All').strip()
     month_f = request.GET.get('month', 'All').strip()
     year_f = request.GET.get('year', 'All').strip()
+    business_type = request.GET.get('business_type', 'All').strip() # Added tracking filter parsed from frontend
 
     reports_qs = FarmVisitReport.objects.all().select_related('farm', 'executive')
     products_qs = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive')
+
+    # Apply Segment Filter
+    if business_type != 'All' and business_type != '':
+        reports_qs = reports_qs.filter(farm__business_type__iexact=business_type)
+        products_qs = products_qs.filter(visit__farm__business_type__iexact=business_type)
 
     if state_f != 'All' and state_f != '':
         reports_qs = reports_qs.filter(farm__state__iexact=state_f)
@@ -599,6 +617,7 @@ def executive_analytics_view(request):
         'zone_labels_js': json.dumps(zone_labels), 'zone_data_js': json.dumps(zone_data),
         'year_labels_js': json.dumps(year_labels), 'year_data_js': year_data,
         'month_labels_js': json.dumps(month_labels), 'month_data_js': month_data,
+        'selected_business_type': business_type, # Context pipeline preservation 
         'states': Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state'),
         'countries': Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else [],
         'districts': Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district'),
