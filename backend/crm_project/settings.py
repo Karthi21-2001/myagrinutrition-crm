@@ -168,3 +168,10 @@ PWA_APP_ICONS = [
         'sizes': '512x512'
     }
 ]
+
+
+# ==========================================
+# ✉️ COMMUNICATIONS & TELEMETRY DISPATCHERS
+# ==========================================
+# Pipes all password reset email logs to the terminal console stdout during local testing
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
