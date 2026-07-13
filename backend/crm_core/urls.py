@@ -1,5 +1,5 @@
 # crm_core/urls.py
-from django.urls import path
+from django.urls import path, reverse_lazy
 from django.contrib.auth import views as auth_views
 from . import views
 
@@ -8,7 +8,7 @@ urlpatterns = [
     # 🔐 EXECUTIVE AUTHENTICATION & RECOVERY ROUTES
     # ==========================================
     path('register/', views.register_user, name='register_user'),
-    path('account/signup/', views.register_user, name='executive_signup'), # Unified to your custom signup form flow
+    path('account/signup/', views.register_user, name='executive_signup'), 
     path('login/', views.login_user, name='login_user'),
     path('logout/', views.logout_user, name='logout_user'),
     
@@ -23,23 +23,21 @@ urlpatterns = [
          auth_views.PasswordResetDoneView.as_view(template_name='crm_core/password_reset_done.html'), 
          name='password_reset_done'),
          
-    # 3. The secure, single-use reset link sent to the executive's email
+    # 3. Secure reset link: Automatically redirects to login view on successful entry submission
     path('password-reset-confirm/<uidb64>/<token>/', 
-         auth_views.PasswordResetConfirmView.as_view(template_name='crm_core/password_reset_confirm.html'), 
+         auth_views.PasswordResetConfirmView.as_view(
+             template_name='crm_core/password_reset_confirm.html',
+             success_url=reverse_lazy('login_user')  # 🚀 Automatically skip complete screen and go to login
+         ), 
          name='password_reset_confirm'),
          
-    # 4. Success page after password change
-    path('password-reset-complete/', 
-         auth_views.PasswordResetCompleteView.as_view(template_name='crm_core/password_reset_complete.html'), 
-         name='password_reset_complete'),
-    
     # ==========================================
     # 🌱 CORE AGRI-FORM LAYOUT INTERFACES
     # ==========================================
     path('visit-form/', views.render_visit_form, name='render_visit_form'),
-    path('field-log/', views.render_visit_form, name='field_visiting_log'), # Unified route for the executive field log
+    path('field-log/', views.render_visit_form, name='field_visiting_log'), 
     path('save-visit/', views.save_farm_visit, name='save_farm_visit'),
-    path('log-visit/', views.render_visit_form, name='log_visit_alt'), # Structural fallback alias
+    path('log-visit/', views.render_visit_form, name='log_visit_alt'), 
     
     # ==========================================
     # 📥 EXCEL EXPORT ENGINE ROUTES
@@ -50,10 +48,7 @@ urlpatterns = [
     # ==========================================
     # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
     # ==========================================
-    # Primary telemetry tracking dashboard view
     path('dashboard/', views.dashboard_home, name='dashboard_home'), 
-    
-    # Granular data matrix breakdown pipelines (Protected for Admin accounts only)
     path('dashboard/analytics/', views.dashboard_analytics, name='dashboard_analytics'),
     path('analytics/performance/', views.executive_analytics_view, name='executive_analytics_view'),
     path('analytics-report/', views.executive_analytics_view, name='analytics_report'), 
