@@ -13,21 +13,21 @@ urlpatterns = [
     path('logout/', views.logout_user, name='logout_user'),
     
     # --- Password Reset Workflows ---
-    # 1. Route to submit email for password reset
+    # 1. Page where executive enters email to request a reset link
     path('password-reset/', 
          auth_views.PasswordResetView.as_view(template_name='crm_core/password_reset.html'), 
          name='password_reset'),
          
-    # 2. Route showing a confirmation link was sent
+    # 2. Success message confirming the email request was processed
     path('password-reset/done/', 
          auth_views.PasswordResetDoneView.as_view(template_name='crm_core/password_reset_done.html'), 
          name='password_reset_done'),
          
-    # 3. Secure reset link: Automatically redirects to login view on successful entry submission
+    # 3. Secure link entry form: Automatically saves new password and redirects to login view
     path('password-reset-confirm/<uidb64>/<token>/', 
          auth_views.PasswordResetConfirmView.as_view(
              template_name='crm_core/password_reset_confirm.html',
-             success_url=reverse_lazy('login_user')  # 🚀 Automatically skip complete screen and go to login
+             success_url=reverse_lazy('login_user')
          ), 
          name='password_reset_confirm'),
          
