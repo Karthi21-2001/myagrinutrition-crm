@@ -462,16 +462,17 @@
             const labels = {{ chart_labels_js|safe|default:"[]" }};
             const dataValues = {{ chart_counts_js|safe|default:"[]" }};
 
+            // 🧠 Evaluates backend parameters and forces values to be completely empty arrays if no tracking data exists
             const finalizedLabels = labels.includes("No Data Available") ? [] : labels;
             const finalizedData = labels.includes("No Data Available") ? [] : dataValues;
 
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: finalizedLabels,
+                    labels: finalizedLabels, // 🧠 Stays completely empty if no data exists
                     datasets: [{
                         label: 'Farms Registered per District',
-                        data: finalizedData,
+                        data: finalizedData,   // 🧠 Stays completely empty if no data exists
                         backgroundColor: '#38bdf8', 
                         borderWidth: 0,
                         borderRadius: 6
