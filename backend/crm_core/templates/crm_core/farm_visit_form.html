@@ -598,7 +598,6 @@
             if (subSectorMap[selectedSector]) {
                 subSectorMap[selectedSector].forEach(optionData => {
                     const opt = document.createElement('option');
-                    const selectedSector = sectorSelect.value;
                     opt.value = optionData.value;
                     opt.textContent = optionData.text;
                     subSectorSelect.appendChild(opt);
@@ -796,7 +795,10 @@
                     }
                     
                     fetch(`/crm/api/get-location-details/?lat=${lat}&lon=${lon}`)
-                        .then(res => res.json())
+                        .then(res => {
+                            if (!res.ok) throw new Error("Network response error");
+                            return res.json();
+                        })
                         .then(data => {
                             if(!data.error) {
                                 document.getElementById('district').value = data.district || '';
@@ -804,26 +806,28 @@
                                 btn.innerText = "✅ Location Secured";
                             } else {
                                 alert("Failed to resolve address elements.");
-                                btn.innerText = "❌ Location Resolve Error";
+                                btn.innerText = "❌ Resolve Error";
                                 btn.disabled = false;
                             }
                         })
                         .catch(err => {
                             console.error(err);
-                            alert("API error while trying to fetch address details.");
-                            btn.innerText = "❌ Network Error";
+                            alert("Error fetching location details from API.");
+                            btn.innerText = "❌ API Error";
                             btn.disabled = false;
                         });
                 },
                 function(error) {
-                    alert("GPS coordinates denied or timed out. Please verify device permissions.");
-                    btn.innerText = "❌ Permission Denied";
+                    alert("Geolocation failed: " + error.message);
+                    btn.innerText = "❌ Fetch Failed";
                     btn.disabled = false;
-                }
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
             );
         } else {
-            alert("Geolocation is not supported by your current browser environment.");
-            btn.innerText = "❌ Browser Unsupported";
+            alert("Geolocation is not supported by your browser.");
+            btn.innerText = "❌ Not Supported";
+            btn.disabled = false;
         }
     });
     </script>
