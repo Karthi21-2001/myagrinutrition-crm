@@ -250,7 +250,6 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
-    # 🟢 Integrated 'Live GPS Link' inside Headers
     headers = [
         'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
@@ -288,7 +287,6 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
         ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
         
-        # 🟢 Dynamic Hyperlink Generation Loop Logic
         gps_cell = ws_data.cell(row=current_row, column=15)
         if f and f.latitude and f.longitude:
             gps_cell.value = "View on Map"
@@ -318,7 +316,6 @@ def export_visits_to_excel(request):
 # ==========================================
 
 def get_dashboard_context(request):
-    """Central processing pipeline for managing filter logic on both templates."""
     sel_state = request.GET.get('state', '')
     sel_country = request.GET.get('country', '')
     sel_district = request.GET.get('district', '')
@@ -407,21 +404,18 @@ def get_dashboard_context(request):
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Renders the Core KPI Summary Panel (Counters, Conversion, & Dispatches)"""
     context = get_dashboard_context(request)
     return render(request, 'crm_core/dashboard.html', context)
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    """Renders the Advanced Analytics Telemetry Dashboard (Full Multi-Graphs Visualization)"""
     context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
 
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    """Fixed route configuration pointing to the correct analytics template configuration"""
     context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
 
@@ -431,14 +425,46 @@ def executive_analytics_view(request):
 # ==========================================
 
 def get_location_details(request):
+    """Processes incoming map telemetry coordinates and fetches spatial records."""
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
-    # ❌ Hardcoded dummy strings:
-    return JsonResponse({'status': 'success', 'state': 'Detected State', 'district': 'Detected District'})
+    
+    if not lat or not lon:
+        return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
+        
+    try:
+        headers = {'User-Agent': 'AgriNutritionCRM/1.0 (contact@myagrinutrition.com)'}
+        api_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
+        
+        response = requests.get(api_url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            address = data.get('address', {})
+            
+            district = address.get('district') or address.get('county') or address.get('subdistrict') or 'Unknown District'
+            area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or 'Unknown Area'
+            state = address.get('state', 'Unknown State')
+            
+            return JsonResponse({
+                'status': 'success',
+                'state': state,
+                'district': district,
+                'area': area
+            })
+            
+    except Exception:
+        pass
+        
+    return JsonResponse({
+        'status': 'success',
+        'state': 'Unknown State',
+        'district': 'Detected Location',
+        'area': f"Lat: {lat[:7]}, Lon: {lon[:7]}"
+    })
 
 
 def get_dependent_filters(request):
-    """Dynamic cascade endpoint filtering districts by chosen state choice."""
     state_query = request.GET.get('state', '')
     if state_query:
         districts = list(Farm.objects.filter(state=state_query).values_list('district', flat=True).distinct().exclude(district=''))
