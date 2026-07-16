@@ -1,17 +1,16 @@
+# crm_project/urls.py
 from django.contrib import admin
 from django.urls import path, include
-from two_factor.urls import urlpatterns as tf_urls
+# Import the signup view from your app (adjust 'crm_core' if your app folder has a different name)
+from crm_core.views import executive_signup_view 
 
 urlpatterns = [
-    # ⚙️ DJANGO ADMIN PANEL INTERFACE
     path('admin/', admin.site.urls),
     
-    # 🔒 SECURE MULTI-FACTOR AUTHENTICATION WORKFLOW GATEWAYS
-    # Automatically establishes secure paths for: login/, setup/, backup/tokens/, etc.
-    path('', include(tf_urls)), 
+    # Add this line to map the signup page!
+    path('account/signup/', executive_signup_view, name='signup'),
     
-    # 🍇 SYSTEM ROUTING FORWARDER
-    # This automatically prefixes all modular app routes with 'crm/' 
-    # (e.g., crm/register/, crm/dashboard/)
-    path('crm/', include('crm_core.urls')), 
+    # Your existing routes
+    path('account/', include('two_factor.urls', 'two_factor')),
+    path('crm/', include('crm_core.urls')), # Adjust 'crm_core.urls' if your app is named differently
 ]
