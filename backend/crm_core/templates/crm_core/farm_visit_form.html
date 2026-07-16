@@ -410,7 +410,6 @@
                     </select>
                 </div>
 
-                <!-- 🆕 Dynamic Sub-Sector Dropdown -->
                 <div class="form-group-spacing">
                     <label>Sub-Sector Segment</label>
                     <select name="sub_business_type" id="sub_business_type_select">
@@ -599,6 +598,7 @@
             if (subSectorMap[selectedSector]) {
                 subSectorMap[selectedSector].forEach(optionData => {
                     const opt = document.createElement('option');
+                    const selectedSector = sectorSelect.value;
                     opt.value = optionData.value;
                     opt.textContent = optionData.text;
                     subSectorSelect.appendChild(opt);
@@ -799,30 +799,31 @@
                         .then(res => res.json())
                         .then(data => {
                             if(!data.error) {
-                                document.getElementById('district').value = data.district;
-                                document.getElementById('area').value = data.area;
+                                document.getElementById('district').value = data.district || '';
+                                document.getElementById('area').value = data.area || '';
                                 btn.innerText = "✅ Location Secured";
                             } else {
                                 alert("Failed to resolve address elements.");
-                                btn.innerText = "Retry Location Capture";
+                                btn.innerText = "❌ Location Resolve Error";
                                 btn.disabled = false;
                             }
                         })
                         .catch(err => {
-                            alert("Network connection error tracking coordinates.");
-                            btn.innerText = "Retry Location Capture";
+                            console.error(err);
+                            alert("API error while trying to fetch address details.");
+                            btn.innerText = "❌ Network Error";
                             btn.disabled = false;
                         });
                 },
                 function(error) {
-                    alert("GPS hardware tracking timed out. Make sure location permissions are allowed on your device.");
-                    btn.innerText = "Retry Location Capture";
+                    alert("GPS coordinates denied or timed out. Please verify device permissions.");
+                    btn.innerText = "❌ Permission Denied";
                     btn.disabled = false;
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
+                }
             );
         } else {
-            alert("Your browser/device does not support location tracking.");
+            alert("Geolocation is not supported by your current browser environment.");
+            btn.innerText = "❌ Browser Unsupported";
         }
     });
     </script>
