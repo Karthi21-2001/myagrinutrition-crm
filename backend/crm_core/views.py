@@ -77,12 +77,12 @@ def save_farm_visit(request):
         owner_name = request.POST.get('owner_name')
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
+        sub_segment = request.POST.get('sub_segment', '').strip()  # Added dynamic Sub-segment target mapping
         
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         farm_problem = request.POST.get('farm_problem')
         
-        # 🛡️ Clean State Parsing: Fallback to District or Unknown instead of storing literal 'State'
         state = request.POST.get('state', '').strip()
         if not state or state.lower() == 'state':
             state = district if district else 'Unknown State'
@@ -103,6 +103,7 @@ def save_farm_visit(request):
                         'executive': current_user,
                         'contact_number': contact_number,
                         'business_type': business_type,
+                        'sub_segment': sub_segment,  # Saved on fallback creation matrix
                         'state': state,
                         'district': district,
                         'area': area,
@@ -111,8 +112,11 @@ def save_farm_visit(request):
                     }
                 )
                 
-                if not created and business_type:
-                    farm_instance.business_type = business_type
+                if not created:
+                    if business_type:
+                        farm_instance.business_type = business_type
+                    if sub_segment:
+                        farm_instance.sub_segment = sub_segment  # Dynamic validation updating line
                     farm_instance.state = state
                     farm_instance.district = district
                     farm_instance.area = area
@@ -162,7 +166,7 @@ def save_farm_visit(request):
 
                 for i in range(len(pipeline_products)):
                     pipe_prod_name = pipeline_products[i].strip()
-                    if not pipe_prod_name:  # FIXED: Corrected inversion bug to properly process filled values
+                    if not pipe_prod_name:  
                         continue
 
                     p_qty = int(p_quantities[i]) if (i < len(p_quantities) and p_quantities[i]) else 0
@@ -205,7 +209,7 @@ def get_location_details(request):
     try:
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
         headers = {'User-Agent': 'MyAgrinutrition_CRM_Field_App/1.0'}
-        response = requests.get(url, headers=headers, timeout=5).json()  # Added resilient request timeout protection
+        response = requests.get(url, headers=headers, timeout=5).json()  
         address_data = response.get('address', {})
         
         area = (
@@ -233,24 +237,25 @@ def get_location_details(request):
 
 
 # ==========================================
-# 📥 EXCEL EXPORT ENGINE (SCOPED RESTRUCTURING)
+# 📥 EXCEL EXPORT ENGINE
 # ==========================================
 
 @csrf_exempt
 def export_visits_to_excel(request):
-    # 1. Catch dynamic filter state vectors straight from dashboard layout query string parameters
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
     executive_filter = request.GET.get('executive', 'All').strip()
     state_filter = request.GET.get('state', 'All').strip()
     district_filter = request.GET.get('district', 'All').strip()
     business_type = request.GET.get('business_type', 'All').strip()
+    sub_segment_filter = request.GET.get('sub_segment', 'All').strip() # Added tracking variable parser
 
-    # 2. Build multi-conditional Q objects to mirror pipeline queries seamlessly
     export_filters = Q()
 
     if business_type and business_type != 'All':
         export_filters &= Q(visit__farm__business_type__iexact=business_type)
+    if sub_segment_filter and sub_segment_filter != 'All':
+        export_filters &= Q(visit__farm__sub_segment__iexact=sub_segment_filter) # Appended relational matching rules
     if state_filter and state_filter != 'All':
         export_filters &= Q(visit__farm__state__iexact=state_filter)
     if district_filter and district_filter != 'All':
@@ -258,7 +263,6 @@ def export_visits_to_excel(request):
     if executive_filter and executive_filter != 'All':
         export_filters &= Q(visit__executive__username__iexact=executive_filter)
 
-    # Apply date ranges parsed down safely inside ISO standard configuration limits
     if start_date_str:
         try:
             export_filters &= Q(visit__visit_date__date__gte=start_date_str)
@@ -270,7 +274,6 @@ def export_visits_to_excel(request):
         except ValueError:
             pass
 
-    # 3. Compile layout architecture via openpyxl components
     wb = openpyxl.Workbook()
     ws_data = wb.active
     ws_data.title = "Field Visit Database Log"
@@ -282,9 +285,11 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
+    # Added 'Sub-Segment' explicitly tracking clean sheet header columns layout matrix
     headers = [
-        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number','Geospatial Metrics', 'Sector Segment','Sub-Segment',
-        'State', 'District', 'Area / Suburb', 'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated'
+        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
+        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
+        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -294,7 +299,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # 4. Stream isolated records into specific worksheet tracking matrices
     all_products = VisitedProductDetail.objects.filter(export_filters).select_related(
         'visit__farm', 'visit__executive'
     ).order_by('-visit__visit_date')
@@ -310,15 +314,16 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
         ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
         ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-        ws_data.cell(row=current_row, column=7, value=f.state if f else "")
-        ws_data.cell(row=current_row, column=8, value=f.district if f else "")
-        ws_data.cell(row=current_row, column=9, value=f.area if f else "")
-        ws_data.cell(row=current_row, column=10, value=p.product_name)
-        ws_data.cell(row=current_row, column=11, value=p.sale_quantity)
-        ws_data.cell(row=current_row, column=12, value=float(p.primary_price))
-        ws_data.cell(row=current_row, column=13, value=float(p.revenue_generated))
+        ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and hasattr(f, 'sub_segment') else "") # Stream Sub-segment line
+        ws_data.cell(row=current_row, column=8, value=f.state if f else "")
+        ws_data.cell(row=current_row, column=9, value=f.district if f else "")
+        ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+        ws_data.cell(row=current_row, column=11, value=p.product_name)
+        ws_data.cell(row=current_row, column=12, value=p.sale_quantity)
+        ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
+        ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
         
-        for c_idx in range(1, 14):
+        for c_idx in range(1, 15):
             ws_data.cell(row=current_row, column=c_idx).border = thin_border
         current_row += 1
 
@@ -349,6 +354,7 @@ def dashboard_home(request):
     month = request.GET.get('month', '').strip()
     year = request.GET.get('year', '').strip()
     business_type = request.GET.get('business_type', '').strip()
+    sub_segment = request.GET.get('sub_segment', '').strip()
 
     farm_filters = Q()
     visit_filters = Q()
@@ -358,6 +364,11 @@ def dashboard_home(request):
         farm_filters &= Q(business_type__iexact=business_type)
         visit_filters &= Q(farm__business_type__iexact=business_type)
         action_filters &= Q(visit__farm__business_type__iexact=business_type)
+
+    if sub_segment and sub_segment != 'All':
+        farm_filters &= Q(sub_segment__iexact=sub_segment)
+        visit_filters &= Q(farm__sub_segment__iexact=sub_segment)
+        action_filters &= Q(visit__farm__sub_segment__iexact=sub_segment)
 
     if country and country != 'All' and hasattr(Farm, 'country'):
         farm_filters &= Q(country__iexact=country)
@@ -385,6 +396,7 @@ def dashboard_home(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state')
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district')
+    sub_segment_list = Farm.objects.exclude(sub_segment__isnull=True).values_list('sub_segment', flat=True).distinct().order_by('sub_segment')
     executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username')
 
     total_farms = Farm.objects.filter(farm_filters).count()
@@ -419,6 +431,7 @@ def dashboard_home(request):
         'state_list': state_list,
         'country_list': country_list,
         'district_list': district_list,
+        'sub_segment_list': sub_segment_list,
         'executive_list': executive_list,
         
         'selected_state': state,
@@ -428,6 +441,7 @@ def dashboard_home(request):
         'selected_month': month,
         'selected_year': year,
         'selected_business_type': business_type,
+        'selected_sub_segment': sub_segment,
 
         'total_farms': total_farms,
         'total_visits': total_visits,
@@ -456,6 +470,7 @@ def dashboard_analytics(request):
     month_query = request.GET.get('month', '').strip()
     year_query = request.GET.get('year', '').strip()
     business_type = request.GET.get('business_type', '').strip()
+    sub_segment = request.GET.get('sub_segment', '').strip()
 
     farms_queryset = Farm.objects.all()
     reports_queryset = FarmVisitReport.objects.all().select_related('farm', 'executive')
@@ -465,6 +480,11 @@ def dashboard_analytics(request):
         farms_queryset = farms_queryset.filter(business_type__iexact=business_type)
         reports_queryset = reports_queryset.filter(farm__business_type__iexact=business_type)
         products_queryset = products_queryset.filter(visit__farm__business_type__iexact=business_type)
+
+    if sub_segment and sub_segment != 'All':
+        farms_queryset = farms_queryset.filter(sub_segment__iexact=sub_segment)
+        reports_queryset = reports_queryset.filter(farm__sub_segment__iexact=sub_segment)
+        products_queryset = products_queryset.filter(visit__farm__sub_segment__iexact=sub_segment)
 
     if state_query and state_query != 'All':
         farms_queryset = farms_queryset.filter(state__iexact=state_query)
@@ -536,6 +556,7 @@ def dashboard_analytics(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct()
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct() if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct()
+    sub_segment_list = Farm.objects.exclude(sub_segment__isnull=True).values_list('sub_segment', flat=True).distinct()
     executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct()
 
     context = {
@@ -551,6 +572,7 @@ def dashboard_analytics(request):
         'state_list': state_list,
         'country_list': country_list,
         'district_list': district_list,
+        'sub_segment_list': sub_segment_list,
         'executive_list': executive_list,
         
         'selected_state': state_query,
@@ -560,6 +582,7 @@ def dashboard_analytics(request):
         'selected_month': month_query,
         'selected_year': year_query,
         'selected_business_type': business_type,
+        'selected_sub_segment': sub_segment,
         
         'chart_labels_js': json.dumps(district_labels),
         'chart_counts_js': json.dumps(district_counts),
@@ -583,6 +606,7 @@ def executive_analytics_view(request):
     month_f = request.GET.get('month', 'All').strip()
     year_f = request.GET.get('year', 'All').strip()
     business_type = request.GET.get('business_type', 'All').strip()
+    sub_segment = request.GET.get('sub_segment', 'All').strip()
 
     reports_qs = FarmVisitReport.objects.all().select_related('farm', 'executive')
     products_qs = VisitedProductDetail.objects.all().select_related('visit__farm', 'visit__executive')
@@ -590,6 +614,10 @@ def executive_analytics_view(request):
     if business_type != 'All' and business_type != '':
         reports_qs = reports_qs.filter(farm__business_type__iexact=business_type)
         products_qs = products_qs.filter(visit__farm__business_type__iexact=business_type)
+
+    if sub_segment != 'All' and sub_segment != '':
+        reports_qs = reports_qs.filter(farm__sub_segment__iexact=sub_segment)
+        products_qs = products_qs.filter(visit__farm__sub_segment__iexact=sub_segment)
 
     if state_f != 'All' and state_f != '':
         reports_qs = reports_qs.filter(farm__state__iexact=state_f)
@@ -651,9 +679,11 @@ def executive_analytics_view(request):
         'year_labels_js': json.dumps(year_labels), 'year_data_js': year_data,
         'month_labels_js': json.dumps(month_labels), 'month_data_js': month_data,
         'selected_business_type': business_type, 
+        'selected_sub_segment': sub_segment,
         'states': Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state'),
         'countries': Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else [],
         'districts': Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district'),
+        'sub_segments': Farm.objects.exclude(sub_segment__isnull=True).values_list('sub_segment', flat=True).distinct().order_by('sub_segment'),
         'executives': User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username'),
     }
     return render(request, 'crm_core/analytics_report.html', context)
@@ -667,8 +697,8 @@ def executive_analytics_view(request):
 def get_dependent_filters(request):
     state = request.GET.get('state', 'All').strip()
     country = request.GET.get('country', 'All').strip()
+    business_type = request.GET.get('business_type', 'All').strip() # Read primary input context vector
 
-    # FIXED: Added robust filtration and completed truncated framework code logic block
     queryset = Farm.objects.all()
     
     if country and country != 'All' and hasattr(Farm, 'country'):
@@ -679,7 +709,22 @@ def get_dependent_filters(request):
     districts = list(queryset.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district'))
     areas = list(queryset.exclude(area__isnull=True).values_list('area', flat=True).distinct().order_by('area'))
     
+    # Dynamic dictionary builder mapping configuration for sub-segments
+    sub_segments_map = {
+        'poultry': ['Broiler', 'Layer', 'Feedmill', 'Hatchery'],
+        'aqua': ['Feedmill', 'Hatchery', 'Shrimp', 'Fish']
+    }
+    
+    # Calculate array responses based on current segment selection string
+    sub_segments = []
+    if business_type.lower() in sub_segments_map:
+        sub_segments = sub_segments_map[business_type.lower()]
+    else:
+        # Fallback to query existing distinct entries from database if selection matches other types
+        sub_segments = list(queryset.filter(business_type__iexact=business_type).exclude(sub_segment__isnull=True).values_list('sub_segment', flat=True).distinct())
+
     return JsonResponse({
         'districts': districts,
-        'areas': areas
+        'areas': areas,
+        'sub_segments': sub_segments # Appended structured data vector to frontend AJAX cascading receiver
     })
