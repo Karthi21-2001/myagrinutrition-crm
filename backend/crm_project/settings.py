@@ -83,11 +83,15 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'crm_project.urls'
 
-# 🛠️ GLOBAL TEMPLATE CONFIGURATION
+# 🛠️ GLOBAL TEMPLATE CONFIGURATION MATRIX WITH MULTI-PATH STRUCTURAL FALLBACK
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],  
+        # Explicitly maps global directories and local application layout layers
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'crm_core' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
