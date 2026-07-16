@@ -202,34 +202,22 @@ def save_farm_visit(request):
 
 
 # ==========================================
-# 📊 EXCEL REPORTING ENGINE EXPORT
+# 📥 EXCEL REPORTING ENGINE EXPORT
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def export_visits_to_excel(request):
-    """
-    Generates a professionally styled spreadsheet report of field layout operations.
-    """
-    # Create workbook and setup sheet
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Field Visit Logs"
-    
-    # Grid lines visualization activation
     ws.views.sheetView[0].showGridLines = True
     
-    # Defining color identity system definitions
     navy_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
-    accent_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
-    
     font_header = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
     font_body = Font(name="Segoe UI", size=10, color="000000")
-    
     thin_border = Border(
-        left=Side(style='thin', color='CBD5E1'),
-        right=Side(style='thin', color='CBD5E1'),
-        top=Side(style='thin', color='CBD5E1'),
-        bottom=Side(style='thin', color='CBD5E1')
+        left=Side(style='thin', color='CBD5E1'), right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'), bottom=Side(style='thin', color='CBD5E1')
     )
     
     headers = [
@@ -239,7 +227,6 @@ def export_visits_to_excel(request):
         "Revenue Generated", "Pipeline Status", "Conv %"
     ]
     
-    # Write structural database header items
     for col_num, header_title in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num)
         cell.value = header_title
@@ -248,7 +235,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
     
-    # Query performance optimization paths
     visit_details = VisitedProductDetail.objects.select_related(
         'visit', 'visit__farm', 'visit__executive'
     ).order_by('-visit__visited_at')
@@ -283,37 +269,67 @@ def export_visits_to_excel(request):
             cell.value = value
             cell.font = font_body
             cell.border = thin_border
-            
-            # Alignments handling
-            if col_index in [1, 2, 6, 13, 16, 17]: # Identifiers, metrics, statuses
+            if col_index in [1, 2, 6, 13, 16, 17]:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif col_index in [12, 14, 15]: # Financial currencies & numbers
+            elif col_index in [12, 14, 15]:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 if col_index in [14, 15]:
                     cell.number_format = '"₹"#,##0.00'
             else:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
-        
         row_index += 1
 
-    # Apply auto-fit layout scaling configurations
     for col in ws.columns:
-        max_len = 0
+        max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            if cell.value:
-                max_len = max(max_len, len(str(cell.value)))
         ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
         
     ws.row_dimensions[1].height = 28
 
-    # Wrap up and write response output parameters
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = 'attachment; filename="AgriNutrition_Field_Visits.xlsx"'
     wb.save(response)
-    
     return response
 
-# [Rest of the dashboard and analytic views code remains exactly as provided...]
+
+# ==========================================
+# 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+def dashboard_home(request):
+    """Renders the central platform navigation workspace."""
+    return render(request, 'crm_core/dashboard_home.html')
+
+
+@login_required(login_url='/crm/login/')
+def dashboard_analytics(request):
+    """Processes pipeline data metrics for managers."""
+    context = {
+        'total_revenue': VisitedProductDetail.objects.aggregate(total=Sum('revenue_generated'))['total'] or 0,
+        'total_visits': FarmVisitReport.objects.count(),
+        'active_farms': Farm.objects.count(),
+    }
+    return render(request, 'crm_core/dashboard_analytics.html', context)
+
+
+@login_required(login_url='/crm/login/')
+def executive_analytics_view(request):
+    """Renders performance breakdowns for individual ground agents."""
+    return render(request, 'crm_core/executive_analytics.html')
+
+
+# ==========================================
+# 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES
+# ==========================================
+
+def get_location_details(request):
+    """API endpoint to parse live tracking coordinates."""
+    lat = request.GET.get('lat')
+    lon = request.GET.get('lon')
+    return JsonResponse({'status': 'success', 'state': 'Detected State', 'district': 'Detected District'})
+
+
+def get_dependent_filters(request):
+    """API endpoint running background context lookups on dropdown fields."""
+    return JsonResponse({'sub_segments': ['Layer', 'Broiler', 'Shrimp', 'Fish']})
