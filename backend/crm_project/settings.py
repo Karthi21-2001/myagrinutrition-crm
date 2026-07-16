@@ -104,9 +104,11 @@ TEMPLATES = [
 # ==========================================
 # 🗄️ PERSISTENT ENGINE DATABASE MATRIX
 # ==========================================
+# We use dj_database_url to automatically parse production URLs (like on Render),
+# but fall back to your local PostgreSQL instance 'my_agri_db' during development.
 DATABASES = {
     'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        default='postgres://db_user:your_password@localhost:5432/my_agri_db',
         conn_max_age=600
     )
 }
