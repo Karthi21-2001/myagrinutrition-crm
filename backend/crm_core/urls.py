@@ -1,7 +1,6 @@
 # crm_core/urls.py
-from django.urls import path, reverse_lazy
+from django.urls import path
 from django.views.generic import TemplateView
-from django.contrib.auth import views as auth_views
 from . import views
 
 urlpatterns = [
@@ -30,6 +29,7 @@ urlpatterns = [
     # ==========================================
     # 📥 EXCEL EXPORT ENGINE ROUTES
     # ==========================================
+    # Securely bound to views.export_visits_to_excel
     path('export-excel/', views.export_visits_to_excel, name='export_visits_to_excel'),
     path('export-visits/', views.export_visits_to_excel, name='export_visits_alt'),
     
