@@ -29,6 +29,12 @@ class Farm(models.Model):
         choices=BUSINESS_TYPE_CHOICES, 
         default='General'
     )
+    sub_segment = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True,
+        help_text="Specific operational sub-classification or industry segment."
+    )  # <-- Added Field
     
     # 🐥 Poultry Shed Population Inventory Tracking Metrics
     chicks_count = models.IntegerField(default=0, verbose_name="Chicks Population")
