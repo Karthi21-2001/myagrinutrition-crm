@@ -45,7 +45,8 @@
             <a href="{% url 'export_visits_to_excel' %}" id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-emerald-500 transition duration-150 flex items-center gap-2 shadow-sm">
                 📥 Export Excel Log Sheet
             </a>
-            <a href="{% url 'dashboard_analytics' %}" class="bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
+            <!-- Fixed URL targeting for root dashboard view navigation -->
+            <a href="{% url 'dashboard_home' %}" class="bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
                 ⬅ Back to Summary
             </a>
         </div>
