@@ -82,7 +82,7 @@ def save_farm_visit(request):
         area = request.POST.get('area', '').strip()
         farm_problem = request.POST.get('farm_problem')
         
-        # 🛡️ Clean State Parsing: Fallback to District or Unknown instead of storing literal 'State'
+        # Clean State Parsing
         state = request.POST.get('state', '').strip()
         if not state or state.lower() == 'state':
             state = district if district else 'Unknown State'
@@ -233,12 +233,11 @@ def get_location_details(request):
 
 
 # ==========================================
-# 📥 EXCEL EXPORT ENGINE (SCOPED RESTRUCTURING)
+# 📥 EXCEL EXPORT ENGINE (WITH GPS LINKS & FARM PROBLEMS)
 # ==========================================
 
 @csrf_exempt
 def export_visits_to_excel(request):
-    # 1. Catch dynamic filter state vectors straight from dashboard layout query string parameters
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
     executive_filter = request.GET.get('executive', 'All').strip()
@@ -246,7 +245,6 @@ def export_visits_to_excel(request):
     district_filter = request.GET.get('district', 'All').strip()
     business_type = request.GET.get('business_type', 'All').strip()
 
-    # 2. Build multi-conditional Q objects to mirror pipeline queries seamlessly
     export_filters = Q()
 
     if business_type and business_type != 'All':
@@ -258,7 +256,6 @@ def export_visits_to_excel(request):
     if executive_filter and executive_filter != 'All':
         export_filters &= Q(visit__executive__username__iexact=executive_filter)
 
-    # Apply date ranges parsed down safely inside ISO standard configuration limits
     if start_date_str:
         try:
             export_filters &= Q(visit__visit_date__date__gte=start_date_str)
@@ -270,7 +267,6 @@ def export_visits_to_excel(request):
         except ValueError:
             pass
 
-    # 3. Compile layout architecture via openpyxl components
     wb = openpyxl.Workbook()
     ws_data = wb.active
     ws_data.title = "Field Visit Database Log"
@@ -282,9 +278,11 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
+    # 📌 Added 'Farm Problem Observed' and 'GPS Location Link' cleanly into headers matrix
     headers = [
-        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 'Sector Segment',
-        'State', 'District', 'Area / Suburb', 'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated'
+        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number',
+        'Geospatial Metrics', 'Sector Segment', 'Sub-Segment', 'State', 'District', 
+        'Area / Suburb', 'Farm Problem Observed', 'GPS Location Link', 'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -294,7 +292,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # 4. Stream isolated records into specific worksheet tracking matrices
     all_products = VisitedProductDetail.objects.filter(export_filters).select_related(
         'visit__farm', 'visit__executive'
     ).order_by('-visit__visit_date')
@@ -309,23 +306,43 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
         ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
         ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
-        ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-        ws_data.cell(row=current_row, column=7, value=f.state if f else "")
-        ws_data.cell(row=current_row, column=8, value=f.district if f else "")
-        ws_data.cell(row=current_row, column=9, value=f.area if f else "")
-        ws_data.cell(row=current_row, column=10, value=p.product_name)
-        ws_data.cell(row=current_row, column=11, value=p.sale_quantity)
-        ws_data.cell(row=current_row, column=12, value=float(p.primary_price))
-        ws_data.cell(row=current_row, column=13, value=float(p.revenue_generated))
         
-        for c_idx in range(1, 14):
+        # Geospatial tracking matrix data points
+        ws_data.cell(row=current_row, column=6, value=f"{f.latitude}, {f.longitude}" if f and f.latitude and f.longitude else "No Coordinates")
+        ws_data.cell(row=current_row, column=7, value=f.business_type if f else "")
+        ws_data.cell(row=current_row, column=8, value=getattr(f, 'sub_segment', '')) 
+        
+        ws_data.cell(row=current_row, column=9, value=f.state if f else "")
+        ws_data.cell(row=current_row, column=10, value=f.district if f else "")
+        ws_data.cell(row=current_row, column=11, value=f.area if f else "")
+        
+        # 🔍 FIX: Injected Farm Problem Observed text into Column 12
+        ws_data.cell(row=current_row, column=12, value=v.farm_problem if v and v.farm_problem else "None Noted")
+        
+        # 📍 Hyperlinked GPS map URL generation into Column 13
+        gps_cell = ws_data.cell(row=current_row, column=13)
+        if f and f.latitude and f.longitude:
+            gps_cell.value = "🗺️ View on Map"
+            gps_cell.hyperlink = f"https://www.google.com/maps/search/?api=1&query={f.latitude},{f.longitude}"
+            gps_cell.font = Font(name="Segoe UI", size=10, color="1D4ED8", underline="single", bold=True)
+        else:
+            gps_cell.value = "No Live GPS Data"
+            gps_cell.font = Font(name="Segoe UI", size=10, color="64748B", italic=True)
+            
+        ws_data.cell(row=current_row, column=14, value=p.product_name)
+        ws_data.cell(row=current_row, column=15, value=p.sale_quantity)
+        ws_data.cell(row=current_row, column=16, value=float(p.primary_price))
+        ws_data.cell(row=current_row, column=17, value=float(p.revenue_generated))
+        
+        # Loop over all 17 layout tracking columns to structure thin border lines cleanly
+        for c_idx in range(1, 18):
             ws_data.cell(row=current_row, column=c_idx).border = thin_border
         current_row += 1
 
     for col in ws_data.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 15)
+        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 16)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
@@ -666,32 +683,13 @@ def executive_analytics_view(request):
 @login_required(login_url='/crm/login/')
 def get_dependent_filters(request):
     state = request.GET.get('state', 'All').strip()
-    country = request.GET.get('country', 'All').strip()
-
-    records = FarmVisitReport.objects.all().select_related('farm', 'executive')
-
-    if country != 'All' and country != '' and hasattr(Farm, 'country'):
-        records = records.filter(farm__country__iexact=country)
-    if state != 'All' and state != '':
-        records = records.filter(farm__state__iexact=state)
-
-    available_districts = list(
-        records.exclude(farm__district__isnull=True)
-        .values_list('farm__district', flat=True)
-        .distinct()
-        .order_by('farm__district')
-    )
     
-    available_executives = list(
-        records.exclude(executive__isnull=True)
-        .filter(executive__is_staff=False, executive__is_superuser=False)
-        .values_list('executive__username', flat=True)
-        .distinct()
-        .order_by('executive__username')
-    )
-
-    return JsonResponse({
-        'status': 'success',
-        'districts': available_districts,
-        'executives': available_executives
-    })
+    farm_filters = Q()
+    if state and state != 'All':
+        farm_filters &= Q(state__iexact=state)
+        
+    districts = Farm.objects.filter(farm_filters).exclude(
+        district__isnull=True
+    ).values_list('district', flat=True).distinct().order_by('district')
+    
+    return JsonResponse({'districts': list(districts)})
