@@ -1,5 +1,6 @@
 # crm_core/urls.py
 from django.urls import path, reverse_lazy
+from django.views.generic import TemplateView
 from django.contrib.auth import views as auth_views
 from . import views
 
@@ -12,24 +13,11 @@ urlpatterns = [
     path('login/', views.login_user, name='login_user'),
     path('logout/', views.logout_user, name='logout_user'),
     
-    # --- Password Reset Workflows ---
-    # 1. Page where executive enters email to request a reset link
+    # --- Permanent Password Recovery Admin Router ---
+    # Intercepts the workflow to render a static admin notice screen instead of executing a mail-out reset loop
     path('password-reset/', 
-         auth_views.PasswordResetView.as_view(template_name='crm_core/password_reset.html'), 
+         TemplateView.as_view(template_name='crm_core/password_reset.html'), 
          name='password_reset'),
-         
-    # 2. Success message confirming the email request was processed
-    path('password-reset/done/', 
-         auth_views.PasswordResetDoneView.as_view(template_name='crm_core/password_reset_done.html'), 
-         name='password_reset_done'),
-         
-    # 3. Secure link entry form: Automatically saves new password and redirects to login view
-    path('password-reset-confirm/<uidb64>/<token>/', 
-         auth_views.PasswordResetConfirmView.as_view(
-             template_name='crm_core/password_reset_confirm.html',
-             success_url=reverse_lazy('login_user')
-         ), 
-         name='password_reset_confirm'),
          
     # ==========================================
     # 🌱 CORE AGRI-FORM LAYOUT INTERFACES
