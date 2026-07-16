@@ -27,7 +27,7 @@
         button { width: 100%; background-color: #0284c7; font-weight: bold; padding: 12px; margin-top: 15px; color: white; border: none; cursor: pointer; }
         button:hover { background-color: #0369a1; }
         
-        /* Utility styles for the new links matrix */
+        /* Utility styles for the links matrix */
         .utility-row {
             display: flex;
             align-items: center;
@@ -49,16 +49,21 @@
             margin-bottom: 0;
             cursor: pointer;
         }
+        
+        /* Modified specific styling based on your requirements */
         .utility-row a {
-            color: #0284c7;
+            color: #34d399; /* Emerald 400 */
+            font-size: 0.75rem; /* text-xs */
             text-decoration: none;
             font-weight: bold;
+            transition: color 0.15s ease-in-out;
         }
         .utility-row a:hover {
+            color: #6ee7b7; /* Emerald 300 */
             text-decoration: underline;
         }
 
-        .footer-link { text-align: center; margin-top: 20px; font-size: 0.9rem; color: #64748b; border-t: 1px solid #e2e8f0; padding-top: 15px; }
+        .footer-link { text-align: center; margin-top: 20px; font-size: 0.9rem; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px; }
         .footer-link a { color: #0284c7; text-decoration: none; font-weight: bold; }
         .footer-link a:hover { text-decoration: underline; }
     </style>
