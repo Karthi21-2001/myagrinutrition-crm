@@ -202,95 +202,104 @@ def save_farm_visit(request):
 
 
 # ==========================================
-# 📥 EXCEL REPORTING ENGINE EXPORT
+# 📥 EXCEL EXPORT ENGINE
 # ==========================================
 
-@login_required(login_url='/crm/login/')
+@csrf_exempt
 def export_visits_to_excel(request):
+    start_date_str = request.GET.get('start_date', '').strip()
+    end_date_str = request.GET.get('end_date', '').strip()
+    executive_filter = request.GET.get('executive', 'All').strip()
+    state_filter = request.GET.get('state', 'All').strip()
+    district_filter = request.GET.get('district', 'All').strip()
+    business_type = request.GET.get('business_type', 'All').strip()
+    sub_segment_filter = request.GET.get('sub_segment', 'All').strip()
+
+    export_filters = Q()
+
+    if business_type and business_type != 'All':
+        export_filters &= Q(visit__farm__business_type__iexact=business_type)
+    if sub_segment_filter and sub_segment_filter != 'All':
+        export_filters &= Q(visit__farm__sub_segment__iexact=sub_segment_filter)
+    if state_filter and state_filter != 'All':
+        export_filters &= Q(visit__farm__state__iexact=state_filter)
+    if district_filter and district_filter != 'All':
+        export_filters &= Q(visit__farm__district__iexact=district_filter)
+    if executive_filter and executive_filter != 'All':
+        export_filters &= Q(visit__executive__username__iexact=executive_filter)
+
+    if start_date_str:
+        try:
+            export_filters &= Q(visit__visit_date__date__gte=start_date_str)
+        except ValueError:
+            pass
+    if end_date_str:
+        try:
+            export_filters &= Q(visit__visit_date__date__lte=end_date_str)
+        except ValueError:
+            pass
+
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Field Visit Logs"
-    ws.views.sheetView[0].showGridLines = True
-    
-    navy_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
-    font_header = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-    font_body = Font(name="Segoe UI", size=10, color="000000")
+    ws_data = wb.active
+    ws_data.title = "Field Visit Database Log"
+    ws_data.views.sheetView[0].showGridLines = True
+
+    dark_slate, border_color = "0F172A", "CBD5E1"
     thin_border = Border(
-        left=Side(style='thin', color='CBD5E1'), right=Side(style='thin', color='CBD5E1'),
-        top=Side(style='thin', color='CBD5E1'), bottom=Side(style='thin', color='CBD5E1')
+        left=Side(style='thin', color=border_color), right=Side(style='thin', color=border_color),
+        top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
-    
+
     headers = [
-        "Visit ID", "Date", "Executive", "Farm Name", "Owner Name", 
-        "Contact", "Sector", "District", "Area", "Problem Statement",
-        "Product Tracked", "Sale Qty", "Unit", "Rate (Price)", 
-        "Revenue Generated", "Pipeline Status", "Conv %"
+        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
+        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
+        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated'
     ]
-    
-    for col_num, header_title in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num)
-        cell.value = header_title
-        cell.font = font_header
-        cell.fill = navy_fill
+
+    for col_idx, text in enumerate(headers, 1):
+        cell = ws_data.cell(row=1, column=col_idx, value=text)
+        cell.font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color=dark_slate, end_color=dark_slate, fill_type="solid")
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cell.border = thin_border
-    
-    visit_details = VisitedProductDetail.objects.select_related(
-        'visit', 'visit__farm', 'visit__executive'
+    ws_data.row_dimensions[1].height = 28
+
+    all_products = VisitedProductDetail.objects.filter(export_filters).select_related(
+        'visit__farm', 'visit__executive'
     ).order_by('-visit__visit_date')
     
-    row_index = 2
-    for detail in visit_details:
-        v_report = detail.visit
-        farm = v_report.farm
+    current_row = 2
+    for p in all_products:
+        v = p.visit
+        f = v.farm if v else None
         
-        row_data = [
-            v_report.id,
-            v_report.visit_date.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visit_date') and v_report.visit_date else 'N/A',
-            v_report.executive.get_full_name() if v_report.executive and v_report.executive.get_full_name() else (v_report.executive.username if v_report.executive else 'System'),
-            farm.farm_name,
-            farm.owner_name,
-            farm.contact_number,
-            f"{farm.business_type} ({farm.sub_segment})",
-            farm.district,
-            farm.area,
-            v_report.farm_problem,
-            detail.product_name,
-            detail.sale_quantity,
-            detail.unit_type,
-            detail.primary_price,
-            detail.revenue_generated,
-            detail.process_status,
-            f"{detail.conversion_percentage}%"
-        ]
+        ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
+        ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
+        ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
+        ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
+        ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
+        ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
+        ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and f.sub_segment else "") 
+        ws_data.cell(row=current_row, column=8, value=f.state if f else "")
+        ws_data.cell(row=current_row, column=9, value=f.district if f else "")
+        ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+        ws_data.cell(row=current_row, column=11, value=p.product_name)
+        ws_data.cell(row=current_row, column=12, value=p.sale_quantity)
+        ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
+        ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
         
-        for col_index, value in enumerate(row_data, 1):
-            cell = ws.cell(row=row_index, column=col_index)
-            cell.value = value
-            cell.font = font_body
-            cell.border = thin_border
-            if col_index in [1, 2, 6, 13, 16, 17]:
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif col_index in [12, 14, 15]:
-                cell.alignment = Alignment(horizontal="right", vertical="center")
-                if col_index in [14, 15]:
-                    cell.number_format = '"$ "#,##0.00'
-            else:
-                cell.alignment = Alignment(horizontal="left", vertical="center")
-        row_index += 1
+        for c_idx in range(1, 15):
+            ws_data.cell(row=current_row, column=c_idx).border = thin_border
+        current_row += 1
 
-    for col in ws.columns:
+    for col in ws_data.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
-        
-    ws.row_dimensions[1].height = 28
+        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 15)
 
-    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = 'attachment; filename="AgriNutrition_Field_Visits.xlsx"'
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
-
 
 # ==========================================
 # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
