@@ -433,6 +433,7 @@ def executive_analytics_view(request):
 def get_location_details(request):
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
+    # ❌ Hardcoded dummy strings:
     return JsonResponse({'status': 'success', 'state': 'Detected State', 'district': 'Detected District'})
 
 
