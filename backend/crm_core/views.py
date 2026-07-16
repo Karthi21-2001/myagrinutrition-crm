@@ -96,7 +96,7 @@ def save_farm_visit(request):
 
         try:
             with transaction.atomic():
-                # Removed 'sub_segment' from defaults as it doesn't exist in the database model
+                # Re-enabled 'sub_segment' natively into defaults since it exists in the model
                 farm_instance, created = Farm.objects.get_or_create(
                     farm_name=farm_name,
                     owner_name=owner_name,
@@ -104,6 +104,7 @@ def save_farm_visit(request):
                         'executive': current_user,
                         'contact_number': contact_number,
                         'business_type': business_type,
+                        'sub_segment': sub_segment,
                         'state': state,
                         'district': district,
                         'area': area,
@@ -115,8 +116,7 @@ def save_farm_visit(request):
                 if not created:
                     if business_type:
                         farm_instance.business_type = business_type
-                    # Guarded assignment to avoid crash if the attribute doesn't exist
-                    if sub_segment and hasattr(farm_instance, 'sub_segment'):
+                    if sub_segment:
                         farm_instance.sub_segment = sub_segment 
                     farm_instance.state = state
                     farm_instance.district = district
@@ -256,8 +256,7 @@ def export_visits_to_excel(request):
     if business_type and business_type != 'All':
         export_filters &= Q(visit__farm__business_type__iexact=business_type)
     if sub_segment_filter and sub_segment_filter != 'All':
-        # Safely fallback to business_type filter since sub_segment field is missing
-        export_filters &= Q(visit__farm__business_type__iexact=sub_segment_filter)
+        export_filters &= Q(visit__farm__sub_segment__iexact=sub_segment_filter)
     if state_filter and state_filter != 'All':
         export_filters &= Q(visit__farm__state__iexact=state_filter)
     if district_filter and district_filter != 'All':
@@ -315,7 +314,7 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
         ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
         ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-        ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and hasattr(f, 'sub_segment') else "") 
+        ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and f.sub_segment else "") 
         ws_data.cell(row=current_row, column=8, value=f.state if f else "")
         ws_data.cell(row=current_row, column=9, value=f.district if f else "")
         ws_data.cell(row=current_row, column=10, value=f.area if f else "")
@@ -367,10 +366,9 @@ def dashboard_home(request):
         action_filters &= Q(visit__farm__business_type__iexact=business_type)
 
     if sub_segment and sub_segment != 'All':
-        # Fallback to business_type query filtering since sub_segment database field doesn't exist
-        farm_filters &= Q(business_type__iexact=sub_segment)
-        visit_filters &= Q(farm__business_type__iexact=sub_segment)
-        action_filters &= Q(visit__farm__business_type__iexact=sub_segment)
+        farm_filters &= Q(sub_segment__iexact=sub_segment)
+        visit_filters &= Q(farm__sub_segment__iexact=sub_segment)
+        action_filters &= Q(visit__farm__sub_segment__iexact=sub_segment)
 
     if country and country != 'All' and hasattr(Farm, 'country'):
         farm_filters &= Q(country__iexact=country)
@@ -391,16 +389,14 @@ def dashboard_home(request):
         visit_filters &= Q(visit_date__month=month)
         action_filters &= Q(visit__visit_date__month=month)
     if year and year != 'All':
-        farm_filters &= Q(visit_date__year=year)
+        farm_filters &= Q(created_at__year=year)
         visit_filters &= Q(visit_date__year=year)
         action_filters &= Q(visit__visit_date__year=year)
 
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct().order_by('state')
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct().order_by('country') if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct().order_by('district')
-    
-    # Fallback list builder using business_type instead of the non-existent sub_segment field
-    sub_segment_list = Farm.objects.exclude(business_type__isnull=True).values_list('business_type', flat=True).distinct().order_by('business_type')
+    sub_segment_list = Farm.objects.exclude(sub_segment__isnull=True).exclude(sub_segment='').values_list('sub_segment', flat=True).distinct().order_by('sub_segment')
     executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct().order_by('username')
 
     total_farms = Farm.objects.filter(farm_filters).count()
@@ -486,10 +482,9 @@ def dashboard_analytics(request):
         products_queryset = products_queryset.filter(visit__farm__business_type__iexact=business_type)
 
     if sub_segment and sub_segment != 'All':
-        # Fallback to business_type query filtering since sub_segment database field doesn't exist
-        farms_queryset = farms_queryset.filter(business_type__iexact=sub_segment)
-        reports_queryset = reports_queryset.filter(farm__business_type__iexact=sub_segment)
-        products_queryset = products_queryset.filter(visit__farm__business_type__iexact=sub_segment)
+        farms_queryset = farms_queryset.filter(sub_segment__iexact=sub_segment)
+        reports_queryset = reports_queryset.filter(farm__sub_segment__iexact=sub_segment)
+        products_queryset = products_queryset.filter(visit__farm__sub_segment__iexact=sub_segment)
 
     if state_query and state_query != 'All':
         farms_queryset = farms_queryset.filter(state__iexact=state_query)
@@ -515,7 +510,7 @@ def dashboard_analytics(request):
         products_queryset = products_queryset.filter(visit__visit_date__month=month_query)
 
     if year_query and year_query != 'All':
-        farms_queryset = farms_queryset.filter(visit_date__year=year_query)
+        farms_queryset = farms_queryset.filter(created_at__year=year_query)
         reports_queryset = reports_queryset.filter(visit_date__year=year_query)
         products_queryset = products_queryset.filter(visit__visit_date__year=year_query)
 
@@ -561,9 +556,7 @@ def dashboard_analytics(request):
     state_list = Farm.objects.exclude(state__isnull=True).values_list('state', flat=True).distinct()
     country_list = Farm.objects.exclude(country__isnull=True).values_list('country', flat=True).distinct() if hasattr(Farm, 'country') else []
     district_list = Farm.objects.exclude(district__isnull=True).values_list('district', flat=True).distinct()
-    
-    # CRASH FIX: Replaced non-existent sub_segment lookup with business_type list builder fallback
-    sub_segment_list = Farm.objects.exclude(business_type__isnull=True).values_list('business_type', flat=True).distinct()
+    sub_segment_list = Farm.objects.exclude(sub_segment__isnull=True).exclude(sub_segment='').values_list('sub_segment', flat=True).distinct()
     executive_list = User.objects.filter(is_active=True).exclude(is_staff=True).exclude(is_superuser=True).values_list('username', flat=True).distinct()
 
     context = {
@@ -623,9 +616,8 @@ def executive_analytics_view(request):
         products_qs = products_qs.filter(visit__farm__business_type__iexact=business_type)
 
     if sub_segment != 'All' and sub_segment != '':
-        # Fallback to business_type query filtering since sub_segment database field doesn't exist
-        reports_qs = reports_qs.filter(farm__business_type__iexact=sub_segment)
-        products_qs = products_qs.filter(visit__farm__business_type__iexact=sub_segment)
+        reports_qs = reports_qs.filter(farm__sub_segment__iexact=sub_segment)
+        products_qs = products_qs.filter(visit__farm__sub_segment__iexact=sub_segment)
 
     if state_f != 'All' and state_f != '':
         reports_qs = reports_qs.filter(farm__state__iexact=state_f)
@@ -666,24 +658,56 @@ def executive_analytics_view(request):
     ).order_by('year')
     year_labels = [item['year'].strftime('%Y') if item['year'] else 'N/A' for item in yearly_sales]
     year_data = [float(item['revenue'] or 0) for item in yearly_sales]
+    
+    # Simple context configuration for analytics view rendering
+    context = {
+        'user_labels_js': json.dumps(user_labels),
+        'user_counts_js': json.dumps(user_counts),
+        'zone_labels_js': json.dumps(zone_labels),
+        'zone_data_js': json.dumps(zone_data),
+        'year_labels_js': json.dumps(year_labels),
+        'year_data_js': json.dumps(year_data),
+    }
+    return render(request, 'crm_core/analytics.html', context)
 
-    monthly_sales_qs = products_qs.filter(sale_quantity__gt=0).annotate(month=TruncMonth('visit__visit_date')).values('month').annotate(
-        revenue=Sum(F('sale_quantity') * F('primary_price'), output_field=DecimalField())
-    ).order_by('month')
-    month_labels = [item['month'].strftime('%b %Y') if item['month'] else 'N/A' for item in monthly_sales_qs]
-    month_data = [float(item['revenue'] or 0) for item in monthly_sales_qs]
 
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({
-            'user_labels': user_labels,
-            'user_counts': user_counts,
-            'zone_labels': zone_labels,
-            'zone_data': zone_data,
-            'year_labels': year_labels,
-            'year_data': year_data,
-            'month_labels': month_labels,
-            'month_data': month_data,
-        })
+# ==========================================
+# 📡 DYNAMIC DEPENDENT FILTERS ENDPOINT
+# ==========================================
 
-    # Optional rendering fallback if you ever request this normally
-    return JsonResponse({'status': 'Operational'})
+@login_required(login_url='/crm/login/')
+def get_dependent_filters(request):
+    """
+    Returns dependent filter options (districts, sub-segments) based on 
+    the selected state and business type to keep dashboard interfaces dynamic.
+    """
+    state_param = request.GET.get('state', '').strip()
+    business_type_param = request.GET.get('business_type', '').strip()
+
+    farms_qs = Farm.objects.all()
+
+    if state_param and state_param != 'All':
+        farms_qs = farms_qs.filter(state__iexact=state_param)
+    if business_type_param and business_type_param != 'All':
+        farms_qs = farms_qs.filter(business_type__iexact=business_type_param)
+
+    districts = list(
+        farms_qs.exclude(district__isnull=True)
+        .exclude(district='')
+        .values_list('district', flat=True)
+        .distinct()
+        .order_by('district')
+    )
+    
+    sub_segments = list(
+        farms_qs.exclude(sub_segment__isnull=True)
+        .exclude(sub_segment='')
+        .values_list('sub_segment', flat=True)
+        .distinct()
+        .order_by('sub_segment')
+    )
+
+    return JsonResponse({
+        'districts': districts,
+        'sub_segments': sub_segments
+    })
