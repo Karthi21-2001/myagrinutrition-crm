@@ -181,9 +181,9 @@ def save_farm_visit(request):
                         potential_quantity=p_qty,
                         target_quantity=t_qty,
                         sale_quantity=0,
-                        unit_type=p_unit,
                         primary_price=0.00,
                         revenue_generated=0.00,
+                        unit_type=p_unit,
                         process_status=status,
                         conversion_percentage=conv_pct
                     )
@@ -247,7 +247,7 @@ def export_visits_to_excel(request):
         row_data = [
             v_report.id,
             v_report.visited_at.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visited_at') and v_report.visited_at else 'N/A',
-            v_report.executive.get_full_name() if v_report.executive else 'System',
+            v_report.executive.get_full_name() if v_report.executive and v_report.executive.get_full_name() else (v_report.executive.username if v_report.executive else 'System'),
             farm.farm_name,
             farm.owner_name,
             farm.contact_number,
@@ -298,24 +298,109 @@ def export_visits_to_excel(request):
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Renders the central platform navigation workspace."""
     return render(request, 'crm_core/dashboard_home.html')
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    """Processes pipeline data metrics for managers."""
+    """Processes pipeline data metrics dynamically with global lookups for templates."""
+    # Get request parameters for live filtering
+    sel_state = request.GET.get('state', '')
+    sel_country = request.GET.get('country', '')
+    sel_district = request.GET.get('district', '')
+    sel_executive = request.GET.get('executive', '')
+    sel_month = request.GET.get('month', '')
+    sel_year = request.GET.get('year', '')
+
+    # Setup base filters for dynamic evaluation
+    farm_filters = Q()
+    visit_filters = Q()
+    product_filters = Q()
+
+    if sel_state:
+        farm_filters &= Q(state=sel_state)
+        visit_filters &= Q(farm__state=sel_state)
+        product_filters &= Q(visit__farm__state=sel_state)
+    if sel_district:
+        farm_filters &= Q(district=sel_district)
+        visit_filters &= Q(farm__district=sel_district)
+        product_filters &= Q(visit__farm__district=sel_district)
+    if sel_executive:
+        farm_filters &= Q(executive__username=sel_executive)
+        visit_filters &= Q(executive__username=sel_executive)
+        product_filters &= Q(visit__executive__username=sel_executive)
+    if sel_month:
+        visit_filters &= Q(visited_at__month=sel_month)
+        product_filters &= Q(visit__visited_at__month=sel_month)
+    if sel_year:
+        visit_filters &= Q(visited_at__year=sel_year)
+        product_filters &= Q(visit__visited_at__year=sel_year)
+
+    # Core Metric Computations
+    total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
+    vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
+    v_count = FarmVisitReport.objects.filter(visit_filters).count()
+    
+    # Calculate unique conversion rate
+    hot_leads = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
+    total_leads = VisitedProductDetail.objects.filter(product_filters).count()
+    conv_rate = round((hot_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
+
+    # Top District Visual Data Extraction
+    district_data = Farm.objects.filter(farm_filters).values('district').annotate(count=Count('id')).order_by('-count')[:5]
+    chart_labels = [d['district'] if d['district'] else 'Unknown' for d in district_data]
+    chart_counts = [d['count'] for d in district_data]
+
+    # Structured Performance Matrix Grouping
+    monthly_sales = (
+        VisitedProductDetail.objects.filter(product_filters)
+        .annotate(month=TruncMonth('visit__visited_at'))
+        .values(
+            'month', 
+            'visit__executive__username', 
+            'visit__farm__state', 
+            'visit__farm__district', 
+            'visit__farm__area'
+        )
+        .annotate(
+            total_qty=Sum('sale_quantity'), 
+            total_revenue=Sum('revenue_generated')
+        )
+        .order_by('-month', '-total_revenue')
+    )
+
     context = {
-        'total_revenue': VisitedProductDetail.objects.aggregate(total=Sum('revenue_generated'))['total'] or 0,
-        'total_visits': FarmVisitReport.objects.count(),
-        'active_farms': Farm.objects.count(),
+        'total_revenue': total_rev,
+        'total_visits': v_count,
+        'total_farms': Farm.objects.filter(farm_filters).count(),
+        'total_sales_volume': vol_sold,
+        'conversion_rate': conv_rate,
+        'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('products').order_by('-visited_at')[:10],
+        'monthly_sales': monthly_sales,
+        
+        # Filter Lists
+        'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
+        'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
+        'executive_list': User.objects.filter(farmvisitreport__isnull=False).values_list('username', flat=True).distinct(),
+        'country_list': ['India'], # Default context fallback
+        
+        # Safe JSON strings for ChartJS tracking injection
+        'chart_labels_js': json.dumps(chart_labels if chart_labels else ["No Data Available"]),
+        'chart_counts_js': json.dumps(chart_counts if chart_counts else [0]),
+        
+        # Active Selected Filters State Conservation
+        'selected_state': sel_state,
+        'selected_country': sel_country,
+        'selected_district': sel_district,
+        'selected_executive': sel_executive,
+        'selected_month': sel_month,
+        'selected_year': sel_year,
     }
     return render(request, 'crm_core/dashboard_analytics.html', context)
 
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    """Renders performance breakdowns for individual ground agents."""
     return render(request, 'crm_core/executive_analytics.html')
 
 
@@ -324,12 +409,16 @@ def executive_analytics_view(request):
 # ==========================================
 
 def get_location_details(request):
-    """API endpoint to parse live tracking coordinates."""
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
+    # Mock fallback payload; hook up to real reverse geocoding endpoints here if needed
     return JsonResponse({'status': 'success', 'state': 'Detected State', 'district': 'Detected District'})
 
 
 def get_dependent_filters(request):
-    """API endpoint running background context lookups on dropdown fields."""
+    """Dynamic cascade endpoint filtering districts by chosen state choice."""
+    state_query = request.GET.get('state', '')
+    if state_query:
+        districts = list(Farm.objects.filter(state=state_query).values_list('district', flat=True).distinct().exclude(district=''))
+        return JsonResponse({'districts': districts})
     return JsonResponse({'sub_segments': ['Layer', 'Broiler', 'Shrimp', 'Fish']})
