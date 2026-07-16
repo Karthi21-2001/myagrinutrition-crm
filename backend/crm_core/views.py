@@ -394,7 +394,9 @@ def get_dashboard_context(request):
         
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
-        'executive_list': User.objects.filter(filed_visit_reports__isnull=False).values_list('username', flat=True).distinct(),
+        
+        # 🟢 UPDATED: Fetches all registered active executives regardless of whether they have logged a visit yet.
+        'executive_list': User.objects.filter(is_active=True).values_list('username', flat=True).distinct(),
         'country_list': ['India'],
         
         'chart_labels_js': json.dumps(chart_labels if chart_labels else ["No Data Available"]),
