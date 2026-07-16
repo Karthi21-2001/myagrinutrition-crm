@@ -274,7 +274,7 @@ def export_visits_to_excel(request):
             elif col_index in [12, 14, 15]:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 if col_index in [14, 15]:
-                    cell.number_format = '"¾"#,##0.00'
+                    cell.number_format = '"$ "#,##0.00'
             else:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
         row_index += 1
@@ -298,7 +298,8 @@ def export_visits_to_excel(request):
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    return render(request, 'crm_core/dashboard_home.html')
+    # FIX: Run the logic inside dashboard_analytics instead of rendering a missing file
+    return dashboard_analytics(request)
 
 
 @login_required(login_url='/crm/login/')
@@ -389,7 +390,6 @@ def dashboard_analytics(request):
         'selected_year': sel_year,
     }
     
-    # Fix: Point to the actual file name shown in your repository
     return render(request, 'crm_core/analytics_report.html', context)
 
 
