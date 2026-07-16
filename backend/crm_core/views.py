@@ -235,7 +235,7 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
     
-    # FIX: Updated order_by path from '-visit__visited_at' to '-visit__visit_date'
+    # FIX: Updated tracking query from '-visit__visited_at' to '-visit__visit_date'
     visit_details = VisitedProductDetail.objects.select_related(
         'visit', 'visit__farm', 'visit__executive'
     ).order_by('-visit__visit_date')
@@ -245,7 +245,7 @@ def export_visits_to_excel(request):
         v_report = detail.visit
         farm = v_report.farm
         
-        # FIX: Updated check from 'visited_at' to 'visit_date'
+        # FIX: Changed field validation to use 'visit_date'
         row_data = [
             v_report.id,
             v_report.visit_date.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visit_date') and v_report.visit_date else 'N/A',
@@ -330,7 +330,7 @@ def dashboard_analytics(request):
         visit_filters &= Q(executive__username=sel_executive)
         product_filters &= Q(visit__executive__username=sel_executive)
         
-    # FIX: Updated date parsing hooks from 'visited_at' to 'visit_date'
+    # FIX: Updated date parameter lookups from 'visited_at' to 'visit_date'
     if sel_month:
         visit_filters &= Q(visit_date__month=sel_month)
         product_filters &= Q(visit__visit_date__month=sel_month)
@@ -350,7 +350,7 @@ def dashboard_analytics(request):
     chart_labels = [d['district'] if d['district'] else 'Unknown' for d in district_data]
     chart_counts = [d['count'] for d in district_data]
 
-    # FIX: Updated month truncation hook from 'visit__visited_at' to 'visit__visit_date'
+    # FIX: Switched month truncation expression target to 'visit__visit_date'
     monthly_sales = (
         VisitedProductDetail.objects.filter(product_filters)
         .annotate(month=TruncMonth('visit__visit_date'))
@@ -368,7 +368,8 @@ def dashboard_analytics(request):
         .order_by('-month', '-total_revenue')
     )
 
-    # FIX: Updated recent visits list sort ordering constraint from '-visited_at' to '-visit_date'
+    # FIX 1 (First Error Fix): Order by '-visit_date' instead of '-visited_at'
+    # FIX 2 (Second Error Fix): Switched user lookup to 'filed_visit_reports__isnull'
     context = {
         'total_revenue': total_rev,
         'total_visits': v_count,
@@ -380,7 +381,7 @@ def dashboard_analytics(request):
         
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
-        'executive_list': User.objects.filter(farmvisitreport__isnull=False).values_list('username', flat=True).distinct(),
+        'executive_list': User.objects.filter(filed_visit_reports__isnull=False).values_list('username', flat=True).distinct(),
         'country_list': ['India'],
         
         'chart_labels_js': json.dumps(chart_labels if chart_labels else ["No Data Available"]),
