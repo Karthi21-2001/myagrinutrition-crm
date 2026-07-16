@@ -192,7 +192,6 @@ def save_farm_visit(request):
             if request.user.is_staff or request.user.is_superuser:
                 return redirect('dashboard_analytics')
             
-            # FIXED: Renders page back with saved context data instead of triggering an empty redirect
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
         except Exception as e:
@@ -200,5 +199,121 @@ def save_farm_visit(request):
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
     return redirect('render_visit_form')
+
+
+# ==========================================
+# 📊 EXCEL REPORTING ENGINE EXPORT
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+def export_visits_to_excel(request):
+    """
+    Generates a professionally styled spreadsheet report of field layout operations.
+    """
+    # Create workbook and setup sheet
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Field Visit Logs"
+    
+    # Grid lines visualization activation
+    ws.views.sheetView[0].showGridLines = True
+    
+    # Defining color identity system definitions
+    navy_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+    accent_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+    
+    font_header = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+    font_body = Font(name="Segoe UI", size=10, color="000000")
+    
+    thin_border = Border(
+        left=Side(style='thin', color='CBD5E1'),
+        right=Side(style='thin', color='CBD5E1'),
+        top=Side(style='thin', color='CBD5E1'),
+        bottom=Side(style='thin', color='CBD5E1')
+    )
+    
+    headers = [
+        "Visit ID", "Date", "Executive", "Farm Name", "Owner Name", 
+        "Contact", "Sector", "District", "Area", "Problem Statement",
+        "Product Tracked", "Sale Qty", "Unit", "Rate (Price)", 
+        "Revenue Generated", "Pipeline Status", "Conv %"
+    ]
+    
+    # Write structural database header items
+    for col_num, header_title in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.value = header_title
+        cell.font = font_header
+        cell.fill = navy_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = thin_border
+    
+    # Query performance optimization paths
+    visit_details = VisitedProductDetail.objects.select_related(
+        'visit', 'visit__farm', 'visit__executive'
+    ).order_by('-visit__visited_at')
+    
+    row_index = 2
+    for detail in visit_details:
+        v_report = detail.visit
+        farm = v_report.farm
+        
+        row_data = [
+            v_report.id,
+            v_report.visited_at.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visited_at') and v_report.visited_at else 'N/A',
+            v_report.executive.get_full_name() if v_report.executive else 'System',
+            farm.farm_name,
+            farm.owner_name,
+            farm.contact_number,
+            f"{farm.business_type} ({farm.sub_segment})",
+            farm.district,
+            farm.area,
+            v_report.farm_problem,
+            detail.product_name,
+            detail.sale_quantity,
+            detail.unit_type,
+            detail.primary_price,
+            detail.revenue_generated,
+            detail.process_status,
+            f"{detail.conversion_percentage}%"
+        ]
+        
+        for col_index, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_index, column=col_index)
+            cell.value = value
+            cell.font = font_body
+            cell.border = thin_border
+            
+            # Alignments handling
+            if col_index in [1, 2, 6, 13, 16, 17]: # Identifiers, metrics, statuses
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            elif col_index in [12, 14, 15]: # Financial currencies & numbers
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if col_index in [14, 15]:
+                    cell.number_format = '"₹"#,##0.00'
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+        
+        row_index += 1
+
+    # Apply auto-fit layout scaling configurations
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+        
+    ws.row_dimensions[1].height = 28
+
+    # Wrap up and write response output parameters
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="AgriNutrition_Field_Visits.xlsx"'
+    wb.save(response)
+    
+    return response
 
 # [Rest of the dashboard and analytic views code remains exactly as provided...]
