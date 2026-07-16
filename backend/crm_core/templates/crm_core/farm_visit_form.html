@@ -410,6 +410,14 @@
                     </select>
                 </div>
 
+                <!-- 🆕 Dynamic Sub-Sector Dropdown -->
+                <div class="form-group-spacing">
+                    <label>Sub-Sector Segment</label>
+                    <select name="sub_business_type" id="sub_business_type_select">
+                        <!-- Options generated dynamically via JS -->
+                    </select>
+                </div>
+
                 <div>
                     <label>Farm Problem Observed</label>
                     <textarea name="farm_problem" required rows="4" placeholder="Describe clinical symptoms, pest counts, dynamic weather stressors, or crop development indicators..."></textarea>
@@ -558,14 +566,47 @@
     <script>
     let map, marker;
 
-    // 🔄 Sector Switching Logic
+    // 🔄 Sector & Sub-Sector Switching Logic
     document.addEventListener('DOMContentLoaded', function() {
         const sectorSelect = document.getElementById('business_type_select');
+        const subSectorSelect = document.getElementById('sub_business_type_select');
         const poultrySection = document.getElementById('poultry-section');
         const aquaSection = document.getElementById('aqua-section');
 
+        // Configuration mapping for Sub-Sectors
+        const subSectorMap = {
+            Poultry: [
+                { value: 'Broiler', text: '🐤 Broiler' },
+                { value: 'Hatcheries', text: '🥚 Hatcheries' },
+                { value: 'Feedmill', text: '🏭 Feedmill' },
+                { value: 'Layer', text: '🐔 Layer' }
+            ],
+            Aqua: [
+                { value: 'Shrimp', text: '🦐 Shrimp' },
+                { value: 'Fish', text: '🐟 Fish' },
+                { value: 'Feedmill', text: '🏭 Feedmill' },
+                { value: 'Hatcheries', text: '🧬 Hatcheries' }
+            ]
+        };
+
         function dynamicSectorToggle() {
-            if (sectorSelect.value === 'Aqua') {
+            const selectedSector = sectorSelect.value;
+            
+            // Clear prior sub-sector selections
+            subSectorSelect.innerHTML = '';
+            
+            // Build out new configurations safely
+            if (subSectorMap[selectedSector]) {
+                subSectorMap[selectedSector].forEach(optionData => {
+                    const opt = document.createElement('option');
+                    opt.value = optionData.value;
+                    opt.textContent = optionData.text;
+                    subSectorSelect.appendChild(opt);
+                });
+            }
+
+            // Panel view states handling
+            if (selectedSector === 'Aqua') {
                 poultrySection.style.display = 'none';
                 aquaSection.style.display = 'block';
                 toggleInputs(poultrySection, true);
