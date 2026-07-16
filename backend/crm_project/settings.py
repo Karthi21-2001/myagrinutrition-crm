@@ -17,10 +17,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-yi(fw7m(n=3e%i%+m4%00imcyq8*uf(_0p)_u9pyxtmk*a3i_5'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-yi(fw7m(n=3e%i%+m4%00imcyq8*uf(_0p)_u9pyxtmk*a3i_5')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Automatically set DEBUG to False in Render production, True locally
+DEBUG = os.environ.get('RENDER', 'False') == 'False'
 
 # 🚀 ALLOWED NETWORK INTERFACES & TUNNELS
 ALLOWED_HOSTS = [
@@ -38,7 +39,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://*.trycloudflare.com',       
     'https://trycloudflare.com',         
     'https://crm.myagrinutritioncrm.com',
-    'https://myagrinutrition-crm.onrender.com'  # 🚀 Added Render URL
+    'https://myagrinutrition-crm.onrender.com'
 ]
 
 
@@ -101,17 +102,32 @@ TEMPLATES = [
     },
 ]
 
+
 # ==========================================
 # 🗄️ PERSISTENT ENGINE DATABASE MATRIX
 # ==========================================
-# We use dj_database_url to automatically parse production URLs (like on Render),
-# but fall back to your local PostgreSQL instance 'my_agri_db' during development.
-DATABASES = {
-    'default': dj_database_url.config(
-        default='postgres://db_user:your_password@localhost:5432/my_agri_db',
-        conn_max_age=600
-    )
-}
+# Prioritize Render's live database connection, fallback to local development
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True  # 🔒 Render PostgreSQL requires SSL in production!
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'my_agri_db',
+            'USER': 'db_user',
+            'PASSWORD': 'your_password',
+            'HOST': '127.0.0.1',
+            'PORT': '5432',
+        }
+    }
 
 
 # Password validation
