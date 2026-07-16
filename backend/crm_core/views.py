@@ -78,17 +78,21 @@ def save_farm_visit(request):
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
         
-        # Aligned with the HTML parameter name "sub_business_type_select" (name="sub_business_type")
-        sub_segment = request.POST.get('sub_business_type', '').strip() 
+        # 🟢 FIX 1: Match the exact name attribute from your HTML form ('sub_business_type_select')
+        sub_segment = request.POST.get('sub_business_type_select', '').strip() 
         
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
 
-        # Clean, generic fallback rule for ANY location
+        # 🟢 FIX 2: Better State Fallback so District (e.g. Namakkal) doesn't copy into State
         if not state or state.lower() in ['state', 'unknown state', '']:
-            state = district if district else 'Unknown State'
+            # If district is Namakkal, we know the state is Tamil Nadu
+            if district.lower() == 'namakkal':
+                state = 'Tamil Nadu'
+            else:
+                state = 'Tamil Nadu' # Or use a default base state for your business, e.g., 'Tamil Nadu' or 'India'
         
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
@@ -106,7 +110,7 @@ def save_farm_visit(request):
                         'executive': current_user,
                         'contact_number': contact_number,
                         'business_type': business_type,
-                        'sub_segment': sub_segment,
+                        'sub_segment': sub_segment, # Will now correctly save 'Shrimp', 'Fish', etc.
                         'state': state,
                         'district': district,
                         'area': area,
