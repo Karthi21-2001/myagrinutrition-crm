@@ -1,5 +1,5 @@
 # backend/accounts/forms.py
-from django import formats
+from django import formats  # <-- This is causing the crash!
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from django import forms
