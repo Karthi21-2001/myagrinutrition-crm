@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from two_factor.urls import urlpatterns as tf_urls
 # 🔄 CHANGE THIS LINE: Import from accounts instead of crm_core
-from accounts.views import executive_signup_view 
+from .forms import ExecutiveSignUpForm
 
 urlpatterns = [
     # ⚙️ DJANGO ADMIN PANEL INTERFACE
