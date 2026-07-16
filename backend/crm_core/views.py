@@ -400,7 +400,9 @@ def dashboard_analytics(request):
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    return render(request, 'crm_core/executive_analytics.html')
+    """Fixed route configuration pointing to the correct analytics template configuration"""
+    context = get_dashboard_context(request)
+    return render(request, 'crm_core/analytics_report.html', context)
 
 
 # ==========================================
