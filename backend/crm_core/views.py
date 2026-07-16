@@ -22,116 +22,43 @@ from .forms import ExecutiveSignUpForm
 User = get_user_model()
 
 # ==========================================
-# 📥 EXCEL EXPORT ENGINE
+# 🔐 EXECUTIVE AUTHENTICATION CONTROLLERS
 # ==========================================
 
-@csrf_exempt
-def export_visits_to_excel(request):
-    start_date_str = request.GET.get('start_date', '').strip()
-    end_date_str = request.GET.get('end_date', '').strip()
-    executive_filter = request.GET.get('executive', 'All').strip()
-    state_filter = request.GET.get('state', 'All').strip()
-    district_filter = request.GET.get('district', 'All').strip()
-    business_type = request.GET.get('business_type', 'All').strip()
-    sub_segment_filter = request.GET.get('sub_segment', 'All').strip()
+def register_user(request):
+    if request.method == 'POST':
+        form = ExecutiveSignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            if user.is_staff or user.is_superuser:
+                return redirect('dashboard_home')
+            return redirect('render_visit_form')
+    else:
+        form = ExecutiveSignUpForm()
+    return render(request, 'crm_core/register.html', {'form': form})
 
-    export_filters = Q()
 
-    if business_type and business_type != 'All':
-        export_filters &= Q(visit__farm__business_type__iexact=business_type)
-    if sub_segment_filter and sub_segment_filter != 'All':
-        export_filters &= Q(visit__farm__sub_segment__iexact=sub_segment_filter)
-    if state_filter and state_filter != 'All':
-        export_filters &= Q(visit__farm__state__iexact=state_filter)
-    if district_filter and district_filter != 'All':
-        export_filters &= Q(visit__farm__district__iexact=district_filter)
-    if executive_filter and executive_filter != 'All':
-        export_filters &= Q(visit__executive__username__iexact=executive_filter)
+def login_user(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                login(request, user)
+                if user.is_staff or user.is_superuser:
+                    return redirect('dashboard_home')
+                return redirect('render_visit_form')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'crm_core/login.html', {'form': form})
 
-    if start_date_str:
-        try:
-            export_filters &= Q(visit__visit_date__date__gte=start_date_str)
-        except ValueError:
-            pass
-    if end_date_str:
-        try:
-            export_filters &= Q(visit__visit_date__date__lte=end_date_str)
-        except ValueError:
-            pass
 
-    wb = openpyxl.Workbook()
-    ws_data = wb.active
-    ws_data.title = "Field Visit Database Log"
-    ws_data.views.sheetView[0].showGridLines = True
-
-    dark_slate, border_color = "0F172A", "CBD5E1"
-    thin_border = Border(
-        left=Side(style='thin', color=border_color), right=Side(style='thin', color=border_color),
-        top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
-    )
-
-    # 🟢 ADDED 'Live GPS Link' TO HEADERS
-    headers = [
-        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
-        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
-        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated', 'Live GPS Link'
-    ]
-
-    for col_idx, text in enumerate(headers, 1):
-        cell = ws_data.cell(row=1, column=col_idx, value=text)
-        cell.font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-        cell.fill = PatternFill(start_color=dark_slate, end_color=dark_slate, fill_type="solid")
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    ws_data.row_dimensions[1].height = 28
-
-    all_products = VisitedProductDetail.objects.filter(export_filters).select_related(
-        'visit__farm', 'visit__executive'
-    ).order_by('-visit__visit_date')
-    
-    current_row = 2
-    for p in all_products:
-        v = p.visit
-        f = v.farm if v else None
-        
-        ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
-        ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
-        ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
-        ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
-        ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
-        ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-        ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and f.sub_segment else "") 
-        ws_data.cell(row=current_row, column=8, value=f.state if f else "")
-        ws_data.cell(row=current_row, column=9, value=f.district if f else "")
-        ws_data.cell(row=current_row, column=10, value=f.area if f else "")
-        ws_data.cell(row=current_row, column=11, value=p.product_name)
-        ws_data.cell(row=current_row, column=12, value=p.sale_quantity)
-        ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
-        ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
-        
-        # 🟢 GENERATING DYNAMIC HYPERLINK IF COORDINATES EXIST
-        gps_cell = ws_data.cell(row=current_row, column=15)
-        if f and f.latitude and f.longitude:
-            gps_cell.value = "View on Map"
-            gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
-            gps_cell.font = Font(name="Segoe UI", size=11, color="0000FF", underline="single")
-        else:
-            gps_cell.value = "No GPS Data"
-            gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
-
-        # Updated loop index from 1..15 to apply borders to the new column as well
-        for c_idx in range(1, 16):
-            ws_data.cell(row=current_row, column=c_idx).border = thin_border
-        current_row += 1
-
-    for col in ws_data.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col[0].column)
-        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 15)
-
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
-    wb.save(response)
-    return response
+def logout_user(request):
+    logout(request)
+    return redirect('login_user')
 
 
 # ==========================================
@@ -323,10 +250,11 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
+    # 🟢 ADDED 'Live GPS Link' TO HEADERS
     headers = [
         'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
-        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated'
+        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated', 'Live GPS Link'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -360,7 +288,18 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
         ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
         
-        for c_idx in range(1, 15):
+        # 🟢 GENERATING DYNAMIC HYPERLINK IF COORDINATES EXIST
+        gps_cell = ws_data.cell(row=current_row, column=15)
+        if f and f.latitude and f.longitude:
+            gps_cell.value = "View on Map"
+            gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
+            gps_cell.font = Font(name="Segoe UI", size=11, color="0000FF", underline="single")
+        else:
+            gps_cell.value = "No GPS Data"
+            gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
+
+        # Updated loop index from 1..15 to apply borders to the new column as well
+        for c_idx in range(1, 16):
             ws_data.cell(row=current_row, column=c_idx).border = thin_border
         current_row += 1
 
@@ -373,6 +312,7 @@ def export_visits_to_excel(request):
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
+
 
 # ==========================================
 # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
