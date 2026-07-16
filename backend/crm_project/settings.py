@@ -83,18 +83,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'crm_project.urls'
 
-# 🛠️ GLOBAL TEMPLATE CONFIGURATION MATRIX WITH MULTI-PATH STRUCTURAL FALLBACK
+# 🛠️ GLOBAL TEMPLATE CONFIGURATION MATRIX
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # Explicitly maps global directories and local application layout layers
-        'DIRS': [
-            BASE_DIR / 'templates',
-            BASE_DIR / 'crm_core' / 'templates',
-        ],
-        'APP_DIRS': True,
+        # Ensure Django knows how to look into your global templates directory
+        'DIRS': [BASE_DIR / 'templates'], 
+        'APP_DIRS': True, # Keep True so Django scans <app_name>/templates/ directories automatically
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug', # Re-added for standard troubleshooting context
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -106,8 +104,6 @@ TEMPLATES = [
 # ==========================================
 # 🗄️ PERSISTENT ENGINE DATABASE MATRIX
 # ==========================================
-# Connects to Render's environment DATABASE_URL variable for absolute persistence,
-# falling back gracefully to a local development sqlite block if the environment var is absent.
 DATABASES = {
     'default': dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
