@@ -77,14 +77,17 @@ def save_farm_visit(request):
         owner_name = request.POST.get('owner_name')
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
-        sub_segment = request.POST.get('sub_segment', '').strip() 
+        
+        # Aligned with the HTML parameter name "sub_business_type_select" (name="sub_business_type")
+        sub_segment = request.POST.get('sub_business_type', '').strip() 
         
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
-        farm_problem = request.POST.get('farm_problem')
-        
         state = request.POST.get('state', '').strip()
-        if not state or state.lower() == 'state':
+        farm_problem = request.POST.get('farm_problem')
+
+        # Clean, generic fallback rule for ANY location
+        if not state or state.lower() in ['state', 'unknown state', '']:
             state = district if district else 'Unknown State'
         
         lat = request.POST.get('latitude')
@@ -446,8 +449,8 @@ def get_location_details(request):
             area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or 'Unknown Area'
             state = address.get('state', 'Unknown State')
             
+            # Flattened structural output to match JavaScript client parsing directly
             return JsonResponse({
-                'status': 'success',
                 'state': state,
                 'district': district,
                 'area': area
@@ -457,7 +460,6 @@ def get_location_details(request):
         pass
         
     return JsonResponse({
-        'status': 'success',
         'state': 'Unknown State',
         'district': 'Detected Location',
         'area': f"Lat: {lat[:7]}, Lon: {lon[:7]}"
