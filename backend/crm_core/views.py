@@ -62,7 +62,7 @@ def logout_user(request):
 
 
 # ==========================================
-# 🌱 MYAGRI-CORE MANAGEMENT FUNCTIONALITY
+# 🌱 AGRI-CORE MANAGEMENT FUNCTIONALITY
 # ==========================================
 
 @login_required(login_url='/crm/login/')
