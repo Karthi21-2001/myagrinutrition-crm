@@ -62,7 +62,7 @@ def logout_user(request):
 
 
 # ==========================================
-# 🌱 AGRI-CORE MANAGEMENT FUNCTIONALITY
+# 🌱 MYAGRI-CORE MANAGEMENT FUNCTIONALITY
 # ==========================================
 
 @login_required(login_url='/crm/login/')
@@ -250,7 +250,7 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
-    # 🟢 ADDED 'Live GPS Link' TO HEADERS
+    # 🟢 Integrated 'Live GPS Link' inside Headers
     headers = [
         'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
@@ -288,7 +288,7 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
         ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
         
-        # 🟢 GENERATING DYNAMIC HYPERLINK IF COORDINATES EXIST
+        # 🟢 Dynamic Hyperlink Generation Loop Logic
         gps_cell = ws_data.cell(row=current_row, column=15)
         if f and f.latitude and f.longitude:
             gps_cell.value = "View on Map"
@@ -298,7 +298,6 @@ def export_visits_to_excel(request):
             gps_cell.value = "No GPS Data"
             gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-        # Updated loop index from 1..15 to apply borders to the new column as well
         for c_idx in range(1, 16):
             ws_data.cell(row=current_row, column=c_idx).border = thin_border
         current_row += 1
