@@ -32,7 +32,7 @@ def register_user(request):
             user = form.save()
             login(request, user)
             if user.is_staff or user.is_superuser:
-                return redirect('dashboard_analytics')
+                return redirect('dashboard_home')
             return redirect('render_visit_form')
     else:
         form = ExecutiveSignUpForm()
@@ -49,7 +49,7 @@ def login_user(request):
             if user is not None:
                 login(request, user)
                 if user.is_staff or user.is_superuser:
-                    return redirect('dashboard_analytics')
+                    return redirect('dashboard_home')
                 return redirect('render_visit_form')
     else:
         form = AuthenticationForm()
@@ -190,7 +190,7 @@ def save_farm_visit(request):
 
             messages.success(request, "Agri-Field visit logging record processed successfully!")
             if request.user.is_staff or request.user.is_superuser:
-                return redirect('dashboard_analytics')
+                return redirect('dashboard_home')
             
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
@@ -296,15 +296,8 @@ def export_visits_to_excel(request):
 # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
 # ==========================================
 
-@login_required(login_url='/crm/login/')
-def dashboard_home(request):
-    # FIX: Run the logic inside dashboard_analytics instead of rendering a missing file
-    return dashboard_analytics(request)
-
-
-@login_required(login_url='/crm/login/')
-def dashboard_analytics(request):
-    """Processes pipeline data metrics dynamically with global lookups for templates."""
+def get_dashboard_context(request):
+    """Central processing pipeline for managing filter logic on both templates."""
     sel_state = request.GET.get('state', '')
     sel_country = request.GET.get('country', '')
     sel_district = request.GET.get('district', '')
@@ -365,7 +358,7 @@ def dashboard_analytics(request):
         .order_by('-month', '-total_revenue')
     )
 
-    context = {
+    return {
         'total_revenue': total_rev,
         'total_visits': v_count,
         'total_farms': Farm.objects.filter(farm_filters).count(),
@@ -389,7 +382,19 @@ def dashboard_analytics(request):
         'selected_month': sel_month,
         'selected_year': sel_year,
     }
-    
+
+
+@login_required(login_url='/crm/login/')
+def dashboard_home(request):
+    """Renders the Core KPI Summary Panel (Counters, Conversion, & Dispatches)"""
+    context = get_dashboard_context(request)
+    return render(request, 'crm_core/dashboard.html', context)
+
+
+@login_required(login_url='/crm/login/')
+def dashboard_analytics(request):
+    """Renders the Advanced Analytics Telemetry Dashboard (Full Multi-Graphs Visualization)"""
+    context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
 
 
