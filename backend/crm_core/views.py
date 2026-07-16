@@ -235,18 +235,20 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
     
+    # FIX: Updated order_by path from '-visit__visited_at' to '-visit__visit_date'
     visit_details = VisitedProductDetail.objects.select_related(
         'visit', 'visit__farm', 'visit__executive'
-    ).order_by('-visit__visited_at')
+    ).order_by('-visit__visit_date')
     
     row_index = 2
     for detail in visit_details:
         v_report = detail.visit
         farm = v_report.farm
         
+        # FIX: Updated check from 'visited_at' to 'visit_date'
         row_data = [
             v_report.id,
-            v_report.visited_at.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visited_at') and v_report.visited_at else 'N/A',
+            v_report.visit_date.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visit_date') and v_report.visit_date else 'N/A',
             v_report.executive.get_full_name() if v_report.executive and v_report.executive.get_full_name() else (v_report.executive.username if v_report.executive else 'System'),
             farm.farm_name,
             farm.owner_name,
@@ -304,7 +306,6 @@ def dashboard_home(request):
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
     """Processes pipeline data metrics dynamically with global lookups for templates."""
-    # Get request parameters for live filtering
     sel_state = request.GET.get('state', '')
     sel_country = request.GET.get('country', '')
     sel_district = request.GET.get('district', '')
@@ -312,7 +313,6 @@ def dashboard_analytics(request):
     sel_month = request.GET.get('month', '')
     sel_year = request.GET.get('year', '')
 
-    # Setup base filters for dynamic evaluation
     farm_filters = Q()
     visit_filters = Q()
     product_filters = Q()
@@ -329,32 +329,31 @@ def dashboard_analytics(request):
         farm_filters &= Q(executive__username=sel_executive)
         visit_filters &= Q(executive__username=sel_executive)
         product_filters &= Q(visit__executive__username=sel_executive)
+        
+    # FIX: Updated date parsing hooks from 'visited_at' to 'visit_date'
     if sel_month:
-        visit_filters &= Q(visited_at__month=sel_month)
-        product_filters &= Q(visit__visited_at__month=sel_month)
+        visit_filters &= Q(visit_date__month=sel_month)
+        product_filters &= Q(visit__visit_date__month=sel_month)
     if sel_year:
-        visit_filters &= Q(visited_at__year=sel_year)
-        product_filters &= Q(visit__visited_at__year=sel_year)
+        visit_filters &= Q(visit_date__year=sel_year)
+        product_filters &= Q(visit__visit_date__year=sel_year)
 
-    # Core Metric Computations
     total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
     vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
     v_count = FarmVisitReport.objects.filter(visit_filters).count()
     
-    # Calculate unique conversion rate
     hot_leads = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
     total_leads = VisitedProductDetail.objects.filter(product_filters).count()
     conv_rate = round((hot_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
 
-    # Top District Visual Data Extraction
     district_data = Farm.objects.filter(farm_filters).values('district').annotate(count=Count('id')).order_by('-count')[:5]
     chart_labels = [d['district'] if d['district'] else 'Unknown' for d in district_data]
     chart_counts = [d['count'] for d in district_data]
 
-    # Structured Performance Matrix Grouping
+    # FIX: Updated month truncation hook from 'visit__visited_at' to 'visit__visit_date'
     monthly_sales = (
         VisitedProductDetail.objects.filter(product_filters)
-        .annotate(month=TruncMonth('visit__visited_at'))
+        .annotate(month=TruncMonth('visit__visit_date'))
         .values(
             'month', 
             'visit__executive__username', 
@@ -369,26 +368,24 @@ def dashboard_analytics(request):
         .order_by('-month', '-total_revenue')
     )
 
+    # FIX: Updated recent visits list sort ordering constraint from '-visited_at' to '-visit_date'
     context = {
         'total_revenue': total_rev,
         'total_visits': v_count,
         'total_farms': Farm.objects.filter(farm_filters).count(),
         'total_sales_volume': vol_sold,
         'conversion_rate': conv_rate,
-        'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('products').order_by('-visited_at')[:10],
+        'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('products').order_by('-visit_date')[:10],
         'monthly_sales': monthly_sales,
         
-        # Filter Lists
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
         'executive_list': User.objects.filter(farmvisitreport__isnull=False).values_list('username', flat=True).distinct(),
-        'country_list': ['India'], # Default context fallback
+        'country_list': ['India'],
         
-        # Safe JSON strings for ChartJS tracking injection
         'chart_labels_js': json.dumps(chart_labels if chart_labels else ["No Data Available"]),
         'chart_counts_js': json.dumps(chart_counts if chart_counts else [0]),
         
-        # Active Selected Filters State Conservation
         'selected_state': sel_state,
         'selected_country': sel_country,
         'selected_district': sel_district,
@@ -411,7 +408,6 @@ def executive_analytics_view(request):
 def get_location_details(request):
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
-    # Mock fallback payload; hook up to real reverse geocoding endpoints here if needed
     return JsonResponse({'status': 'success', 'state': 'Detected State', 'district': 'Detected District'})
 
 
