@@ -235,7 +235,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
     
-    # FIX: Updated tracking query from '-visit__visited_at' to '-visit__visit_date'
     visit_details = VisitedProductDetail.objects.select_related(
         'visit', 'visit__farm', 'visit__executive'
     ).order_by('-visit__visit_date')
@@ -245,7 +244,6 @@ def export_visits_to_excel(request):
         v_report = detail.visit
         farm = v_report.farm
         
-        # FIX: Changed field validation to use 'visit_date'
         row_data = [
             v_report.id,
             v_report.visit_date.strftime('%Y-%m-%d %H:%M') if hasattr(v_report, 'visit_date') and v_report.visit_date else 'N/A',
@@ -276,7 +274,7 @@ def export_visits_to_excel(request):
             elif col_index in [12, 14, 15]:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 if col_index in [14, 15]:
-                    cell.number_format = '"₹"#,##0.00'
+                    cell.number_format = '"¾"#,##0.00'
             else:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
         row_index += 1
@@ -330,7 +328,6 @@ def dashboard_analytics(request):
         visit_filters &= Q(executive__username=sel_executive)
         product_filters &= Q(visit__executive__username=sel_executive)
         
-    # FIX: Updated date parameter lookups from 'visited_at' to 'visit_date'
     if sel_month:
         visit_filters &= Q(visit_date__month=sel_month)
         product_filters &= Q(visit__visit_date__month=sel_month)
@@ -350,7 +347,6 @@ def dashboard_analytics(request):
     chart_labels = [d['district'] if d['district'] else 'Unknown' for d in district_data]
     chart_counts = [d['count'] for d in district_data]
 
-    # FIX: Switched month truncation expression target to 'visit__visit_date'
     monthly_sales = (
         VisitedProductDetail.objects.filter(product_filters)
         .annotate(month=TruncMonth('visit__visit_date'))
@@ -368,8 +364,6 @@ def dashboard_analytics(request):
         .order_by('-month', '-total_revenue')
     )
 
-    # FIX 1 (First Error Fix): Order by '-visit_date' instead of '-visited_at'
-    # FIX 2 (Second Error Fix): Switched user lookup to 'filed_visit_reports__isnull'
     context = {
         'total_revenue': total_rev,
         'total_visits': v_count,
@@ -394,7 +388,9 @@ def dashboard_analytics(request):
         'selected_month': sel_month,
         'selected_year': sel_year,
     }
-    return render(request, 'crm_core/dashboard_analytics.html', context)
+    
+    # Fix: Point to the actual file name shown in your repository
+    return render(request, 'crm_core/analytics_report.html', context)
 
 
 @login_required(login_url='/crm/login/')
