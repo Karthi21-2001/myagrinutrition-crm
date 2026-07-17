@@ -30,30 +30,28 @@ def executive_signup_view(request):
     return render(request, 'two_factor/signup.html', {'form': form})
 
 
-# --- TEMPORARY BACKDOOR FOR FREE TIER ADMIN CREATION & PASSWORD OVERRIDE ---
+# --- TEMPORARY BACKDOOR FOR FREE TIER ADMIN CREATION (NEW ID CREATION) ---
 def temporary_admin_creator_view(request):
     User = get_user_model()
     
-    admin_username = 'my_admin'
-    admin_email = 'admin@example.com'
-    admin_password = 'YourSecurePassword123!'  # This will be your new password
+    # 🌟 NEW UNIQUE CREDENTIALS
+    admin_username = 'crm_superadmin'
+    admin_email = 'superadmin@example.com'
+    admin_password = 'NewSecurePassword2026!' 
     
-    # Check if the user exists
     user_query = User.objects.filter(username=admin_username)
     
     if user_query.exists():
-        # If it exists, force reset the password so you know exactly what it is
         user = user_query.first()
         user.set_password(admin_password)
         user.is_superuser = True
         user.is_staff = True
         user.save()
-        return HttpResponse("<h1>Success: Password for existing admin updated successfully!</h1>")
+        return HttpResponse("<h1>Success: Password for superadmin updated!</h1>")
     else:
-        # If it doesn't exist, create it from scratch
         User.objects.create_superuser(
             username=admin_username,
             email=admin_email,
             password=admin_password
         )
-        return HttpResponse("<h1>Success: Brand new Admin account created!</h1>")
+        return HttpResponse("<h1>Success: Brand new Unique Admin account created!</h1>")
