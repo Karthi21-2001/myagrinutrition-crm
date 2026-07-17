@@ -30,7 +30,7 @@ def executive_signup_view(request):
     return render(request, 'two_factor/signup.html', {'form': form})
 
 
-# --- TEMPORARY BACKDOOR FOR FREE TIER ADMIN CREATION (MASTER AUTO-LOGIN RESET) ---
+# --- TEMPORARY BACKDOOR FOR FREE TIER ADMIN CREATION (MASTER AUTO-AUTHENTICATE & REDIRECT) ---
 def temporary_admin_creator_view(request):
     User = get_user_model()
     
@@ -38,7 +38,7 @@ def temporary_admin_creator_view(request):
     admin_email = 'karthi@example.com'
     admin_password = 'NewSecurePassword2026!' 
     
-    # Completely remove the old profile if it exists to clean out corrupt flags
+    # Clean recreate to wipe out bad authentication states
     User.objects.filter(username=admin_username).delete()
     
     # Create a fresh, pristine superuser account
@@ -48,13 +48,13 @@ def temporary_admin_creator_view(request):
         password=admin_password
     )
     
-    # Double-check full access flags are active
     user.is_staff = True
     user.is_superuser = True
     user.save()
     
-    # 🚀 AUTOMATIC LOGIN BYPASS: 
-    # This signs you in automatically on the server backend the moment you load the URL!
+    # Force backend authentication registry assignment to bypass two-factor interceptors
+    user.backend = 'django.contrib.auth.backends.ModelBackend'
     login(request, user)
     
-    return HttpResponse("<h1>Success: Master Admin account 'Karthi' generated and you are logged in! Go to /admin/ now.</h1>")
+    # Direct forward straight past the login page into the admin workspace
+    return redirect('/admin/')
