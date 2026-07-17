@@ -30,28 +30,31 @@ def executive_signup_view(request):
     return render(request, 'two_factor/signup.html', {'form': form})
 
 
-# --- TEMPORARY BACKDOOR FOR FREE TIER ADMIN CREATION (NEW ID CREATION) ---
+# --- TEMPORARY BACKDOOR FOR FREE TIER ADMIN CREATION (MASTER AUTO-LOGIN RESET) ---
 def temporary_admin_creator_view(request):
     User = get_user_model()
     
-    # 🌟 NEW UNIQUE CREDENTIALS
-    admin_username = 'crm_superadmin'
-    admin_email = 'superadmin@example.com'
+    admin_username = 'Karthi'
+    admin_email = 'karthi@example.com'
     admin_password = 'NewSecurePassword2026!' 
     
-    user_query = User.objects.filter(username=admin_username)
+    # Completely remove the old profile if it exists to clean out corrupt flags
+    User.objects.filter(username=admin_username).delete()
     
-    if user_query.exists():
-        user = user_query.first()
-        user.set_password(admin_password)
-        user.is_superuser = True
-        user.is_staff = True
-        user.save()
-        return HttpResponse("<h1>Success: Password for superadmin updated!</h1>")
-    else:
-        User.objects.create_superuser(
-            username=admin_username,
-            email=admin_email,
-            password=admin_password
-        )
-        return HttpResponse("<h1>Success: Brand new Unique Admin account created!</h1>")
+    # Create a fresh, pristine superuser account
+    user = User.objects.create_superuser(
+        username=admin_username,
+        email=admin_email,
+        password=admin_password
+    )
+    
+    # Double-check full access flags are active
+    user.is_staff = True
+    user.is_superuser = True
+    user.save()
+    
+    # 🚀 AUTOMATIC LOGIN BYPASS: 
+    # This signs you in automatically on the server backend the moment you load the URL!
+    login(request, user)
+    
+    return HttpResponse("<h1>Success: Master Admin account 'Karthi' generated and you are logged in! Go to /admin/ now.</h1>")
