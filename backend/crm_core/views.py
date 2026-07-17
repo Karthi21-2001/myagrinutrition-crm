@@ -78,7 +78,6 @@ def save_farm_visit(request):
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
         
-        # 🟢 FIX 1: Match the exact name attribute from your HTML form ('sub_business_type_select')
         sub_segment = request.POST.get('sub_business_type_select', '').strip() 
         
         district = request.POST.get('district', '').strip()
@@ -86,13 +85,11 @@ def save_farm_visit(request):
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
 
-        # 🟢 FIX 2: Better State Fallback so District (e.g. Namakkal) doesn't copy into State
         if not state or state.lower() in ['state', 'unknown state', '']:
-            # If district is Namakkal, we know the state is Tamil Nadu
             if district.lower() == 'namakkal':
                 state = 'Tamil Nadu'
             else:
-                state = 'Tamil Nadu' # Or use a default base state for your business, e.g., 'Tamil Nadu' or 'India'
+                state = 'Tamil Nadu'
         
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
@@ -110,7 +107,7 @@ def save_farm_visit(request):
                         'executive': current_user,
                         'contact_number': contact_number,
                         'business_type': business_type,
-                        'sub_segment': sub_segment, # Will now correctly save 'Shrimp', 'Fish', etc.
+                        'sub_segment': sub_segment,
                         'state': state,
                         'district': district,
                         'area': area,
@@ -135,7 +132,6 @@ def save_farm_visit(request):
                     farm_problem=farm_problem
                 )
 
-                # Orders Processing Segment
                 order_products = request.POST.getlist('discussed_product[]')
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
@@ -163,7 +159,6 @@ def save_farm_visit(request):
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
 
-                # Future Deal Target Segment
                 pipeline_products = request.POST.getlist('pipeline_discussed_product[]')
                 p_quantities = request.POST.getlist('pipeline_potential_quantity[]')
                 t_quantities = request.POST.getlist('pipeline_target_quantity[]')
@@ -395,8 +390,8 @@ def get_dashboard_context(request):
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
         
-        # 🟢 UPDATED: Fetches all registered active executives regardless of whether they have logged a visit yet.
-        'executive_list': User.objects.filter(is_active=True).values_list('username', flat=True).distinct(),
+        # 🟢 SECURED WORKSPACE FILTER: Hides admins and staff, only shows field executives.
+        'executive_list': User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct(),
         'country_list': ['India'],
         
         'chart_labels_js': json.dumps(chart_labels if chart_labels else ["No Data Available"]),
@@ -434,7 +429,6 @@ def executive_analytics_view(request):
 # ==========================================
 
 def get_location_details(request):
-    """Processes incoming map telemetry coordinates and fetches spatial records."""
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
     
@@ -455,7 +449,6 @@ def get_location_details(request):
             area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or 'Unknown Area'
             state = address.get('state', 'Unknown State')
             
-            # Flattened structural output to match JavaScript client parsing directly
             return JsonResponse({
                 'state': state,
                 'district': district,
