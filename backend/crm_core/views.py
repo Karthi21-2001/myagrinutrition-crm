@@ -336,6 +336,38 @@ def export_visits_to_excel(request):
 # ==========================================
 
 def get_dashboard_context(request):
+    # Safe fallback initializations
+    total_rev = 0
+    vol_sold = 0
+    v_count = 0
+    total_farms_count = 0
+    conversion_rate = 0.0
+    
+    combo_labels, combo_revenue, combo_volume = [], [], []
+    top_prod_labels, top_prod_revenue = [], []
+    pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
+    product_pricing_table = []
+    exec_labels, exec_revenue, exec_conv_pct = [], [], []
+    funnel_stages = []
+    funnel_list = []
+    geo_district_performance = []
+    map_labels, map_revenue = [], []
+    telemetry_audit_log = []
+    bird_counts = [0, 0, 0, 0]
+    bird_labels = ['Chicks', 'Growers', 'Layers', 'Culling Birds']
+    reported_problems = []
+    problems_list = []
+    segment_breakdown = []
+    visit_frequency_exec = []
+    year_wise_trends = []
+    month_wise_cycle = []
+    recent_visits_queryset = FarmVisitReport.objects.none()
+    
+    state_list = []
+    district_list = []
+    executive_list = []
+
+    # Read Filters safely
     sel_state = request.GET.get('state', '').strip()
     sel_country = request.GET.get('country', '').strip()
     sel_district = request.GET.get('district', '').strip()
@@ -343,102 +375,103 @@ def get_dashboard_context(request):
     sel_month = request.GET.get('month', '').strip()
     sel_year = request.GET.get('year', '').strip()
 
-    farm_filters = Q()
-    visit_filters = Q()
-    product_filters = Q()
-
-    if sel_state and sel_state not in ['All', 'All States']:
-        farm_filters &= Q(state=sel_state)
-        visit_filters &= Q(farm__state=sel_state)
-        product_filters &= Q(visit__farm__state=sel_state)
-    if sel_district and sel_district not in ['All', 'All Districts']:
-        farm_filters &= Q(district=sel_district)
-        visit_filters &= Q(farm__district=sel_district)
-        product_filters &= Q(visit__farm__district=sel_district)
-    if sel_executive and sel_executive not in ['All', 'All Executives']:
-        farm_filters &= Q(executive__username=sel_executive)
-        visit_filters &= Q(executive__username=sel_executive)
-        product_filters &= Q(visit__executive__username=sel_executive)
-        
-    if sel_month and sel_month not in ['All', 'All Months']:
-        visit_filters &= Q(visit_date__month=sel_month)
-        product_filters &= Q(visit__visit_date__month=sel_month)
-    if sel_year and sel_year != 'All':
-        visit_filters &= Q(visit_date__year=sel_year)
-        product_filters &= Q(visit__visit_date__year=sel_year)
-
-    total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
-    vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
-    v_count = FarmVisitReport.objects.filter(visit_filters).count()
-    
-    closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
-    total_leads = VisitedProductDetail.objects.filter(product_filters).count()
-    
-    conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
-
-    # 1️⃣ SALES & REVENUE ADVANCED COMPONENT
-    time_series_data = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .annotate(month=TruncMonth('visit__visit_date'))
-        .values('month')
-        .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
-        .order_by('month')
-    )
-    
-    combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
-    combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
-    combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
-
-    product_performance = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .values('product_name')
-        .annotate(revenue=Sum('revenue_generated'), qty_sold=Sum('sale_quantity'))
-        .order_by('-revenue')
-    )
-    top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
-    top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
-
-    pipeline_spread = VisitedProductDetail.objects.filter(product_filters).aggregate(
-        actual=Sum('sale_quantity'),
-        target=Sum('target_quantity'),
-        potential=Sum('potential_quantity')
-    )
-    if not pipeline_spread or pipeline_spread.get('actual') is None:
-        pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
-    else:
-        pipeline_spread = {k: (v or 0) for k, v in pipeline_spread.items()}
-        
-    product_pricing_table = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .values('product_name')
-        .annotate(avg_unit_price=Avg('primary_price'))
-        .order_by('product_name')
-    )
-
-    # 2️⃣ OPERATIONS & EXECUTIVE LEADERBOARDS
-    executive_performance = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .values('visit__executive__username')
-        .annotate(
-            revenue=Sum('revenue_generated'),
-            total_items=Count('id'),
-            hot_items=Count('id', filter=Q(process_status='Hot'))
-        )
-        .order_by('-revenue')
-    )
-    exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
-    exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
-    exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
-
-    funnel_stages = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .values('process_status')
-        .annotate(count=Count('id'))
-        .order_by('-count')
-    )
-
-    # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX (FIXED FOR ENGINE COMPATIBILITY)
     try:
+        # Build Filter Matrices
+        farm_filters = Q()
+        visit_filters = Q()
+        product_filters = Q()
+
+        if sel_state and sel_state not in ['All', 'All States']:
+            farm_filters &= Q(state=sel_state)
+            visit_filters &= Q(farm__state=sel_state)
+            product_filters &= Q(visit__farm__state=sel_state)
+        if sel_district and sel_district not in ['All', 'All Districts']:
+            farm_filters &= Q(district=sel_district)
+            visit_filters &= Q(farm__district=sel_district)
+            product_filters &= Q(visit__farm__district=sel_district)
+        if sel_executive and sel_executive not in ['All', 'All Executives']:
+            farm_filters &= Q(executive__username=sel_executive)
+            visit_filters &= Q(executive__username=sel_executive)
+            product_filters &= Q(visit__executive__username=sel_executive)
+            
+        if sel_month and sel_month not in ['All', 'All Months']:
+            visit_filters &= Q(visit_date__month=sel_month)
+            product_filters &= Q(visit__visit_date__month=sel_month)
+        if sel_year and sel_year != 'All':
+            visit_filters &= Q(visit_date__year=sel_year)
+            product_filters &= Q(visit__visit_date__year=sel_year)
+
+        # Core Global KPI Aggregations
+        total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
+        vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
+        v_count = FarmVisitReport.objects.filter(visit_filters).count()
+        total_farms_count = Farm.objects.filter(farm_filters).count()
+        
+        closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
+        total_leads = VisitedProductDetail.objects.filter(product_filters).count()
+        conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
+
+        # 1️⃣ SALES & REVENUE ADVANCED COMPONENT
+        time_series_data = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .annotate(month=TruncMonth('visit__visit_date'))
+            .values('month')
+            .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
+            .order_by('month')
+        )
+        
+        combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
+        combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
+        combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
+
+        product_performance = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .values('product_name')
+            .annotate(revenue=Sum('revenue_generated'), qty_sold=Sum('sale_quantity'))
+            .order_by('-revenue')
+        )
+        top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
+        top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
+
+        pipeline_spread_agg = VisitedProductDetail.objects.filter(product_filters).aggregate(
+            actual=Sum('sale_quantity'),
+            target=Sum('target_quantity'),
+            potential=Sum('potential_quantity')
+        )
+        if pipeline_spread_agg and pipeline_spread_agg.get('actual') is not None:
+            pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
+            
+        product_pricing_table = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .values('product_name')
+            .annotate(avg_unit_price=Avg('primary_price'))
+            .order_by('product_name')
+        )
+
+        # 2️⃣ OPERATIONS & EXECUTIVE LEADERBOARDS
+        executive_performance = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .values('visit__executive__username')
+            .annotate(
+                revenue=Sum('revenue_generated'),
+                total_items=Count('id'),
+                hot_items=Count('id', filter=Q(process_status='Hot'))
+            )
+            .order_by('-revenue')
+        )
+        exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
+        exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
+        exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
+
+        funnel_stages = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .values('process_status')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+        )
+        funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
+
+        # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
@@ -452,89 +485,84 @@ def get_dashboard_context(request):
         )
         map_labels = [d['district'] if d.get('district') else 'Unknown' for d in geo_district_performance[:10]]
         map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
-    except Exception:
-        geo_district_performance = []
-        map_labels = []
-        map_revenue = []
 
-    telemetry_audit_log = (
-        FarmVisitReport.objects.filter(visit_filters)
-        .select_related('farm', 'executive')
-        .values('visit_date', 'farm__area', 'farm__latitude', 'farm__longitude', 'executive__username', 'farm__farm_name')
-        .order_by('-visit_date')[:15]
-    )
+        telemetry_audit_log = (
+            FarmVisitReport.objects.filter(visit_filters)
+            .select_related('farm', 'executive')
+            .values('visit_date', 'farm__area', 'farm__latitude', 'farm__longitude', 'executive__username', 'farm__farm_name')
+            .order_by('-visit_date')[:15]
+        )
 
-    # 4️⃣ FARM PROFILE & STRUCTURAL HEALTH INSIGHTS
-    try:
+        # 4️⃣ FARM PROFILE & STRUCTURAL HEALTH INSIGHTS
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('chicks_count'),
             growers=Sum('grower_count'),
             layers=Sum('layer_count'),
             culling=Sum('culling_bird')
         )
-        bird_counts = [
-            (bird_population.get('chicks') or 0),
-            (bird_population.get('growers') or 0),
-            (bird_population.get('layers') or 0),
-            (bird_population.get('culling') or 0)
-        ]
-    except Exception:
-        bird_counts = [0, 0, 0, 0]
+        if bird_population:
+            bird_counts = [
+                (bird_population.get('chicks') or 0),
+                (bird_population.get('growers') or 0),
+                (bird_population.get('layers') or 0),
+                (bird_population.get('culling') or 0)
+            ]
+            
+        reported_problems = (
+            FarmVisitReport.objects.filter(visit_filters)
+            .values('farm_problem')
+            .annotate(frequency=Count('id'))
+            .exclude(farm_problem__in=['', None])
+            .order_by('-frequency')[:10]
+        )
+        problems_list = [dict(prob) for prob in reported_problems] if reported_problems else []
+
+        segment_breakdown = (
+            Farm.objects.filter(farm_filters)
+            .values('business_type', 'sub_segment')
+            .annotate(total_farms=Count('id'))
+            .order_by('-total_farms')
+        )
+
+        # 5️⃣ LEGACY ANALYTICS OVERLAYS
+        visit_frequency_exec = (
+            FarmVisitReport.objects.filter(visit_filters)
+            .values('executive__username')
+            .annotate(visit_count=Count('id'))
+            .order_by('-visit_count')
+        )
         
-    bird_labels = ['Chicks', 'Growers', 'Layers', 'Culling Birds']
+        year_wise_trends = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .annotate(year=TruncYear('visit__visit_date'))
+            .values('year')
+            .annotate(revenue=Sum('revenue_generated'))
+            .order_by('year')
+        )
+        
+        month_wise_cycle = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .annotate(month=TruncMonth('visit__visit_date'))
+            .values('month')
+            .annotate(revenue=Sum('revenue_generated'))
+            .order_by('month')
+        )
 
-    reported_problems = (
-        FarmVisitReport.objects.filter(visit_filters)
-        .values('farm_problem')
-        .annotate(frequency=Count('id'))
-        .exclude(farm_problem__in=['', None])
-        .order_by('-frequency')[:10]
-    )
-
-    segment_breakdown = (
-        Farm.objects.filter(farm_filters)
-        .values('business_type', 'sub_segment')
-        .annotate(total_farms=Count('id'))
-        .order_by('-total_farms')
-    )
-
-    # 5️⃣ LEGACY ANALYTICS OVERLAYS
-    visit_frequency_exec = (
-        FarmVisitReport.objects.filter(visit_filters)
-        .values('executive__username')
-        .annotate(visit_count=Count('id'))
-        .order_by('-visit_count')
-    )
-    
-    year_wise_trends = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .annotate(year=TruncYear('visit__visit_date'))
-        .values('year')
-        .annotate(revenue=Sum('revenue_generated'))
-        .order_by('year')
-    )
-    
-    month_wise_cycle = (
-        VisitedProductDetail.objects.filter(product_filters)
-        .annotate(month=TruncMonth('visit__visit_date'))
-        .values('month')
-        .annotate(revenue=Sum('revenue_generated'))
-        .order_by('month')
-    )
-
-    funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
-    problems_list = [dict(prob) for prob in reported_problems] if reported_problems else []
-
-    # Safeguard template evaluations against empty logs
-    try:
         recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
+
+        # Dynamic Form Dropdown Initializations
+        state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
+        district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
+        executive_list = User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct()
+
     except Exception:
-        recent_visits_queryset = FarmVisitReport.objects.none()
+        # Graceful logging or handling logic can be inserted here if needed
+        pass
 
     return {
         'total_revenue': total_rev,
         'total_visits': v_count,
-        'total_farms': Farm.objects.filter(farm_filters).count(),
+        'total_farms': total_farms_count,
         'total_sales_volume': vol_sold,
         'conversion_rate': conversion_rate,
         
@@ -569,9 +597,9 @@ def get_dashboard_context(request):
 
         'recent_visits': recent_visits_queryset,
         
-        'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
-        'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
-        'executive_list': User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct(),
+        'state_list': state_list,
+        'district_list': district_list,
+        'executive_list': executive_list,
         'country_list': ['India'],
         
         'selected_state': sel_state,
