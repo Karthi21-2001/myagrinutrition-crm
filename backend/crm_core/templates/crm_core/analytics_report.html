@@ -188,7 +188,7 @@
 
         <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <!-- 📍 Fixed and optimized: Visits By State Layout Block -->
+            <!-- Visits By State Layout Block -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div class="mb-2">
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Visits by State</h3>
@@ -230,7 +230,7 @@
                 </div>
             </div>
 
-            <!-- Dynamic Sector Segmentation Block Matrix -->
+            <!-- Business Sector Distribution (Removed Rooster/Fish) -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Business Sector Distribution</h3>
@@ -238,12 +238,22 @@
                 </div>
                 <div class="flex-1 grid grid-cols-2 gap-3 font-bold text-xs p-1 mt-4">
                     <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
-                        <div class="flex justify-between items-center text-amber-400 text-lg"><span class="text-xs uppercase tracking-wide font-bold text-slate-200">Poultry</span> Rooster </div>
-                        <div class="mt-2"><span id="sectorPoultry" class="text-2xl font-black text-white">65%</span><p class="text-[9px] font-medium text-amber-500/70 mt-0.5">Broiler/Layer Matrix</p></div>
+                        <div class="flex justify-between items-center text-amber-400 text-lg">
+                            <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Poultry</span>
+                        </div>
+                        <div class="mt-2">
+                            <span id="sectorPoultry" class="text-2xl font-black text-white">65%</span>
+                            <p class="text-[9px] font-medium text-amber-500/70 mt-0.5">Broiler/Layer Matrix</p>
+                        </div>
                     </div>
                     <div class="bg-sky-500/5 border border-sky-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
-                        <div class="flex justify-between items-center text-sky-400 text-lg"><span class="text-xs uppercase tracking-wide font-bold text-slate-200">Aqua</span> Fish </div>
-                        <div class="mt-2"><span id="sectorAqua" class="text-2xl font-black text-white">35%</span><p class="text-[9px] font-medium text-sky-500/70 mt-0.5">Shrimp Tracking</p></div>
+                        <div class="flex justify-between items-center text-sky-400 text-lg">
+                            <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Aqua</span>
+                        </div>
+                        <div class="mt-2">
+                            <span id="sectorAqua" class="text-2xl font-black text-white">35%</span>
+                            <p class="text-[9px] font-medium text-sky-500/70 mt-0.5">Shrimp Tracking</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -399,7 +409,6 @@
                 options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
             });
 
-            // 📍 FIXED INITIALIZATION: State Map Metrics Bar Chart Config
             let stateChart = new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
                 type: 'bar',
                 data: { 
@@ -487,7 +496,6 @@
                 execChart.data.datasets[0].data = data.execData;
                 execChart.update();
 
-                // Update Geographic Chart Data Safely
                 stateChart.data.labels = data.stateLabels;
                 stateChart.data.datasets[0].data = data.stateData;
                 stateChart.update();
