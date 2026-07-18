@@ -319,10 +319,12 @@ def export_visits_to_excel(request):
                     
             current_row += 1
 
-    for col in ws_data.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col[0].column)
-        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 14)
+    # Safe check to prevent crashing if the spreadsheet has no records
+    if ws_data.max_row > 1:
+        for col in ws_data.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws_data.column_dimensions[col_letter].width = max(max_len + 4, 14)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
@@ -366,7 +368,7 @@ def get_dashboard_context(request):
         visit_filters &= Q(visit_date__year=sel_year)
         product_filters &= Q(visit__visit_date__year=sel_year)
 
-    # Core high-level aggregates
+    # Core high-level aggregates with robust None-coalescing
     total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
     vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
     v_count = FarmVisitReport.objects.filter(visit_filters).count()
@@ -374,7 +376,6 @@ def get_dashboard_context(request):
     closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
     total_leads = VisitedProductDetail.objects.filter(product_filters).count()
     
-    # 🩹 Fix 1: Inline Guard Clause against ZeroDivisionErrors
     conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
 
     # 1️⃣ SALES & REVENUE ADVANCED COMPONENT
@@ -386,10 +387,10 @@ def get_dashboard_context(request):
         .order_by('month')
     )
     
-    # 🩹 Fix 2: Explicitly typecast fields into clean JSON primitives using DjangoJSONEncoder safety fallback
-    combo_labels = [t['month'].strftime("%b %Y") if t['month'] else 'Unknown' for t in time_series_data]
-    combo_revenue = [float(t['revenue'] or 0) for t in time_series_data]
-    combo_volume = [int(t['volume'] or 0) for t in time_series_data]
+    # 🛡️ HARDENED CRASH FIX: Guard loops against missing datetime attributes or keys
+    combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
+    combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
+    combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
     product_performance = (
         VisitedProductDetail.objects.filter(product_filters)
@@ -397,7 +398,7 @@ def get_dashboard_context(request):
         .annotate(revenue=Sum('revenue_generated'), qty_sold=Sum('sale_quantity'))
         .order_by('-revenue')
     )
-    top_prod_labels = [p['product_name'] for p in product_performance]
+    top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
     top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
 
     pipeline_spread = VisitedProductDetail.objects.filter(product_filters).aggregate(
@@ -405,8 +406,11 @@ def get_dashboard_context(request):
         target=Sum('target_quantity'),
         potential=Sum('potential_quantity')
     )
-    if not pipeline_spread or pipeline_spread['actual'] is None:
+    if not pipeline_spread or pipeline_spread.get('actual') is None:
         pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
+    else:
+        # Guarantee no internal null elements inside dictionary elements
+        pipeline_spread = {k: (v or 0) for k, v in pipeline_spread.items()}
         
     product_pricing_table = (
         VisitedProductDetail.objects.filter(product_filters)
@@ -426,11 +430,9 @@ def get_dashboard_context(request):
         )
         .order_by('-revenue')
     )
-    exec_labels = [e['visit__executive__username'] if e['visit__executive__username'] else 'Unknown' for e in executive_performance]
+    exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
     exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
-    
-    # 🩹 Fix 3: Added inline protection logic when processing lists for performance datasets
-    exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e['total_items'] else 0.0 for e in executive_performance]
+    exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
 
     funnel_stages = (
         VisitedProductDetail.objects.filter(product_filters)
@@ -450,7 +452,7 @@ def get_dashboard_context(request):
             )
             .order_by('-revenue')
         )
-        map_labels = [d['district'] if d['district'] else 'Unknown' for d in geo_district_performance[:10]]
+        map_labels = [d['district'] if d.get('district') else 'Unknown' for d in geo_district_performance[:10]]
         map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
     except Exception:
         geo_district_performance = []
@@ -473,10 +475,10 @@ def get_dashboard_context(request):
             culling=Sum('culling_bird')
         )
         bird_counts = [
-            bird_population['chicks'] or 0,
-            bird_population['growers'] or 0,
-            bird_population['layers'] or 0,
-            bird_population['culling'] or 0
+            (bird_population.get('chicks') or 0),
+            (bird_population.get('growers') or 0),
+            (bird_population.get('layers') or 0),
+            (bird_population.get('culling') or 0)
         ]
     except Exception:
         bird_counts = [0, 0, 0, 0]
@@ -522,8 +524,8 @@ def get_dashboard_context(request):
         .order_by('month')
     )
 
-    funnel_list = [dict(stage) for stage in funnel_stages]
-    problems_list = [dict(prob) for prob in reported_problems]
+    funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
+    problems_list = [dict(prob) for prob in reported_problems] if reported_problems else []
 
     return {
         'total_revenue': total_rev,
@@ -532,7 +534,6 @@ def get_dashboard_context(request):
         'total_sales_volume': vol_sold,
         'conversion_rate': conversion_rate,
         
-        # 🩹 Fix 4: Output data fields perfectly compiled with DjangoJSONEncoder
         'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
         'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
         'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
