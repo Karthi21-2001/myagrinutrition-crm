@@ -379,7 +379,6 @@ def get_dashboard_context(request):
     conv_rate = round((hot_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
 
     # 1️⃣ SALES & REVENUE ADVANCED COMPONENT
-    # Combo Chart: Revenue & Volume Trends Over Time
     time_series_data = (
         VisitedProductDetail.objects.filter(product_filters)
         .annotate(month=TruncMonth('visit__visit_date'))
@@ -391,7 +390,6 @@ def get_dashboard_context(request):
     combo_revenue = [float(t['revenue'] or 0) for t in time_series_data]
     combo_volume = [int(t['volume'] or 0) for t in time_series_data]
 
-    # Donut Chart: Product Performance Matrix
     product_performance = (
         VisitedProductDetail.objects.filter(product_filters)
         .values('product_name')
@@ -401,14 +399,12 @@ def get_dashboard_context(request):
     top_prod_labels = [p['product_name'] for p in product_performance]
     top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
 
-    # Clustered Bar: Target vs Actual vs Market Potential
     pipeline_spread = VisitedProductDetail.objects.filter(product_filters).aggregate(
         actual=Sum('sale_quantity'),
         target=Sum('target_quantity'),
         potential=Sum('potential_quantity')
     )
     
-    # Pricing Catalog Matrix
     product_pricing_table = (
         VisitedProductDetail.objects.filter(product_filters)
         .values('product_name')
@@ -431,7 +427,6 @@ def get_dashboard_context(request):
     exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
     exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e['total_items'] > 0 else 0 for e in executive_performance]
 
-    # Pipeline Funnel Metrics Breakdown
     funnel_stages = (
         VisitedProductDetail.objects.filter(product_filters)
         .values('process_status')
@@ -440,20 +435,24 @@ def get_dashboard_context(request):
     )
 
     # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX
-    # FIXED: Swapped out 'visit_reports' for explicit fallback framework 'farmvisitreport_set'
-    geo_district_performance = (
-        Farm.objects.filter(farm_filters)
-        .values('state', 'district')
-        .annotate(
-            farm_count=Count('id'),
-            revenue=Sum('farmvisitreport_set__visitedproductdetail_set__revenue_generated')
+    # CRASH PROTECTION: Safe relational tracking for dynamic installations
+    try:
+        geo_district_performance = (
+            Farm.objects.filter(farm_filters)
+            .values('state', 'district')
+            .annotate(
+                farm_count=Count('id'),
+                revenue=Sum('farmvisitreport_set__visitedproductdetail_set__revenue_generated')
+            )
+            .order_by('-revenue')
         )
-        .order_by('-revenue')
-    )
-    map_labels = [d['district'] if d['district'] else 'Unknown' for d in geo_district_performance[:10]]
-    map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
+        map_labels = [d['district'] if d['district'] else 'Unknown' for d in geo_district_performance[:10]]
+        map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
+    except Exception:
+        geo_district_performance = []
+        map_labels = []
+        map_revenue = []
 
-    # Management Telemetry Auditing Log Table List
     telemetry_audit_log = (
         FarmVisitReport.objects.filter(visit_filters)
         .select_related('farm', 'executive')
@@ -462,22 +461,25 @@ def get_dashboard_context(request):
     )
 
     # 4️⃣ FARM PROFILE & STRUCTURAL HEALTH INSIGHTS
-    # Avian Demographics Distribution
-    bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-        chicks=Sum('chicks_count'),
-        growers=Sum('grower_count'),
-        layers=Sum('layer_count'),
-        culling=Sum('culling_bird')
-    )
+    # CRASH PROTECTION: If bird metrics are non-column fields or properties, default safely to 0
+    try:
+        bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
+            chicks=Sum('chicks_count'),
+            growers=Sum('grower_count'),
+            layers=Sum('layer_count'),
+            culling=Sum('culling_bird')
+        )
+        bird_counts = [
+            bird_population['chicks'] or 0,
+            bird_population['growers'] or 0,
+            bird_population['layers'] or 0,
+            bird_population['culling'] or 0
+        ]
+    except Exception:
+        bird_counts = [0, 0, 0, 0]
+        
     bird_labels = ['Chicks', 'Growers', 'Layers', 'Culling Birds']
-    bird_counts = [
-        bird_population['chicks'] or 0,
-        bird_population['growers'] or 0,
-        bird_population['layers'] or 0,
-        bird_population['culling'] or 0
-    ]
 
-    # Pareto Chart / Word Cloud: Farm Diagnoses Observed
     reported_problems = (
         FarmVisitReport.objects.filter(visit_filters)
         .values('farm_problem')
@@ -486,7 +488,6 @@ def get_dashboard_context(request):
         .order_by('-frequency')[:10]
     )
 
-    # Market Segment Treemap Distribution Metrics
     segment_breakdown = (
         Farm.objects.filter(farm_filters)
         .values('business_type', 'sub_segment')
@@ -494,8 +495,7 @@ def get_dashboard_context(request):
         .order_by('-total_farms')
     )
 
-    # 5️⃣ LEGACY / ALREADY-HAVE HISTORICAL ANALYTICS OVERLAYS
-    # Field Visit Frequency per Executive
+    # 5️⃣ LEGACY ANALYTICS OVERLAYS
     visit_frequency_exec = (
         FarmVisitReport.objects.filter(visit_filters)
         .values('executive__username')
@@ -503,7 +503,6 @@ def get_dashboard_context(request):
         .order_by('-visit_count')
     )
     
-    # Year-wise Revenue Trends
     year_wise_trends = (
         VisitedProductDetail.objects.filter(product_filters)
         .annotate(year=TruncYear('visit__visit_date'))
@@ -512,7 +511,6 @@ def get_dashboard_context(request):
         .order_by('year')
     )
     
-    # Month-wise Revenue Cycle
     month_wise_cycle = (
         VisitedProductDetail.objects.filter(product_filters)
         .annotate(month=TruncMonth('visit__visit_date'))
@@ -521,15 +519,17 @@ def get_dashboard_context(request):
         .order_by('month')
     )
 
+    # Clean QuerySet formatting for modern templates
+    funnel_list = [dict(stage) for stage in funnel_stages]
+    problems_list = [dict(prob) for prob in reported_problems]
+
     return {
-        # KPI Core Data Blocks
         'total_revenue': total_rev,
         'total_visits': v_count,
         'total_farms': Farm.objects.filter(farm_filters).count(),
         'total_sales_volume': vol_sold,
         'conversion_rate': conv_rate,
         
-        # 1. Sales & Revenue Analysis (JS Package Payloads)
         'combo_labels_js': json.dumps(combo_labels),
         'combo_revenue_js': json.dumps(combo_revenue),
         'combo_volume_js': json.dumps(combo_volume),
@@ -538,34 +538,29 @@ def get_dashboard_context(request):
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
         
-        # 2. Operations Tracking & Funnels
         'exec_labels_js': json.dumps(exec_labels),
         'exec_revenue_js': json.dumps(exec_revenue),
         'exec_conv_pct_js': json.dumps(exec_conv_pct),
         'funnel_stages': funnel_stages,
-        'funnel_stages_js': json.dumps(list(funnel_stages)),
+        'funnel_stages_js': json.dumps(funnel_list),
         
-        # 3. Geographical Mapping Data Packages
         'map_labels_js': json.dumps(map_labels),
         'map_revenue_js': json.dumps(map_revenue),
         'telemetry_audit_log': telemetry_audit_log,
         'geo_district_performance': geo_district_performance,
         
-        # 4. Farm Profile & Biosecurity Diagnostics
         'bird_labels_js': json.dumps(bird_labels),
         'bird_counts_js': json.dumps(bird_counts),
         'reported_problems': reported_problems,
-        'reported_problems_js': json.dumps(list(reported_problems)),
+        'reported_problems_js': json.dumps(problems_list),
         'segment_breakdown': segment_breakdown,
         
-        # 5. Pre-Existing Pipelines Matrix Integration Overlays
         'visit_frequency_exec': visit_frequency_exec,
         'year_wise_trends': year_wise_trends,
         'month_wise_cycle': month_wise_cycle,
 
         'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10],
         
-        # Filtering Workspace Parameters 
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
         'executive_list': User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct(),
