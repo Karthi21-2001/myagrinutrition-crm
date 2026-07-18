@@ -69,7 +69,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 Added WhiteNoise to serve static assets
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # 🚀 Serves static assets seamlessly
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -88,12 +88,11 @@ ROOT_URLCONF = 'crm_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        # Ensure Django knows how to look into your global templates directory
         'DIRS': [BASE_DIR / 'templates'], 
-        'APP_DIRS': True, # Keep True so Django scans <app_name>/templates/ directories automatically
+        'APP_DIRS': True, 
         'OPTIONS': {
             'context_processors': [
-                'django.template.context_processors.debug', # Re-added for standard troubleshooting context
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -106,27 +105,23 @@ TEMPLATES = [
 # ==========================================
 # 🗄️ PERSISTENT ENGINE DATABASE MATRIX
 # ==========================================
-# Prioritize Render's live database connection, fallback to local development
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
+    # 🌐 Render Production Database Setup
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
-            # Ensure compatibility with varying PostgreSQL connection string formats on Render
-            ssl_require=True
+            ssl_require=True  # 🔒 Render PostgreSQL requires SSL in production!
         )
     }
 else:
+    # 💻 Local Development Database Setup (Fixes "Connection Refused" Errors)
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'my_agri_db',
-            'USER': 'db_user',
-            'PASSWORD': 'your_password',
-            'HOST': '127.0.0.1',
-            'PORT': '5432',
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
@@ -150,17 +145,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Kolkata'  # 🌍 Updated from UTC to match your regional operations matrix
+TIME_ZONE = 'Asia/Kolkata'  # 🌍 Matches regional operational telemetry
 USE_I18N = True
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # 🚀 Tells Django where to collect production static files
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# 📂 WhiteNoise Production Optimization Engine
-# Prevents unhandled 500 crashes if a template requests a missing static asset or manifest manifest matching fails
+# 📂 WhiteNoise Production Resiliency Layout
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -209,5 +203,4 @@ PWA_APP_ICONS = [
 # ==========================================
 # ✉️ COMMUNICATIONS & TELEMETRY DISPATCHERS
 # ==========================================
-# Pipes all password reset email logs to the terminal console stdout during local testing
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
