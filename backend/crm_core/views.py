@@ -440,13 +440,13 @@ def get_dashboard_context(request):
     )
 
     # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX
-    # Zone-wise Sales Metric Breakdown (District Performance Map)
+    # FIXED: Swapped out 'visit_reports' for explicit fallback framework 'farmvisitreport_set'
     geo_district_performance = (
         Farm.objects.filter(farm_filters)
         .values('state', 'district')
         .annotate(
             farm_count=Count('id'),
-            revenue=Sum('visit_reports__visitedproductdetail__revenue_generated')
+            revenue=Sum('farmvisitreport_set__visitedproductdetail_set__revenue_generated')
         )
         .order_by('-revenue')
     )
