@@ -57,7 +57,7 @@
             </div>
             
             <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
-                <!-- 🎯 NEW: EXECUTIVE DROPDOWN SELECTOR MAP -->
+                <!-- 🎯 EXECUTIVE DROPDOWN SELECTOR -->
                 <select id="executiveFilter" class="bg-[var(--bg-input)] border border-[var(--border)] text-white font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
                     <option value="ALL">👥 All Executives</option>
                     <option value="Selva">👤 Selva Kumar</option>
@@ -122,10 +122,10 @@
             </div>
         </div>
 
-        <!-- ================= 📈 MONTH-WISE & YEAR-WISE MACRO REVENUE MATRIX ================= -->
+        <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <!-- Month-wise Running Trend -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-8 h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between">
                 <div>
                     <div class="flex justify-between items-start">
                         <div>
@@ -140,24 +140,19 @@
                 </div>
             </div>
 
-            <!-- Year-wise Comparison Ledger -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
+            <!-- Year-wise Running Trend (MATCHING DESIGN) -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between">
                 <div>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Year-Wise Revenue Matrix</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Historical macro conversion comparison parameters</p>
-                </div>
-                <div id="yearlyLedgerContainer" class="flex-1 overflow-y-auto custom-scrollbar mt-4 space-y-3 pr-1">
-                    <!-- Dynamic Rows Populated by Script with Django Default Layout -->
-                    <div class="bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 flex justify-between items-center">
+                    <div class="flex justify-between items-start">
                         <div>
-                            <span class="text-xs font-extrabold text-white tracking-wide"><i class="fa-solid fa-calendar-days text-slate-500 mr-1.5"></i>FY 2026</span>
-                            <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Visits Confirmed: 1,248</p>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Year-Wise Revenue Review</h3>
+                            <p class="text-[10px] text-[var(--text-muted)]">Historical macro conversion comparison parameters</p>
                         </div>
-                        <div class="text-right">
-                            <span class="text-sm font-black text-[var(--success)]">₹68,45,680</span>
-                            <span class="block text-[8px] text-[var(--success)] font-medium"><i class="fa-solid fa-arrow-trend-up"></i> +22.4% YoY</span>
-                        </div>
+                        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20 rounded-md">Year Matrix</span>
                     </div>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="yearWiseTrendChart"></canvas>
                 </div>
             </div>
         </div>
@@ -269,7 +264,7 @@
                         </tr>
                     </thead>
                     <tbody id="visitLogTableBody" class="divide-y divide-slate-800/50 font-medium text-slate-300">
-                        <!-- Content completely managed by filter matrix engine -->
+                        <!-- Content managed by filter matrix engine -->
                     </tbody>
                 </table>
             </div>
@@ -280,23 +275,20 @@
     <!-- CHART.JS INTEGRATION CORE PLATFORM -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Data Repository Matrix mapping ALL vs Individual Executives
+        // Repository Matrix mapping Data Profiles
         const dashboardData = {
             "ALL": {
                 kpis: { visits: "1,248", execs: "5", farms: "842", qty: "15,680", rev: "₹68,45,680", avg: "₹5,120" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [340000, 410000, 390000, 480000, 560000, 610000, 580000, 620000, 690000, 710000, 730000, 725680],
+                yearLabels: ['2024', '2025', '2026'],
+                yearData: [4901200, 5592400, 6845680],
                 execLabels: ['Selva', 'Karthi', 'Roshan', 'Sai', 'Shyam'],
                 execData: [254300, 210500, 186700, 168400, 142600],
                 prodData: [5620, 3280, 2450, 1250, 1400],
                 problemsData: [428, 300, 198, 150, 110],
                 funnel: { hot: "34%", warm: "51%", cold: "15%" },
                 sectors: { poultry: "65%", aqua: "35%" },
-                yearly: [
-                    { y: "2026", v: "1,248", r: "₹68,45,680", g: "+22.4%" },
-                    { y: "2025", v: "1,020", r: "₹55,92,400", g: "+14.1%" },
-                    { y: "2024", v: "890", r: "₹49,01,200", g: "Base" }
-                ],
                 farms: [
                     { name: "Swasthik Poultry Farm", rev: "₹85,600" },
                     { name: "Green Valley Rice Farm", rev: "₹78,450" },
@@ -314,12 +306,12 @@
                 kpis: { visits: "310", execs: "1", farms: "210", qty: "4,120", rev: "₹18,54,300", avg: "₹5,980" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [110000, 130000, 120000, 140000, 155000, 170000, 160000, 165000, 180000, 182000, 190000, 152300],
+                yearLabels: ['2024', '2025', '2026'], yearData: [1210000, 1450000, 1854300],
                 execLabels: ['Selva'], execData: [254300],
                 prodData: [2100, 950, 600, 300, 170],
                 problemsData: [120, 80, 50, 40, 20],
                 funnel: { hot: "45%", warm: "40%", cold: "15%" },
                 sectors: { poultry: "80%", aqua: "20%" },
-                yearly: [{ y: "2026", v: "310", r: "₹18,54,300", g: "+28.1%" }],
                 farms: [{ name: "Green Valley Rice Farm", rev: "₹78,450" }, { name: "Anand Broiler Unit", rev: "₹45,200" }],
                 visits: [{ date: "18-May-2026", exec: "Selva Kumar", farm: "Green Valley Rice Farm", owner: "Rajesh Kumar", geo: "Namakkal, TN", rev: "₹12,450.00" }]
             },
@@ -327,12 +319,12 @@
                 kpis: { visits: "290", execs: "1", farms: "195", qty: "3,890", rev: "₹15,10,500", avg: "₹5,200" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [90000, 110000, 105000, 125000, 130000, 142000, 135000, 138000, 149000, 155000, 160000, 171500],
+                yearLabels: ['2024', '2025', '2026'], yearData: [1050000, 1210000, 1510500],
                 execLabels: ['Karthi'], execData: [210500],
                 prodData: [1200, 1100, 800, 400, 390],
                 problemsData: [95, 110, 45, 30, 10],
                 funnel: { hot: "25%", warm: "60%", cold: "15%" },
                 sectors: { poultry: "40%", aqua: "60%" },
-                yearly: [{ y: "2026", v: "290", r: "₹15,10,500", g: "+19.4%" }],
                 farms: [{ name: "Sri Lakshmi Poultry Complex", rev: "₹72,300" }, { name: "Nellore Shrimp Farm", rev: "₹51,000" }],
                 visits: [{ date: "18-May-2026", exec: "Karthi Keyan", farm: "Sri Lakshmi Poultry Complex", owner: "M. Swamy", geo: "Nellore, AP", rev: "₹9,800.00" }]
             },
@@ -340,12 +332,12 @@
                 kpis: { visits: "240", execs: "1", farms: "160", qty: "2,950", rev: "₹12,86,700", avg: "₹5,360" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [80000, 95000, 90000, 105000, 112000, 118000, 110000, 115000, 122000, 130000, 140000, 139700],
+                yearLabels: ['2024', '2025', '2026'], yearData: [910000, 1090000, 1286700],
                 execLabels: ['Roshan'], execData: [186700],
                 prodData: [950, 800, 650, 350, 200],
                 problemsData: [110, 60, 48, 50, 30],
                 funnel: { hot: "30%", warm: "50%", cold: "20%" },
                 sectors: { poultry: "50%", aqua: "50%" },
-                yearly: [{ y: "2026", v: "240", r: "₹12,86,700", g: "+15.2%" }],
                 farms: [{ name: "Venkateswara Aqua Complex", rev: "₹68,900" }],
                 visits: [{ date: "17-May-2026", exec: "Roshan Singh", farm: "Venkateswara Aqua Complex", owner: "K. Rao", geo: "Kochi, Kerala", rev: "₹15,200.00" }]
             },
@@ -353,12 +345,12 @@
                 kpis: { visits: "228", execs: "1", farms: "152", qty: "2,820", rev: "₹11,68,400", avg: "₹5,124" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [70000, 80000, 85000, 92000, 100000, 105000, 102000, 108000, 115000, 121000, 124000, 131400],
+                yearLabels: ['2024', '2025', '2026'], yearData: [820000, 980000, 1168400],
                 execLabels: ['Sai'], execData: [168400],
                 prodData: [870, 730, 520, 320, 380],
                 problemsData: [73, 30, 35, 20, 40],
                 funnel: { hot: "35%", warm: "50%", cold: "15%" },
                 sectors: { poultry: "90%", aqua: "10%" },
-                yearly: [{ y: "2026", v: "228", r: "₹11,68,400", g: "+21.0%" }],
                 farms: [{ name: "Swasthik Poultry Farm", rev: "₹85,600" }],
                 visits: [{ date: "16-May-2026", exec: "Sai Prasad", farm: "Swasthik Poultry Farm", owner: "S. Reddy", geo: "Guntur, AP", rev: "₹22,100.00" }]
             },
@@ -366,12 +358,12 @@
                 kpis: { visits: "180", execs: "1", farms: "125", qty: "1,900", rev: "₹10,25,780", avg: "₹5,698" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [50000, 60000, 65000, 78000, 83000, 88000, 85000, 89000, 94000, 99000, 102000, 132780],
+                yearLabels: ['2024', '2025', '2026'], yearData: [710000, 840000, 1025780],
                 execLabels: ['Shyam'], execData: [142600],
                 prodData: [500, 500, 400, 200, 300],
                 problemsData: [30, 20, 20, 10, 10],
                 funnel: { hot: "30%", warm: "45%", cold: "25%" },
                 sectors: { poultry: "30%", aqua: "70%" },
-                yearly: [{ y: "2026", v: "180", r: "₹10,25,780", g: "+11.5%" }],
                 farms: [{ name: "Godavari Fish Culture", rev: "₹41,200" }],
                 visits: [{ date: "15-May-2026", exec: "Shyam Sundar", farm: "Godavari Fish Culture", owner: "N. Murthy", geo: "Eluru, AP", rev: "₹14,200.00" }]
             }
@@ -384,10 +376,17 @@
 
             const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
-            // Initialize Charts variables
+            // 📈 Month-wise Performance Linear Trend Engine
             let trendChart = new Chart(document.getElementById('monthWiseTrendChart').getContext('2d'), {
                 type: 'line',
-                data: { labels: [], datasets: [{ label: 'Revenue', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.05)', borderWidth: 2.5, tension: 0.35, fill: true }] },
+                data: { labels: [], datasets: [{ label: 'Monthly Revenue', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.05)', borderWidth: 2.5, tension: 0.35, fill: true, pointBackgroundColor: '#10b981' }] },
+                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            });
+
+            // 📅 NEW: Year-wise Matching Linear Trend Engine
+            let yearTrendChart = new Chart(document.getElementById('yearWiseTrendChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Yearly Revenue', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderWidth: 2.5, tension: 0.35, fill: true, pointBackgroundColor: '#3b82f6' }] },
                 options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
             });
 
@@ -433,24 +432,7 @@
                 document.getElementById('sectorPoultry').innerText = data.sectors.poultry;
                 document.getElementById('sectorAqua').innerText = data.sectors.aqua;
 
-                // 4. Re-inject Dynamic Yearly Matrices
-                let yearlyHTML = '';
-                data.yearly.forEach(y => {
-                    yearlyHTML += `
-                    <div class="bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 flex justify-between items-center">
-                        <div>
-                            <span class="text-xs font-extrabold text-white tracking-wide"><i class="fa-solid fa-calendar-days text-slate-500 mr-1.5"></i>FY ${y.y}</span>
-                            <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Visits Confirmed: ${y.v}</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-sm font-black text-[var(--success)]">${y.r}</span>
-                            <span class="block text-[8px] text-[var(--success)] font-medium"><i class="fa-solid fa-arrow-trend-up"></i> ${y.g} YoY</span>
-                        </div>
-                    </div>`;
-                });
-                document.getElementById('yearlyLedgerContainer').innerHTML = yearlyHTML;
-
-                // 5. Re-inject Top Farm Records
+                // 4. Re-inject Top Farm Records
                 let farmHTML = `<div class="flex justify-between py-2 font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]"><span>Farm Identity</span><span>Revenue</span></div>`;
                 data.farms.forEach(f => {
                     farmHTML += `
@@ -461,7 +443,7 @@
                 });
                 document.getElementById('farmLedgerContainer').innerHTML = farmHTML;
 
-                // 6. Filter Live Logs Audit Table
+                // 5. Filter Live Logs Audit Table
                 let visitHTML = '';
                 data.visits.forEach(v => {
                     visitHTML += `
@@ -479,10 +461,15 @@
                 });
                 document.getElementById('visitLogTableBody').innerHTML = visitHTML;
 
-                // 7. Dynamic Chart Engine Updates
+                // 6. Dynamic Chart Engine Updates
                 trendChart.data.labels = data.monthLabels;
                 trendChart.data.datasets[0].data = data.monthData;
                 trendChart.update();
+
+                // Year Chart Update (Matching layout structure)
+                yearTrendChart.data.labels = data.yearLabels;
+                yearTrendChart.data.datasets[0].data = data.yearData;
+                yearTrendChart.update();
 
                 execChart.data.labels = data.execLabels;
                 execChart.data.datasets[0].data = data.execData;
@@ -500,7 +487,7 @@
                 updateDashboard(e.target.value);
             });
 
-            // Initial Trigger Initialization (All Data Rendered first)
+            // Initial Trigger Initialization
             updateDashboard("ALL");
         });
     </script>
