@@ -385,7 +385,6 @@ def get_dashboard_context(request):
         .order_by('month')
     )
     
-    # 🛡️ HARDENED CRASH FIX: Guard loops against missing or null elements inside queries
     combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
     combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
     combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
@@ -438,14 +437,16 @@ def get_dashboard_context(request):
         .order_by('-count')
     )
 
-    # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX
+    # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX (FIXED FOR ENGINE COMPATIBILITY)
     try:
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
-            .values(state=F('visit__farm__state'), district=F('visit__farm__district'))
+            .values('visit__farm__state', 'visit__farm__district')
             .annotate(
                 farm_count=Count('visit__farm', distinct=True),
-                revenue=Sum('revenue_generated')
+                revenue=Sum('revenue_generated'),
+                state=F('visit__farm__state'),
+                district=F('visit__farm__district')
             )
             .order_by('-revenue')
         )
@@ -524,6 +525,12 @@ def get_dashboard_context(request):
     funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
     problems_list = [dict(prob) for prob in reported_problems] if reported_problems else []
 
+    # Safeguard template evaluations against empty logs
+    try:
+        recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
+    except Exception:
+        recent_visits_queryset = FarmVisitReport.objects.none()
+
     return {
         'total_revenue': total_rev,
         'total_visits': v_count,
@@ -560,7 +567,7 @@ def get_dashboard_context(request):
         'year_wise_trends': year_wise_trends,
         'month_wise_cycle': month_wise_cycle,
 
-        'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10],
+        'recent_visits': recent_visits_queryset,
         
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
