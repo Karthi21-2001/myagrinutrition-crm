@@ -319,7 +319,6 @@ def export_visits_to_excel(request):
                     
             current_row += 1
 
-    # Safe check to prevent crashing if the spreadsheet has no records
     if ws_data.max_row > 1:
         for col in ws_data.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
@@ -368,7 +367,6 @@ def get_dashboard_context(request):
         visit_filters &= Q(visit_date__year=sel_year)
         product_filters &= Q(visit__visit_date__year=sel_year)
 
-    # Core high-level aggregates with robust None-coalescing
     total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
     vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
     v_count = FarmVisitReport.objects.filter(visit_filters).count()
@@ -387,7 +385,7 @@ def get_dashboard_context(request):
         .order_by('month')
     )
     
-    # 🛡️ HARDENED CRASH FIX: Guard loops against missing datetime attributes or keys
+    # 🛡️ HARDENED CRASH FIX: Guard loops against missing or null elements inside queries
     combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
     combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
     combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
@@ -409,7 +407,6 @@ def get_dashboard_context(request):
     if not pipeline_spread or pipeline_spread.get('actual') is None:
         pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
     else:
-        # Guarantee no internal null elements inside dictionary elements
         pipeline_spread = {k: (v or 0) for k, v in pipeline_spread.items()}
         
     product_pricing_table = (
