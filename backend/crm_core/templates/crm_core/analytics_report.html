@@ -1,30 +1,30 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced AgriNutrition Performance Center</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { background-color: #0f172a; color: #cbd5e1; font-family: 'Segoe UI', system-ui, sans-serif; }
-        .dashboard-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
-        .filter-select { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 0.875rem; transition: border-color 0.15s ease; }
-        .filter-select:focus { border-color: #38bdf8; outline: none; }
-        .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
-        
-        /* High-Density Performance Cards */
-        .kpi-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: transform 0.2s ease, border-color 0.2s ease; }
-        .kpi-card:hover { transform: translateY(-2px); border-color: #475569; }
-        
-        /* Custom scrollbar configurations for dashboard matrices */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-    </style>
-</head>
-<body class="p-4 md:p-8">
+{% extends 'crm_core/base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Custom Dashboard Styling Overrides safely contained within the block -->
+<style>
+    .dashboard-body { background-color: #0f172a; color: #cbd5e1; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .dashboard-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+    .filter-select { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 0.875rem; transition: border-color 0.15s ease; }
+    .filter-select:focus { border-color: #38bdf8; outline: none; }
+    .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+    
+    /* High-Density Performance Cards */
+    .kpi-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: transform 0.2s ease, border-color 0.2s ease; }
+    .kpi-card:hover { transform: translateY(-2px); border-color: #475569; }
+    
+    /* Custom scrollbar configurations for dashboard matrices */
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+</style>
+
+<!-- Tailwinds CSS v4 Engine CDN dependency inject for custom container -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+<div class="dashboard-body p-4 md:p-8 rounded-xl">
 
     <!-- TOP NAVIGATION & MANAGEMENT ACTION PANEL HEADER -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -176,7 +176,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-700">
                         {% for row in product_pricing_table %}
-                        <br class="hover:bg-slate-800/40">
+                        <tr class="hover:bg-slate-800/40">
                             <td class="p-3 font-semibold text-slate-200">{{ row.product_name }}</td>
                             <td class="p-3 text-right text-emerald-400 font-bold">₹{{ row.avg_unit_price|floatformat:2 }}</td>
                         </tr>
@@ -363,178 +363,172 @@
         </div>
     </div>
 
-    <!-- ⚡ REAL-TIME INTERACTIVE SCRIPT ENGINE -->
-    <script>
-        // Store engines globally to call dynamic update requests easily
-        let charts = {};
+</div>
 
-        document.addEventListener("DOMContentLoaded", function () {
-            // Contextual extraction directly linked via Django view contextual template context outputs
-            const safeParse = (contextKey, defaultVal = []) => {
-                try { return JSON.parse(contextKey); } catch(e) { return defaultVal; }
-            };
+<!-- ⚡ REAL-TIME INTERACTIVE SCRIPT ENGINE -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let charts = {};
 
-            const comboLabels = safeParse('{{ combo_labels_js|safe }}');
-            const comboRevenue = safeParse('{{ combo_revenue_js|safe }}');
-            const comboVolume = safeParse('{{ combo_volume_js|safe }}');
-            const topProdLabels = safeParse('{{ top_prod_labels_js|safe }}');
-            const topProdRevenue = safeParse('{{ top_prod_revenue_js|safe }}');
-            const execLabels = safeParse('{{ exec_labels_js|safe }}');
-            const execRevenue = safeParse('{{ exec_revenue_js|safe }}');
-            const funnelStagesRaw = safeParse('{{ funnel_stages_js|safe }}');
-            const mapLabels = safeParse('{{ map_labels_js|safe }}');
-            const mapRevenue = safeParse('{{ map_revenue_js|safe }}');
-            const birdLabels = safeParse('{{ bird_labels_js|safe }}');
-            const birdCounts = safeParse('{{ bird_counts_js|safe }}');
+    document.addEventListener("DOMContentLoaded", function () {
+        const safeParse = (contextKey, defaultVal = []) => {
+            try { return JSON.parse(contextKey); } catch(e) { return defaultVal; }
+        };
 
-            // Global Chart Config Base Templates overrides
-            Chart.defaults.color = '#94a3b8';
-            Chart.defaults.borderColor = '#334155';
+        const comboLabels = safeParse('{{ combo_labels_js|safe }}');
+        const comboRevenue = safeParse('{{ combo_revenue_js|safe }}');
+        const comboVolume = safeParse('{{ combo_volume_js|safe }}');
+        const topProdLabels = safeParse('{{ top_prod_labels_js|safe }}');
+        const topProdRevenue = safeParse('{{ top_prod_revenue_js|safe }}');
+        const execLabels = safeParse('{{ exec_labels_js|safe }}');
+        const execRevenue = safeParse('{{ exec_revenue_js|safe }}');
+        const funnelStagesRaw = safeParse('{{ funnel_stages_js|safe }}');
+        const mapLabels = safeParse('{{ map_labels_js|safe }}');
+        const mapRevenue = safeParse('{{ map_revenue_js|safe }}');
+        const birdLabels = safeParse('{{ bird_labels_js|safe }}');
+        const birdCounts = safeParse('{{ bird_counts_js|safe }}');
 
-            // 1. Combo Chart (Dual Axis - Revenue Line + Quantity Bar)
-            charts.combo = new Chart(document.getElementById('comboChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: comboLabels,
-                    datasets: [
-                        { label: 'Volume Sold', data: comboVolume, backgroundColor: '#38bdf8', yAxisID: 'yVol', order: 2, borderRadius: 4 },
-                        { label: 'Revenue (₹)', data: comboRevenue, borderColor: '#34d399', backgroundColor: 'transparent', type: 'line', yAxisID: 'yRev', order: 1, tension: 0.2 }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        yVol: { position: 'left', beginAtZero: true, grid: { color: '#334155' } },
-                        yRev: { position: 'right', beginAtZero: true, grid: { display: false } }
-                    }
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = '#334155';
+
+        // 1. Combo Chart (Dual Axis - Revenue Line + Quantity Bar)
+        charts.combo = new Chart(document.getElementById('comboChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: comboLabels,
+                datasets: [
+                    { label: 'Volume Sold', data: comboVolume, backgroundColor: '#38bdf8', yAxisID: 'yVol', order: 2, borderRadius: 4 },
+                    { label: 'Revenue (₹)', data: comboRevenue, borderColor: '#34d399', backgroundColor: 'transparent', type: 'line', yAxisID: 'yRev', order: 1, tension: 0.2 }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    yVol: { position: 'left', beginAtZero: true, grid: { color: '#334155' } },
+                    yRev: { position: 'right', beginAtZero: true, grid: { display: false } }
                 }
-            });
-
-            // 2. Top Products Donut Matrix Chart
-            charts.donut = new Chart(document.getElementById('productDonutChart').getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: topProdLabels,
-                    datasets: [{ data: topProdRevenue, backgroundColor: ['#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#22d3ee'] }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-            });
-
-            // 3. Target Clustered Bar Analytics Chart
-            charts.clustered = new Chart(document.getElementById('clusteredBarChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: execLabels,
-                    datasets: [
-                        { label: 'Actual Sales', data: execRevenue, backgroundColor: '#fbbf24', borderRadius: 4 },
-                        { label: 'Target Target Metric', data: execRevenue.map(v => v * 1.15), backgroundColor: '#475569', borderRadius: 4 }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            // 4. Performance Leaderboard Engine 
-            charts.leaderboard = new Chart(document.getElementById('leaderboardChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: execLabels,
-                    datasets: [{ label: 'Sales Generated', data: execRevenue, backgroundColor: '#60a5fa', borderRadius: 4 }]
-                },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
-            });
-
-            // 5. Funnel Analytics System Pipeline Chart
-            charts.funnel = new Chart(document.getElementById('pipelineFunnelChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(funnelStagesRaw).length ? Object.keys(funnelStagesRaw) : ['Leads', 'Quotes', 'Closed'],
-                    datasets: [{ label: 'Stages', data: Object.values(funnelStagesRaw).length ? Object.values(funnelStagesRaw) : [100, 60, 30], backgroundColor: '#f472b6', borderRadius: 4 }]
-                },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-
-            // 6. Regional Map Mock Chart Matrix
-            charts.geo = new Chart(document.getElementById('geoDistrictChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: mapLabels,
-                    datasets: [{ data: mapRevenue, backgroundColor: ['#38bdf8', '#fbbf24', '#f87171', '#34d399'] }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            // 7. Demographics Pie Tracking System Engine
-            charts.demographics = new Chart(document.getElementById('avianDemographicsChart').getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: birdLabels,
-                    datasets: [{ data: birdCounts, backgroundColor: ['#22d3ee', '#818cf8', '#fb7185'] }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            // Synchronize listeners across target telemetry metrics fields
-            const targets = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'startDateInput', 'endDateInput', 'monthSelect'];
-            targets.forEach(id => {
-                document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
-            });
+            }
         });
 
-        // Downstream AJAX Analytics Data Engine Integration Updates
-        function fetchFilteredCanvasMetrics() {
-            const getVal = (id) => document.getElementById(id).value;
-            const queryParams = new URLSearchParams({
-                state: getVal('stateSelect'), country: getVal('countrySelect'), district: getVal('districtSelect'),
-                executive: getVal('executiveSelect'), business_type: getVal('businessTypeSelect'),
-                start_date: getVal('startDateInput'), end_date: getVal('endDateInput'), month: getVal('monthSelect')
-            });
+        // 2. Top Products Donut Matrix Chart
+        charts.donut = new Chart(document.getElementById('productDonutChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: topProdLabels,
+                datasets: [{ data: topProdRevenue, backgroundColor: ['#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#22d3ee'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+        });
 
-            // Sync Export Anchor Button Routing Elements Params Structure
-            const exportButton = document.getElementById('exportCsvBtn');
-            if (exportButton) {
-                const baseRoute = exportButton.getAttribute('href').split('?')[0];
-                exportButton.setAttribute('href', `${baseRoute}?${queryParams.toString()}`);
-            }
+        // 3. Target Clustered Bar Analytics Chart
+        charts.clustered = new Chart(document.getElementById('clusteredBarChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: execLabels,
+                datasets: [
+                    { label: 'Actual Sales', data: execRevenue, backgroundColor: '#fbbf24', borderRadius: 4 },
+                    { label: 'Target Metric', data: execRevenue.map(v => v * 1.15), backgroundColor: '#475569', borderRadius: 4 }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
 
-            // Dispatch Request Asynchronously Downstream to Django views
-            fetch(`${window.location.pathname}?${queryParams.toString()}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error("Telemetry operational data fetch pipeline error.");
-                return response.json();
-            })
-            .then(data => {
-                // Runtime updates of variables when datasets match context telemetry models payloads
-                if (data.combo_labels) {
-                    charts.combo.data.labels = data.combo_labels;
-                    charts.combo.data.datasets[0].data = data.combo_volume;
-                    charts.combo.data.datasets[1].data = data.combo_revenue;
-                    charts.combo.update();
-                }
-                if (data.top_prod_labels) {
-                    charts.donut.data.labels = data.top_prod_labels;
-                    charts.donut.data.datasets[0].data = data.top_prod_revenue;
-                    charts.donut.update();
-                }
-                if (data.exec_labels) {
-                    charts.leaderboard.data.labels = data.exec_labels;
-                    charts.leaderboard.data.datasets[0].data = data.exec_revenue;
-                    charts.leaderboard.update();
+        // 4. Performance Leaderboard Engine 
+        charts.leaderboard = new Chart(document.getElementById('leaderboardChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: execLabels,
+                datasets: [{ label: 'Sales Generated', data: execRevenue, backgroundColor: '#60a5fa', borderRadius: 4 }]
+                },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+        });
 
-                    charts.clustered.data.labels = data.exec_labels;
-                    charts.clustered.data.datasets[0].data = data.exec_revenue;
-                    charts.clustered.data.datasets[1].data = data.exec_revenue.map(v => v * 1.15);
-                    charts.clustered.update();
-                }
-                if (data.map_labels) {
-                    charts.geo.data.labels = data.map_labels;
-                    charts.geo.data.datasets[0].data = data.map_revenue;
-                    charts.geo.update();
-                }
-            })
-            .catch(error => console.error("Error synchronizing interactive analytics graphs:", error));
+        // 5. Funnel Analytics System Pipeline Chart
+        charts.funnel = new Chart(document.getElementById('pipelineFunnelChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(funnelStagesRaw).length ? Object.keys(funnelStagesRaw) : ['Leads', 'Quotes', 'Closed'],
+                datasets: [{ label: 'Stages', data: Object.values(funnelStagesRaw).length ? Object.values(funnelStagesRaw) : [100, 60, 30], backgroundColor: '#f472b6', borderRadius: 4 }]
+            },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+
+        // 6. Regional Map Mock Chart Matrix
+        charts.geo = new Chart(document.getElementById('geoDistrictChart').getContext('2d'), {
+            type: 'pie',
+            data: {
+                labels: mapLabels,
+                datasets: [{ data: mapRevenue, backgroundColor: ['#38bdf8', '#fbbf24', '#f87171', '#34d399'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // 7. Demographics Pie Tracking System Engine
+        charts.demographics = new Chart(document.getElementById('avianDemographicsChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: birdLabels,
+                datasets: [{ data: birdCounts, backgroundColor: ['#22d3ee', '#818cf8', '#fb7185'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        const targets = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'startDateInput', 'endDateInput', 'monthSelect'];
+        targets.forEach(id => {
+            document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
+        });
+    });
+
+    function fetchFilteredCanvasMetrics() {
+        const getVal = (id) => document.getElementById(id).value;
+        const queryParams = new URLSearchParams({
+            state: getVal('stateSelect'), country: getVal('countrySelect'), district: getVal('districtSelect'),
+            executive: getVal('executiveSelect'), business_type: getVal('businessTypeSelect'),
+            start_date: getVal('startDateInput'), end_date: getVal('endDateInput'), month: getVal('monthSelect')
+        });
+
+        const exportButton = document.getElementById('exportCsvBtn');
+        if (exportButton) {
+            const baseRoute = exportButton.getAttribute('href').split('?')[0];
+            exportButton.setAttribute('href', `${baseRoute}?${queryParams.toString()}`);
         }
-    </script>
-</body>
-</html>
+
+        fetch(`${window.location.pathname}?${queryParams.toString()}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error("Telemetry operational data fetch pipeline error.");
+            return response.json();
+        })
+        .then(data => {
+            if (data.combo_labels) {
+                charts.combo.data.labels = data.combo_labels;
+                charts.combo.data.datasets[0].data = data.combo_volume;
+                charts.combo.data.datasets[1].data = data.combo_revenue;
+                charts.combo.update();
+            }
+            if (data.top_prod_labels) {
+                charts.donut.data.labels = data.top_prod_labels;
+                charts.donut.data.datasets[0].data = data.top_prod_revenue;
+                charts.donut.update();
+            }
+            if (data.exec_labels) {
+                charts.leaderboard.data.labels = data.exec_labels;
+                charts.leaderboard.data.datasets[0].data = data.exec_revenue;
+                charts.leaderboard.update();
+
+                charts.clustered.data.labels = data.exec_labels;
+                charts.clustered.data.datasets[0].data = data.exec_revenue;
+                charts.clustered.data.datasets[1].data = data.exec_revenue.map(v => v * 1.15);
+                charts.clustered.update();
+            }
+            if (data.map_labels) {
+                charts.geo.data.labels = data.map_labels;
+                charts.geo.data.datasets[0].data = data.map_revenue;
+                charts.geo.update();
+            }
+        })
+        .catch(error => console.error("Error synchronizing interactive analytics graphs:", error));
+    }
+</script>
+{% endblock %}
