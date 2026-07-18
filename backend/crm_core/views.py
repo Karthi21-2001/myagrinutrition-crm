@@ -2,6 +2,7 @@ import csv
 import json
 import requests
 import openpyxl
+import traceback
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -336,7 +337,6 @@ def export_visits_to_excel(request):
 # ==========================================
 
 def get_dashboard_context(request):
-    # Safe fallback initializations
     total_rev = 0
     vol_sold = 0
     v_count = 0
@@ -367,7 +367,6 @@ def get_dashboard_context(request):
     district_list = []
     executive_list = []
 
-    # Read Filters safely
     sel_state = request.GET.get('state', '').strip()
     sel_country = request.GET.get('country', '').strip()
     sel_district = request.GET.get('district', '').strip()
@@ -376,7 +375,6 @@ def get_dashboard_context(request):
     sel_year = request.GET.get('year', '').strip()
 
     try:
-        # Build Filter Matrices
         farm_filters = Q()
         visit_filters = Q()
         product_filters = Q()
@@ -401,7 +399,6 @@ def get_dashboard_context(request):
             visit_filters &= Q(visit_date__year=sel_year)
             product_filters &= Q(visit__visit_date__year=sel_year)
 
-        # Core Global KPI Aggregations
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
         vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
@@ -411,7 +408,6 @@ def get_dashboard_context(request):
         total_leads = VisitedProductDetail.objects.filter(product_filters).count()
         conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
 
-        # 1️⃣ SALES & REVENUE ADVANCED COMPONENT
         time_series_data = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -448,7 +444,6 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
-        # 2️⃣ OPERATIONS & EXECUTIVE LEADERBOARDS
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
@@ -471,7 +466,6 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
-        # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
@@ -493,7 +487,6 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # 4️⃣ FARM PROFILE & STRUCTURAL HEALTH INSIGHTS
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('chicks_count'),
             growers=Sum('grower_count'),
@@ -524,7 +517,6 @@ def get_dashboard_context(request):
             .order_by('-total_farms')
         )
 
-        # 5️⃣ LEGACY ANALYTICS OVERLAYS
         visit_frequency_exec = (
             FarmVisitReport.objects.filter(visit_filters)
             .values('executive__username')
@@ -550,13 +542,11 @@ def get_dashboard_context(request):
 
         recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
 
-        # Dynamic Form Dropdown Initializations
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
         executive_list = User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct()
 
     except Exception:
-        # Graceful logging or handling logic can be inserted here if needed
         pass
 
     return {
@@ -613,20 +603,41 @@ def get_dashboard_context(request):
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    context = get_dashboard_context(request)
-    return render(request, 'crm_core/dashboard.html', context)
+    try:
+        context = get_dashboard_context(request)
+        return render(request, 'crm_core/dashboard.html', context)
+    except Exception as e:
+        error_message = traceback.format_exc()
+        return HttpResponse(
+            f"<h3>Diagnostic Traceback (Dashboard Home Failing):</h3><pre>{error_message}</pre>", 
+            content_type="text/html"
+        )
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    context = get_dashboard_context(request)
-    return render(request, 'crm_core/analytics_report.html', context)
+    try:
+        context = get_dashboard_context(request)
+        return render(request, 'crm_core/analytics_report.html', context)
+    except Exception as e:
+        error_message = traceback.format_exc()
+        return HttpResponse(
+            f"<h3>Diagnostic Traceback (Dashboard Analytics Failing):</h3><pre>{error_message}</pre>", 
+            content_type="text/html"
+        )
 
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    context = get_dashboard_context(request)
-    return render(request, 'crm_core/analytics_report.html', context)
+    try:
+        context = get_dashboard_context(request)
+        return render(request, 'crm_core/analytics_report.html', context)
+    except Exception as e:
+        error_message = traceback.format_exc()
+        return HttpResponse(
+            f"<h3>Diagnostic Traceback (Executive Analytics Failing):</h3><pre>{error_message}</pre>", 
+            content_type="text/html"
+        )
 
 
 # ==========================================
