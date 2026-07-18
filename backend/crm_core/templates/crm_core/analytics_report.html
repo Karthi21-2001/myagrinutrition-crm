@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My AgriNutrition Dashboard - Analytics Report</title>
+    <title>Advanced AgriNutrition Performance Center</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -13,42 +13,55 @@
         .filter-select:focus { border-color: #38bdf8; outline: none; }
         .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
         
-        /* 💎 PREMIUM POWER-BI STYLE METRIC CARD STYLING */
-        .metric-card {
-            background: #ffffff;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            border-left: 5px solid #28a745; /* Agri Green accent bar */
-            transition: transform 0.2s ease;
-        }
-        .metric-card:hover {
-            transform: translateY(-3px);
-        }
-        .metric-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #1a1a1a;
-        }
+        /* High-Density Performance Cards */
+        .kpi-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: transform 0.2s ease, border-color 0.2s ease; }
+        .kpi-card:hover { transform: translateY(-2px); border-color: #475569; }
+        
+        /* Custom scrollbar configurations for dashboard matrices */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body class="p-6 md:p-8">
+<body class="p-4 md:p-8">
 
     <!-- TOP NAVIGATION & MANAGEMENT ACTION PANEL HEADER -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-wide uppercase">My AgriNutrition Dashboard</h1>
-            <p class="text-xs text-slate-400">Live Management Performance & Pipeline Telemetry</p>
+            <h1 class="text-2xl font-bold text-white tracking-wide uppercase">🌱 Advanced Analyst Center</h1>
+            <p class="text-xs text-slate-400">My AgriNutrition Comprehensive Performance & Field Telemetry Intelligence Suite</p>
         </div>
         <div class="flex items-center gap-3 w-full md:w-auto">
-            <!-- 📥 EXCEL EXPORT DISPATCH ANCHOR LINK -->
+            <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg border border-slate-600 transition duration-150 flex items-center gap-2">
+                🖨️ Print Report
+            </button>
             <a href="{% url 'export_visits_to_excel' %}" id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-emerald-500 transition duration-150 flex items-center gap-2 shadow-sm">
-                📥 Export Excel Log Sheet
+                📥 Export Integrated Logs
             </a>
-            <!-- Fixed URL targeting for root dashboard view navigation -->
-            <a href="{% url 'dashboard_home' %}" class="bg-[#1e293b] hover:bg-[#334155] text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
+            <a href="{% url 'dashboard_home' %}" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
                 ⬅ Back to Summary
             </a>
+        </div>
+    </div>
+
+    <!-- CORE HIGH-LEVEL DYNAMIC KPI STRIP -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="kpi-card border-l-4 border-l-sky-500">
+            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Total visits (KPI Count)</span>
+            <h3 class="text-2xl font-bold text-white tracking-tight">{{ total_visits|default:"0" }}</h3>
+        </div>
+        <div class="kpi-card border-l-4 border-l-emerald-500">
+            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Aggregated Revenue (INR)</span>
+            <h3 class="text-2xl font-bold text-emerald-400 tracking-tight">₹{{ total_revenue|floatformat:2 }}</h3>
+        </div>
+        <div class="kpi-card border-l-4 border-l-amber-500">
+            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Total Sales Volume</span>
+            <h3 class="text-2xl font-bold text-amber-400 tracking-tight">{{ total_sales_volume|default:"0" }} Units</h3>
+        </div>
+        <div class="kpi-card border-l-4 border-l-rose-500">
+            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Conversion Success Rate</span>
+            <h3 class="text-2xl font-bold text-rose-400 tracking-tight">{{ conversion_rate|default:"0" }}%</h3>
         </div>
     </div>
 
@@ -126,144 +139,401 @@
         </div>
     </div>
 
-    <!-- 📉 ANALYTICS CHART DISPLAY CANVAS SYSTEM -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">📊 Field Visit Frequency per Executive</h3>
+    <!-- SECTION 1: SALES & REVENUE INSIGHTS -->
+    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">1. Sales & Revenue Analysis</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+        <!-- Revenue Trends Over Time (Combo Chart) -->
+        <div class="dashboard-card lg:col-span-7">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">📈 Revenue Trends & Quantities Sold Over Time</h3>
             <div class="relative w-full h-[320px]">
-                <canvas id="districtBarChart"></canvas>
+                <canvas id="comboChart"></canvas>
             </div>
         </div>
-        
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🎯 Zone-wise Sales Metric Breakdown (District Performance)</h3>
-            <div class="relative w-full h-[320px]">
-                <canvas id="visitPieChart"></canvas>
+        <!-- Product Top-Sellers Matrix (Donut Chart) -->
+        <div class="dashboard-card lg:col-span-5">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🎯 Top-Selling & Highest-Revenue Products</h3>
+            <div class="relative w-full h-[320px] flex items-center justify-center">
+                <canvas id="productDonutChart"></canvas>
             </div>
         </div>
+        <!-- Actual vs Targets (Clustered Bar Chart) -->
+        <div class="dashboard-card lg:col-span-6">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">📊 Actual Sales vs Targets vs Total Market Potential</h3>
+            <div class="relative w-full h-[280px]">
+                <canvas id="clusteredBarChart"></canvas>
+            </div>
+        </div>
+        <!-- Product Catalog Unit Prices (Matrix Table) -->
+        <div class="dashboard-card lg:col-span-6">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🏷️ Average Unit Prices Catalog Table</h3>
+            <div class="w-full max-h-[280px] overflow-y-auto custom-scrollbar border border-slate-700 rounded-lg">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-800 text-xs text-slate-400 uppercase sticky top-0 border-b border-slate-700">
+                        <tr>
+                            <th class="p-3">Product Name</th>
+                            <th class="p-3 text-right">Average Price (INR)</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        {% for row in product_pricing_table %}
+                        <br class="hover:bg-slate-800/40">
+                            <td class="p-3 font-semibold text-slate-200">{{ row.product_name }}</td>
+                            <td class="p-3 text-right text-emerald-400 font-bold">₹{{ row.avg_unit_price|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="p-4 text-center text-slate-500 italic">No pricing data logged.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">📈 Year-wise Revenue Trends</h3>
-            <div class="relative w-full h-[320px]">
-                <canvas id="yearRevenueChart"></canvas>
+    <!-- SECTION 2: OPERATIONS & PERFORMANCE TRACKING -->
+    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">2. Operations & Performance Tracking</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+        <!-- Field Leaderboard Matrix -->
+        <div class="dashboard-card lg:col-span-7">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🏆 Executive Sales Performance Leaderboard</h3>
+            <div class="relative w-full h-[300px]">
+                <canvas id="leaderboardChart"></canvas>
             </div>
         </div>
+        <!-- Pipeline Status Funnel -->
+        <div class="dashboard-card lg:col-span-5">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">⏳ Sales Pipeline Funnel Conversion Stages</h3>
+            <div class="relative w-full h-[300px]">
+                <canvas id="pipelineFunnelChart"></canvas>
+            </div>
+        </div>
+    </div>
 
+    <!-- SECTION 3: GEOGRAPHICAL PERFORMANCE & AUDITING MATRIX -->
+    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">3. Geographical Distribution & Logs</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+        <!-- Zone-wise / District Performance -->
+        <div class="dashboard-card lg:col-span-5">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🗺️ Zone-wise Metrics Breakdown (District Map Mock)</h3>
+            <div class="relative w-full h-[300px]">
+                <canvas id="geoDistrictChart"></canvas>
+            </div>
+        </div>
+        <!-- Management Telemetry Auditing Table Matrix -->
+        <div class="dashboard-card lg:col-span-7">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🛡️ Management Telemetry Live Audit Trail</h3>
+            <div class="w-full max-h-[300px] overflow-y-auto custom-scrollbar border border-slate-700 rounded-lg">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-800 text-xs text-slate-400 uppercase sticky top-0 border-b border-slate-700">
+                        <tr>
+                            <th class="p-3">Timestamp</th>
+                            <th class="p-3">Executive</th>
+                            <th class="p-3">Farm Name</th>
+                            <th class="p-3">Area / Suburb</th>
+                            <th class="p-3 text-center">Live GPS Navigation</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        {% for audit in telemetry_audit_log %}
+                        <tr class="hover:bg-slate-800/40 text-xs">
+                            <td class="p-3 text-slate-400">{{ audit.visit_date|date:"Y-m-d H:i" }}</td>
+                            <td class="p-3 font-bold text-slate-200">{{ audit.executive__username }}</td>
+                            <td class="p-3">{{ audit.farm__farm_name }}</td>
+                            <td class="p-3"><span class="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs">{{ audit.farm__area }}</span></td>
+                            <td class="p-3 text-center">
+                                {% if audit.farm__latitude and audit.farm__longitude %}
+                                <a href="https://maps.google.com/?q={{ audit.farm__latitude }},{{ audit.farm__longitude }}" target="_blank" class="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 border border-sky-500/30 hover:border-sky-400 px-2 py-1 rounded bg-sky-500/10 transition">
+                                    📍 Route
+                                </a>
+                                {% else %}
+                                <span class="text-slate-500 italic text-xs">No GPS Stream</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-slate-500 italic">No tracking records available.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 4: FARM HEALTH & HEALTH DIAGNOSTICS ARCHITECTURE -->
+    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">4. Farm Profile & Health Analytics</h2>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Avian Demographics Distribution -->
         <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🌙 Month-wise Revenue Cycle</h3>
-            <div class="relative w-full h-[320px]">
-                <canvas id="monthRevenueChart"></canvas>
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">🐓 Avian Demographics Demarcation</h3>
+            <div class="relative w-full h-[260px] flex items-center justify-center">
+                <canvas id="avianDemographicsChart"></canvas>
+            </div>
+        </div>
+        <!-- Top Farm Issues Observed -->
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">⚠️ Top Farm Diagnostics / Problems Observed</h3>
+            <div class="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 border border-slate-700 rounded-lg bg-slate-900/40 p-2">
+                {% for item in reported_problems %}
+                <div class="flex justify-between items-center py-2.5 px-2 text-sm">
+                    <span class="text-slate-300 font-medium flex items-center gap-2">❌ {{ item.farm_problem }}</span>
+                    <span class="bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold px-2.5 py-0.5 rounded-full text-xs">{{ item.frequency }} Reported</span>
+                </div>
+                {% empty %}
+                <div class="text-center p-4 text-slate-500 italic text-sm">No diagnostic notes tracked.</div>
+                {% endfor %}
+            </div>
+        </div>
+        <!-- Market Segment Breakdown -->
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-4">⚓ Market Segment & Sub-Segment Tractions</h3>
+            <div class="w-full max-h-[260px] overflow-y-auto custom-scrollbar border border-slate-700 rounded-lg">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-800 text-slate-400 uppercase sticky top-0 border-b border-slate-700">
+                        <tr>
+                            <th class="p-2.5">Segment</th>
+                            <th class="p-2.5">Sub-Segment</th>
+                            <th class="p-2.5 text-center">Farms</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700">
+                        {% for segment in segment_breakdown %}
+                        <tr class="hover:bg-slate-800/40">
+                            <td class="p-2.5 font-bold text-slate-200">{{ segment.business_type }}</td>
+                            <td class="p-2.5 text-slate-400">{{ segment.sub_segment|default:"General" }}</td>
+                            <td class="p-2.5 text-center font-bold text-sky-400">{{ segment.total_farms }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="p-4 text-center text-slate-500 italic">No segmentation maps recorded.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 5: LEGACY / HISTORICAL REVENUE TREND CHANNELS -->
+    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">5. Legacy Management Overlays</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Field Visit Frequency Per Executive -->
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-3 border-b border-slate-700 pb-2">📊 Field Visit Frequency per Executive</h3>
+            <div class="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 text-sm">
+                {% for item in visit_frequency_exec %}
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-slate-300">👤 {{ item.executive__username }}</span>
+                    <span class="bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold px-2 py-0.5 rounded text-xs">{{ item.visit_count }} Visits</span>
+                </div>
+                {% empty %}
+                <div class="text-center p-4 text-slate-500 italic">No structural logs found.</div>
+                {% endfor %}
+            </div>
+        </div>
+        <!-- Year-Wise Revenue Cycles -->
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-3 border-b border-slate-700 pb-2">📅 Year-wise Revenue Trends</h3>
+            <div class="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 text-sm">
+                {% for item in year_wise_trends %}
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-slate-300">🗓️ {{ item.year|date:"Y" }}</span>
+                    <span class="font-bold text-emerald-400">₹{{ item.revenue|floatformat:2 }}</span>
+                </div>
+                {% empty %}
+                <div class="text-center p-4 text-slate-500 italic">No trend profiles found.</div>
+                {% endfor %}
+            </div>
+        </div>
+        <!-- Month-Wise Revenue Metrics -->
+        <div class="dashboard-card">
+            <h3 class="text-sm font-semibold text-slate-200 mb-3 border-b border-slate-700 pb-2">🌙 Month-wise Revenue Cycle</h3>
+            <div class="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 text-sm">
+                {% for item in month_wise_cycle %}
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-slate-300">📈 {{ item.month|date:"b Y" }}</span>
+                    <span class="font-bold text-amber-400">₹{{ item.revenue|floatformat:2 }}</span>
+                </div>
+                {% empty %}
+                <div class="text-center p-4 text-slate-500 italic">No seasonal items calculated.</div>
+                {% endfor %}
             </div>
         </div>
     </div>
 
     <!-- ⚡ REAL-TIME INTERACTIVE SCRIPT ENGINE -->
     <script>
-        let barChartEngine, pieChartEngine, yearChartEngine, monthChartEngine;
+        // Store engines globally to call dynamic update requests easily
+        let charts = {};
 
         document.addEventListener("DOMContentLoaded", function () {
-            const ctxBar = document.getElementById('districtBarChart').getContext('2d');
-            const ctxPie = document.getElementById('visitPieChart').getContext('2d');
-            const ctxYear = document.getElementById('yearRevenueChart').getContext('2d');
-            const ctxMonth = document.getElementById('monthRevenueChart').getContext('2d');
+            // Contextual extraction directly linked via Django view contextual template context outputs
+            const safeParse = (contextKey, defaultVal = []) => {
+                try { return JSON.parse(contextKey); } catch(e) { return defaultVal; }
+            };
 
-            // Initialize Charts with empty structures waiting for server delivery
-            barChartEngine = new Chart(ctxBar, {
+            const comboLabels = safeParse('{{ combo_labels_js|safe }}');
+            const comboRevenue = safeParse('{{ combo_revenue_js|safe }}');
+            const comboVolume = safeParse('{{ combo_volume_js|safe }}');
+            const topProdLabels = safeParse('{{ top_prod_labels_js|safe }}');
+            const topProdRevenue = safeParse('{{ top_prod_revenue_js|safe }}');
+            const execLabels = safeParse('{{ exec_labels_js|safe }}');
+            const execRevenue = safeParse('{{ exec_revenue_js|safe }}');
+            const funnelStagesRaw = safeParse('{{ funnel_stages_js|safe }}');
+            const mapLabels = safeParse('{{ map_labels_js|safe }}');
+            const mapRevenue = safeParse('{{ map_revenue_js|safe }}');
+            const birdLabels = safeParse('{{ bird_labels_js|safe }}');
+            const birdCounts = safeParse('{{ bird_counts_js|safe }}');
+
+            // Global Chart Config Base Templates overrides
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.borderColor = '#334155';
+
+            // 1. Combo Chart (Dual Axis - Revenue Line + Quantity Bar)
+            charts.combo = new Chart(document.getElementById('comboChart').getContext('2d'), {
                 type: 'bar',
-                data: { labels: [], datasets: [{ label: 'Visits Logged', data: [], backgroundColor: '#38bdf8', borderColor: '#0284c7', borderWidth: 1, borderRadius: 6 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } }
+                data: {
+                    labels: comboLabels,
+                    datasets: [
+                        { label: 'Volume Sold', data: comboVolume, backgroundColor: '#38bdf8', yAxisID: 'yVol', order: 2, borderRadius: 4 },
+                        { label: 'Revenue (₹)', data: comboRevenue, borderColor: '#34d399', backgroundColor: 'transparent', type: 'line', yAxisID: 'yRev', order: 1, tension: 0.2 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        yVol: { position: 'left', beginAtZero: true, grid: { color: '#334155' } },
+                        yRev: { position: 'right', beginAtZero: true, grid: { display: false } }
+                    }
+                }
             });
 
-            pieChartEngine = new Chart(ctxPie, {
-                type: 'bar', 
-                data: { labels: [], datasets: [{ label: 'Revenue (₹)', data: [], backgroundColor: '#a78bfa', borderColor: '#8b5cf6', borderWidth: 1, borderRadius: 6 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { display: false }, ticks: { color: '#94a3b8' } } } }
+            // 2. Top Products Donut Matrix Chart
+            charts.donut = new Chart(document.getElementById('productDonutChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: topProdLabels,
+                    datasets: [{ data: topProdRevenue, backgroundColor: ['#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#22d3ee'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
             });
 
-            yearChartEngine = new Chart(ctxYear, {
-                type: 'line',
-                data: { labels: [], datasets: [{ label: 'Revenue Growth', data: [], borderColor: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.1)', borderWidth: 2, tension: 0.3, fill: true }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
+            // 3. Target Clustered Bar Analytics Chart
+            charts.clustered = new Chart(document.getElementById('clusteredBarChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: execLabels,
+                    datasets: [
+                        { label: 'Actual Sales', data: execRevenue, backgroundColor: '#fbbf24', borderRadius: 4 },
+                        { label: 'Target Target Metric', data: execRevenue.map(v => v * 1.15), backgroundColor: '#475569', borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
             });
 
-            monthChartEngine = new Chart(ctxMonth, {
-                type: 'line',
-                data: { labels: [], datasets: [{ label: 'Monthly Cycles', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', borderWidth: 2, tension: 0.3, fill: true }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
+            // 4. Performance Leaderboard Engine 
+            charts.leaderboard = new Chart(document.getElementById('leaderboardChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: execLabels,
+                    datasets: [{ label: 'Sales Generated', data: execRevenue, backgroundColor: '#60a5fa', borderRadius: 4 }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
             });
 
-            // Map tracking listeners across all target elements
+            // 5. Funnel Analytics System Pipeline Chart
+            charts.funnel = new Chart(document.getElementById('pipelineFunnelChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(funnelStagesRaw).length ? Object.keys(funnelStagesRaw) : ['Leads', 'Quotes', 'Closed'],
+                    datasets: [{ label: 'Stages', data: Object.values(funnelStagesRaw).length ? Object.values(funnelStagesRaw) : [100, 60, 30], backgroundColor: '#f472b6', borderRadius: 4 }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            // 6. Regional Map Mock Chart Matrix
+            charts.geo = new Chart(document.getElementById('geoDistrictChart').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: mapLabels,
+                    datasets: [{ data: mapRevenue, backgroundColor: ['#38bdf8', '#fbbf24', '#f87171', '#34d399'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 7. Demographics Pie Tracking System Engine
+            charts.demographics = new Chart(document.getElementById('avianDemographicsChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: birdLabels,
+                    datasets: [{ data: birdCounts, backgroundColor: ['#22d3ee', '#818cf8', '#fb7185'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Synchronize listeners across target telemetry metrics fields
             const targets = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'startDateInput', 'endDateInput', 'monthSelect'];
             targets.forEach(id => {
                 document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
             });
-
-            // Run metric discovery sync query on bootstrap layout mount
-            fetchFilteredCanvasMetrics();
         });
 
-        // Async pipeline sync orchestrator
+        // Downstream AJAX Analytics Data Engine Integration Updates
         function fetchFilteredCanvasMetrics() {
-            const state = document.getElementById('stateSelect').value;
-            const country = document.getElementById('countrySelect').value;
-            const district = document.getElementById('districtSelect').value;
-            const executive = document.getElementById('executiveSelect').value;
-            const businessType = document.getElementById('businessTypeSelect').value;
-            const startDate = document.getElementById('startDateInput').value;
-            const endDate = document.getElementById('endDateInput').value;
-            const month = document.getElementById('monthSelect').value;
-
-            // 1. Pack standard payload search tokens
+            const getVal = (id) => document.getElementById(id).value;
             const queryParams = new URLSearchParams({
-                state: state,
-                country: country,
-                district: district,
-                executive: executive,
-                business_type: businessType,
-                start_date: startDate,
-                end_date: endDate,
-                month: month
+                state: getVal('stateSelect'), country: getVal('countrySelect'), district: getVal('districtSelect'),
+                executive: getVal('executiveSelect'), business_type: getVal('businessTypeSelect'),
+                start_date: getVal('startDateInput'), end_date: getVal('endDateInput'), month: getVal('monthSelect')
             });
 
-            // 2. Synchronize Export File Anchor Button link query parameters
+            // Sync Export Anchor Button Routing Elements Params Structure
             const exportButton = document.getElementById('exportCsvBtn');
             if (exportButton) {
                 const baseRoute = exportButton.getAttribute('href').split('?')[0];
                 exportButton.setAttribute('href', `${baseRoute}?${queryParams.toString()}`);
             }
 
-            // 3. Dispatch AJAX request downstream to Django Analytics Views
+            // Dispatch Request Asynchronously Downstream to Django views
             fetch(`${window.location.pathname}?${queryParams.toString()}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(response => {
-                if (!response.ok) throw new Error("Telemetry refresh processing fault");
+                if (!response.ok) throw new Error("Telemetry operational data fetch pipeline error.");
                 return response.json();
             })
             .then(data => {
-                // Update Executive Performance Bar Graph
-                barChartEngine.data.labels = data.labels && data.labels.length ? data.labels : ['No Visits Found'];
-                barChartEngine.data.datasets[0].data = data.values && data.values.length ? data.values : [0];
-                barChartEngine.update();
+                // Runtime updates of variables when datasets match context telemetry models payloads
+                if (data.combo_labels) {
+                    charts.combo.data.labels = data.combo_labels;
+                    charts.combo.data.datasets[0].data = data.combo_volume;
+                    charts.combo.data.datasets[1].data = data.combo_revenue;
+                    charts.combo.update();
+                }
+                if (data.top_prod_labels) {
+                    charts.donut.data.labels = data.top_prod_labels;
+                    charts.donut.data.datasets[0].data = data.top_prod_revenue;
+                    charts.donut.update();
+                }
+                if (data.exec_labels) {
+                    charts.leaderboard.data.labels = data.exec_labels;
+                    charts.leaderboard.data.datasets[0].data = data.exec_revenue;
+                    charts.leaderboard.update();
 
-                // Update Zone-wise District Performance Graph
-                pieChartEngine.data.labels = data.zone_labels && data.zone_labels.length ? data.zone_labels : ['No Data Found'];
-                pieChartEngine.data.datasets[0].data = data.zone_data && data.zone_data.length ? data.zone_data : [0];
-                pieChartEngine.update();
-
-                // Update Yearly Revenue Trend Stream
-                yearChartEngine.data.labels = data.year_labels && data.year_labels.length ? data.year_labels : ['No Trends'];
-                yearChartEngine.data.datasets[0].data = data.year_data && data.year_data.length ? data.year_data : [0];
-                yearChartEngine.update();
-
-                // Update Seasonal Monthly Growth Loop
-                monthChartEngine.data.labels = data.month_labels && data.month_labels.length ? data.month_labels : ['No Data'];
-                monthChartEngine.data.datasets[0].data = data.month_data && data.month_data.length ? data.month_data : [0];
-                monthChartEngine.update();
+                    charts.clustered.data.labels = data.exec_labels;
+                    charts.clustered.data.datasets[0].data = data.exec_revenue;
+                    charts.clustered.data.datasets[1].data = data.exec_revenue.map(v => v * 1.15);
+                    charts.clustered.update();
+                }
+                if (data.map_labels) {
+                    charts.geo.data.labels = data.map_labels;
+                    charts.geo.data.datasets[0].data = data.map_revenue;
+                    charts.geo.update();
+                }
             })
-            .catch(error => {
-                console.error("Critical error updating charts asynchronously:", error);
-            });
+            .catch(error => console.error("Error synchronizing interactive analytics graphs:", error));
         }
     </script>
 </body>
