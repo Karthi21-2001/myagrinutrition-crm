@@ -10,6 +10,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db import transaction
 from django.db.models import Sum, Count, F, Avg, DecimalField, Q
 from django.db.models.functions import TruncMonth, TruncYear
+from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
@@ -77,19 +78,14 @@ def save_farm_visit(request):
         owner_name = request.POST.get('owner_name')
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
-        
         sub_segment = request.POST.get('sub_business_type_select', '').strip() 
-        
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
 
         if not state or state.lower() in ['state', 'unknown state', '']:
-            if district.lower() == 'namakkal':
-                state = 'Tamil Nadu'
-            else:
-                state = 'Tamil Nadu'
+            state = 'Tamil Nadu'
         
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
@@ -333,6 +329,7 @@ def export_visits_to_excel(request):
     wb.save(response)
     return response
 
+
 # ==========================================
 # 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
 # ==========================================
@@ -374,9 +371,11 @@ def get_dashboard_context(request):
     vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
     v_count = FarmVisitReport.objects.filter(visit_filters).count()
     
-    hot_leads = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
+    closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
     total_leads = VisitedProductDetail.objects.filter(product_filters).count()
-    conv_rate = round((hot_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
+    
+    # 🩹 Fix 1: Inline Guard Clause against ZeroDivisionErrors
+    conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
 
     # 1️⃣ SALES & REVENUE ADVANCED COMPONENT
     time_series_data = (
@@ -386,6 +385,8 @@ def get_dashboard_context(request):
         .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
         .order_by('month')
     )
+    
+    # 🩹 Fix 2: Explicitly typecast fields into clean JSON primitives using DjangoJSONEncoder safety fallback
     combo_labels = [t['month'].strftime("%b %Y") if t['month'] else 'Unknown' for t in time_series_data]
     combo_revenue = [float(t['revenue'] or 0) for t in time_series_data]
     combo_volume = [int(t['volume'] or 0) for t in time_series_data]
@@ -404,7 +405,9 @@ def get_dashboard_context(request):
         target=Sum('target_quantity'),
         potential=Sum('potential_quantity')
     )
-    
+    if not pipeline_spread or pipeline_spread['actual'] is None:
+        pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
+        
     product_pricing_table = (
         VisitedProductDetail.objects.filter(product_filters)
         .values('product_name')
@@ -425,7 +428,9 @@ def get_dashboard_context(request):
     )
     exec_labels = [e['visit__executive__username'] if e['visit__executive__username'] else 'Unknown' for e in executive_performance]
     exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
-    exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e['total_items'] > 0 else 0 for e in executive_performance]
+    
+    # 🩹 Fix 3: Added inline protection logic when processing lists for performance datasets
+    exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e['total_items'] else 0.0 for e in executive_performance]
 
     funnel_stages = (
         VisitedProductDetail.objects.filter(product_filters)
@@ -435,14 +440,13 @@ def get_dashboard_context(request):
     )
 
     # 3️⃣ GEOGRAPHICAL HEATMAPS & AUDITING MATRIX
-    # CRASH PROTECTION: Safe relational tracking for dynamic installations
     try:
         geo_district_performance = (
-            Farm.objects.filter(farm_filters)
-            .values('state', 'district')
+            VisitedProductDetail.objects.filter(product_filters)
+            .values(state=F('visit__farm__state'), district=F('visit__farm__district'))
             .annotate(
-                farm_count=Count('id'),
-                revenue=Sum('farmvisitreport_set__visitedproductdetail_set__revenue_generated')
+                farm_count=Count('visit__farm', distinct=True),
+                revenue=Sum('revenue_generated')
             )
             .order_by('-revenue')
         )
@@ -461,7 +465,6 @@ def get_dashboard_context(request):
     )
 
     # 4️⃣ FARM PROFILE & STRUCTURAL HEALTH INSIGHTS
-    # CRASH PROTECTION: If bird metrics are non-column fields or properties, default safely to 0
     try:
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('chicks_count'),
@@ -519,7 +522,6 @@ def get_dashboard_context(request):
         .order_by('month')
     )
 
-    # Clean QuerySet formatting for modern templates
     funnel_list = [dict(stage) for stage in funnel_stages]
     problems_list = [dict(prob) for prob in reported_problems]
 
@@ -528,31 +530,32 @@ def get_dashboard_context(request):
         'total_visits': v_count,
         'total_farms': Farm.objects.filter(farm_filters).count(),
         'total_sales_volume': vol_sold,
-        'conversion_rate': conv_rate,
+        'conversion_rate': conversion_rate,
         
-        'combo_labels_js': json.dumps(combo_labels),
-        'combo_revenue_js': json.dumps(combo_revenue),
-        'combo_volume_js': json.dumps(combo_volume),
-        'top_prod_labels_js': json.dumps(top_prod_labels),
-        'top_prod_revenue_js': json.dumps(top_prod_revenue),
+        # 🩹 Fix 4: Output data fields perfectly compiled with DjangoJSONEncoder
+        'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
+        'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
+        'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
+        'top_prod_labels_js': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
+        'top_prod_revenue_js': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
         
-        'exec_labels_js': json.dumps(exec_labels),
-        'exec_revenue_js': json.dumps(exec_revenue),
-        'exec_conv_pct_js': json.dumps(exec_conv_pct),
+        'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
+        'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
+        'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
         'funnel_stages': funnel_stages,
-        'funnel_stages_js': json.dumps(funnel_list),
+        'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
         
-        'map_labels_js': json.dumps(map_labels),
-        'map_revenue_js': json.dumps(map_revenue),
+        'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
+        'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
         'geo_district_performance': geo_district_performance,
         
-        'bird_labels_js': json.dumps(bird_labels),
-        'bird_counts_js': json.dumps(bird_counts),
+        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
+        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
         'reported_problems': reported_problems,
-        'reported_problems_js': json.dumps(problems_list),
+        'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
         'segment_breakdown': segment_breakdown,
         
         'visit_frequency_exec': visit_frequency_exec,
