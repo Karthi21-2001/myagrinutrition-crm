@@ -211,24 +211,24 @@ def save_farm_visit(request):
 def export_visits_to_excel(request):
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
-    executive_filter = request.GET.get('executive', 'All').strip()
-    state_filter = request.GET.get('state', 'All').strip()
-    district_filter = request.GET.get('district', 'All').strip()
-    business_type = request.GET.get('business_type', 'All').strip()
-    sub_segment_filter = request.GET.get('sub_segment', 'All').strip()
+    executive_filter = request.GET.get('executive', '').strip()
+    state_filter = request.GET.get('state', '').strip()
+    district_filter = request.GET.get('district', '').strip()
+    business_type = request.GET.get('business_type', '').strip()
+    sub_segment_filter = request.GET.get('sub_segment', '').strip()
 
-    # 🎯 NOTICE: Filters are updated to reference fields from the FarmVisitReport model directly
     export_filters = Q()
 
-    if business_type and business_type != 'All':
+    # Fixed global dropdown checks mapping frontend values to prevent empty querysets
+    if business_type and business_type not in ['All', 'All Sectors']:
         export_filters &= Q(farm__business_type__iexact=business_type)
     if sub_segment_filter and sub_segment_filter != 'All':
         export_filters &= Q(farm__sub_segment__iexact=sub_segment_filter)
-    if state_filter and state_filter != 'All':
+    if state_filter and state_filter not in ['All', 'All States']:
         export_filters &= Q(farm__state__iexact=state_filter)
-    if district_filter and district_filter != 'All':
+    if district_filter and district_filter not in ['All', 'All Districts']:
         export_filters &= Q(farm__district__iexact=district_filter)
-    if executive_filter and executive_filter != 'All':
+    if executive_filter and executive_filter not in ['All', 'All Executives']:
         export_filters &= Q(executive__username__iexact=executive_filter)
 
     if start_date_str:
@@ -268,7 +268,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # 📈 CHANGE 1: Query the core FarmVisitReport model so no logs are missed
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
     ).order_by('-visit_date')
@@ -276,15 +275,10 @@ def export_visits_to_excel(request):
     current_row = 2
     for v in all_visits:
         f = v.farm if v else None
-        
-        # Pull any products logged for this specific visit report
         products = VisitedProductDetail.objects.filter(visit=v)
-        
-        # If it's a general consultation with NO products, create a single row placeholder list
         product_loop_list = products if products.exists() else [None]
         
         for p in product_loop_list:
-            # Core Parameters
             ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
             ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
             ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
@@ -296,27 +290,23 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=9, value=f.district if f else "")
             ws_data.cell(row=current_row, column=10, value=f.area if f else "")
             
-            # Farm Problem & Population Inventories
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if v and v.farm_problem else "None reported")
             ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
             ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
             ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
             ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
             
-            # Immediate Order Metrics (Failsafe for General Consults)
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
             ws_data.cell(row=current_row, column=18, value=float(p.primary_price) if p else 0.0)
             ws_data.cell(row=current_row, column=19, value=float(p.revenue_generated) if p else 0.0)
             
-            # Dynamic Pipeline Projections Matrix Data
             ws_data.cell(row=current_row, column=20, value=p.potential_quantity if p else 0)
             ws_data.cell(row=current_row, column=21, value=p.target_quantity if p else 0)
             ws_data.cell(row=current_row, column=22, value=p.unit_type if p else "N/A")
             ws_data.cell(row=current_row, column=23, value=p.process_status if p else "N/A")
             ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%" if p else "0%")
             
-            # Live Geolocation Links
             gps_cell = ws_data.cell(row=current_row, column=25)
             if f and f.latitude and f.longitude:
                 gps_cell.value = "View on Map"
@@ -326,7 +316,6 @@ def export_visits_to_excel(request):
                 gps_cell.value = "No GPS Data"
                 gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-            # Style application pass across all 25 active columns
             for c_idx in range(1, 26):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
@@ -335,7 +324,6 @@ def export_visits_to_excel(request):
                     
             current_row += 1
 
-    # Auto-adjust column widths safely
     for col in ws_data.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
@@ -345,39 +333,41 @@ def export_visits_to_excel(request):
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
+
 # ==========================================
 # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
 # ==========================================
 
 def get_dashboard_context(request):
-    sel_state = request.GET.get('state', '')
-    sel_country = request.GET.get('country', '')
-    sel_district = request.GET.get('district', '')
-    sel_executive = request.GET.get('executive', '')
-    sel_month = request.GET.get('month', '')
-    sel_year = request.GET.get('year', '')
+    sel_state = request.GET.get('state', '').strip()
+    sel_country = request.GET.get('country', '').strip()
+    sel_district = request.GET.get('district', '').strip()
+    sel_executive = request.GET.get('executive', '').strip()
+    sel_month = request.GET.get('month', '').strip()
+    sel_year = request.GET.get('year', '').strip()
 
     farm_filters = Q()
     visit_filters = Q()
     product_filters = Q()
 
-    if sel_state:
+    # Updated filter checks to verify string forms from front-end dropdown structures
+    if sel_state and sel_state not in ['All', 'All States']:
         farm_filters &= Q(state=sel_state)
         visit_filters &= Q(farm__state=sel_state)
         product_filters &= Q(visit__farm__state=sel_state)
-    if sel_district:
+    if sel_district and sel_district not in ['All', 'All Districts']:
         farm_filters &= Q(district=sel_district)
         visit_filters &= Q(farm__district=sel_district)
         product_filters &= Q(visit__farm__district=sel_district)
-    if sel_executive:
+    if sel_executive and sel_executive not in ['All', 'All Executives']:
         farm_filters &= Q(executive__username=sel_executive)
         visit_filters &= Q(executive__username=sel_executive)
         product_filters &= Q(visit__executive__username=sel_executive)
         
-    if sel_month:
+    if sel_month and sel_month not in ['All', 'All Months']:
         visit_filters &= Q(visit_date__month=sel_month)
         product_filters &= Q(visit__visit_date__month=sel_month)
-    if sel_year:
+    if sel_year and sel_year != 'All':
         visit_filters &= Q(visit_date__year=sel_year)
         product_filters &= Q(visit__visit_date__year=sel_year)
 
@@ -416,13 +406,12 @@ def get_dashboard_context(request):
         'total_farms': Farm.objects.filter(farm_filters).count(),
         'total_sales_volume': vol_sold,
         'conversion_rate': conv_rate,
-        'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('products').order_by('-visit_date')[:10],
+        # Fixed prefetch lookup to target default reverse related set mapping name safely
+        'recent_visits': FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10],
         'monthly_sales': monthly_sales,
         
         'state_list': Farm.objects.values_list('state', flat=True).distinct().exclude(state=''),
         'district_list': Farm.objects.values_list('district', flat=True).distinct().exclude(district=''),
-        
-        # 🟢 SECURED WORKSPACE FILTER: Hides admins and staff, only shows field executives.
         'executive_list': User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct(),
         'country_list': ['India'],
         
@@ -461,17 +450,12 @@ def executive_analytics_view(request):
 # ==========================================
 
 def get_location_details(request):
-    """
-    Processes incoming map telemetry coordinates dynamically.
-    Uses a multi-tier API setup to guarantee live lookups anywhere in India.
-    """
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
     
     if not lat or not lon:
         return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
         
-    # --- TIER 1: PRIMARY LOOKUP (OpenStreetMap Nominatim) ---
     try:
         headers = {
             'User-Agent': 'AgriNutritionCRM_Production_Engine/2.0 (operations@myagrinutrition.com)'
@@ -494,9 +478,8 @@ def get_location_details(request):
                     'area': area.strip()
                 })
     except Exception:
-        pass  # Fail gracefully over to Tier 2 if blocked or timed out
+        pass
 
-    # --- TIER 2: AUTOMATIC LIVE BACKUP (BigDataCloud Client API) ---
     try:
         backup_url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
         backup_response = requests.get(backup_url, timeout=4)
@@ -507,7 +490,6 @@ def get_location_details(request):
             state = b_data.get('principalSubdivision', 'Unknown State')
             area = b_data.get('locality', '').strip()
             
-            # Deep scan the administrative lookup array to extract the local District name dynamically
             district = 'Unknown District'
             for admin_layer in b_data.get('informative', []):
                 if admin_layer.get('order') == 4 or 'district' in admin_layer.get('description', '').lower():
@@ -525,8 +507,6 @@ def get_location_details(request):
     except Exception:
         pass
 
-    # --- TIER 3: EMERGENCY TELEMETRY STRIP (If completely offline/both APIs fail) ---
-    # Instead of guessing text, it feeds the coordinate fingerprints back so the form can still submit.
     return JsonResponse({
         'state': 'Live GPS Active',
         'district': f"Dist: {lat[:7]}N",
