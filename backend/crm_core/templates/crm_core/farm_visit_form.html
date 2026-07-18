@@ -392,9 +392,14 @@
                         <input type="text" id="district" class="auto-input" name="district" readonly required placeholder="Awaiting location access...">
                     </div>
 
-                    <div>
+                    <div class="form-group-spacing">
                         <label style="color: var(--text-muted);">Automated Area</label>
                         <input type="text" id="area" class="auto-input" name="area" readonly required placeholder="Awaiting location access...">
+                    </div>
+
+                    <div>
+                        <label style="color: var(--text-muted);">Automated State</label>
+                        <input type="text" id="state" class="auto-input" name="state" readonly required placeholder="Awaiting location access...">
                     </div>
                 </div>
             </div>
@@ -803,31 +808,26 @@
                             if(!data.error) {
                                 document.getElementById('district').value = data.district || '';
                                 document.getElementById('area').value = data.area || '';
+                                document.getElementById('state').value = data.state || '';
                                 btn.innerText = "✅ Location Secured";
                             } else {
-                                alert("Failed to resolve address elements.");
-                                btn.innerText = "❌ Resolve Error";
+                                btn.innerText = "❌ Location Context Error";
                                 btn.disabled = false;
                             }
                         })
                         .catch(err => {
                             console.error(err);
-                            alert("Error fetching location details from API.");
-                            btn.innerText = "❌ API Error";
+                            btn.innerText = "❌ Fetch Error";
                             btn.disabled = false;
                         });
                 },
                 function(error) {
-                    alert("Geolocation failed: " + error.message);
-                    btn.innerText = "❌ Fetch Failed";
+                    btn.innerText = "❌ GPS Denied/Timeout";
                     btn.disabled = false;
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
+                }
             );
         } else {
-            alert("Geolocation is not supported by your browser.");
-            btn.innerText = "❌ Not Supported";
-            btn.disabled = false;
+            btn.innerText = "❌ GPS Not Supported";
         }
     });
     </script>
