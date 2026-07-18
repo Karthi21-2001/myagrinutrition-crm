@@ -4,446 +4,268 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise Analytics Command Suite</title>
+    <title>My AgriNutrition - Farm Visit Dashboard</title>
 
-    <!-- Google Fonts: Inter (Matches the modern geometric reference typography) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS Engine & FontAwesome Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Leaflet Maps Engine CDN -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
     <style>
-        /* Global Typography Override to match screenshot exactly */
-        body {
-            font-family: 'Inter', sans-serif !important;
-        }
-
+        body { font-family: 'Inter', sans-serif !important; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 100px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-        
-        .tab-content { display: none; animation: fadeIn 0.25s ease-out forwards; }
-        .tab-content.active { display: block; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        #geoMap { height: 520px; border-radius: 12px; }
-        .leaflet-container { background: #0f172a !important; }
     </style>
 </head>
-<body class="h-full text-slate-300 antialiased custom-scrollbar flex flex-col">
+<body class="h-full text-slate-300 antialiased custom-scrollbar flex flex-col bg-slate-950">
 
-    <!-- 📊 APPLICATION GLOBAL NAV BAR -->
-    <header class="bg-slate-900 border-b border-slate-800/80 sticky top-0 z-40 px-6 py-4">
-        <div class="max-w-[1600px] mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <!-- 📊 APPLICATION TOP NAV BAR -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4">
+        <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div class="flex items-center space-x-3">
-                <div class="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20">
-                    <i class="fa-solid fa-chart-line text-emerald-400 text-xl"></i>
+                <div class="bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                    <i class="fa-solid fa-wheat-api text-emerald-400 text-xl"></i>
                 </div>
                 <div>
                     <h1 class="text-xl font-black text-white tracking-tight uppercase">My AgriNutrition</h1>
-                    <p class="text-xs text-slate-400 font-medium tracking-wide">Live Management Performance & Pipeline Telemetry</p>
+                    <p class="text-xs text-slate-400 font-medium">Sales & Farm Visit Performance Overview</p>
                 </div>
             </div>
             
-            <div class="flex items-center space-x-3 w-full sm:w-auto">
-                <button onclick="window.print()" class="flex-1 sm:flex-none justify-center bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-xl border border-slate-700 transition flex items-center gap-2">
-                    <i class="fa-solid fa-print text-slate-400"></i> Print Audit
-                </button>
-                <a href="{% url 'dashboard_home' %}" class="flex-1 sm:flex-none justify-center bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-emerald-900/20 transition flex items-center gap-2">
-                    <i class="fa-solid fa-house"></i> Control Hub
-                </a>
+            <!-- Filter Row Elements -->
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto text-xs">
+                <input type="date" value="2026-05-01" class="bg-slate-950 border border-slate-800 rounded-lg p-2 font-medium text-white focus:outline-none">
+                <input type="date" value="2026-05-31" class="bg-slate-950 border border-slate-800 rounded-lg p-2 font-medium text-white focus:outline-none">
+                <select class="bg-slate-950 border border-slate-800 rounded-lg p-2 font-medium text-white focus:outline-none"><option>All States</option></select>
+                <select class="bg-slate-950 border border-slate-800 rounded-lg p-2 font-medium text-white focus:outline-none"><option>All Districts</option></select>
+                <select class="bg-slate-950 border border-slate-800 rounded-lg p-2 font-medium text-white focus:outline-none"><option>All Executives</option></select>
             </div>
         </div>
     </header>
 
-    <!-- 🎛️ BI NAVIGATION CONTROL MATRIX -->
-    <div class="bg-slate-900/50 border-b border-slate-900 px-6 py-2.5 sticky top-[73px] z-30 backdrop-blur-md">
-        <div class="max-w-[1600px] mx-auto overflow-x-auto flex space-x-1.5 custom-scrollbar pb-1 sm:pb-0">
-            <button onclick="switchTab('exec-summary')" id="btn-exec-summary" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg bg-emerald-600 text-white shadow transition-all whitespace-nowrap">📊 Executive Summary</button>
-            <button onclick="switchTab('geo-analysis')" id="btn-geo-analysis" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">📍 Geographic Distribution</button>
-            <button onclick="switchTab('exec-performance')" id="btn-exec-performance" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">👨‍💼 Executive Performance</button>
-            <button onclick="switchTab('product-perf')" id="btn-product-perf" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">💊 Product Performance</button>
-            <button onclick="switchTab('rev-analysis')" id="btn-rev-analysis" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">💰 Revenue Intelligence</button>
-        </div>
-    </div>
-
     <!-- 🗺️ CORE WORKSPACE COMPONENT -->
-    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 md:p-6 lg:p-8">
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 space-y-6">
 
-        <!-- =========================================================
-             📊 DASHBOARD 1: EXECUTIVE SUMMARY
-             ========================================================= -->
-        <div id="exec-summary" class="tab-content active space-y-6">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <!-- KPI 1 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group">
-                    <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Count(Visit Date)</span>
-                        <span class="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Operational</span>
-                    </div>
-                    <h3 class="text-3xl font-black text-sky-400 mt-3 tracking-tight transition">{{ total_visits|default:"1,420" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Total Field Visits</p>
-                </div>
-                <!-- KPI 2 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group">
-                    <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Distinct Executive</span>
-                    </div>
-                    <h3 class="text-3xl font-black text-white mt-3 tracking-tight group-hover:text-indigo-400 transition">{{ total_executives|default:"18" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Active Field Executives</p>
-                </div>
-                <!-- KPI 3 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group">
-                    <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Distinct Farm Name</span>
-                    </div>
-                    <h3 class="text-3xl font-black text-white mt-3 tracking-tight group-hover:text-purple-400 transition">{{ total_farms_visited|default:"342" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Unique Farms Audited</p>
-                </div>
-                <!-- KPI 4 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group-emerald">
-                    <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Sum(Revenue)</span>
-                        <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Financial</span>
-                    </div>
-                    <h3 class="text-3xl font-black text-emerald-400 mt-3 tracking-tight">₹{{ total_revenue|default:"18,45,600" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Aggregated Revenue</p>
-                </div>
+        <!-- ================= KPI CARD DECK ROW ================= -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <!-- Metric 1 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits</span><i class="fa-solid fa-users text-sm text-emerald-400"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">1,248</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 12.5% vs Apr</span>
+            </div>
+            <!-- Metric 2 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Executives</span><i class="fa-solid fa-user-tie text-sm text-sky-400"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">8</h3>
+                <span class="text-[9px] text-slate-400 font-bold mt-1">0.0% vs Apr</span>
+            </div>
+            <!-- Metric 3 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Farms</span><i class="fa-solid fa-house-chimney text-sm text-purple-400"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">842</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 9.8% vs Apr</span>
+            </div>
+            <!-- Metric 4 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Sale Qty</span><i class="fa-solid fa-basket-shopping text-sm text-amber-400"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">15,680</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 15.4% vs Apr</span>
+            </div>
+            <!-- Metric 5 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Revenue Generated</span><i class="fa-solid fa-indian-rupee-sign text-sm text-teal-400"></i></div>
+                <h3 class="text-xl font-black text-teal-400 mt-1">₹12,45,680</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 18.6% vs Apr</span>
+            </div>
+            <!-- Metric 6 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Conversion %</span><i class="fa-solid fa-percent text-sm text-rose-400"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">82.35%</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 6.1% vs Apr</span>
+            </div>
+            <!-- Metric 7 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Target Ach.</span><i class="fa-solid fa-bullseye text-sm text-yellow-500"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">76.42%</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 8.3% vs Apr</span>
+            </div>
+            <!-- Metric 8 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Rev/Visit</span><i class="fa-solid fa-chart-pie text-sm text-blue-400"></i></div>
+                <h3 class="text-xl font-black text-white mt-1">₹5,120</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 5.3% vs Apr</span>
+            </div>
+        </div>
+
+        <!-- ================= GRAPH SECTION MAIN GRID ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 1. Revenue Trend Line Chart -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 lg:col-span-4 h-72 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Revenue Trend (Monthly)</h3>
+                <div class="relative flex-1 min-h-0"><canvas id="revTrendChart"></canvas></div>
             </div>
 
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                <!-- KPI 5 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Sum(Sale Qty)</span>
-                    <h3 class="text-2xl font-black text-white mt-2">{{ total_sales_qty|default:"42,150" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Total Metric Sales Qty</p>
+            <!-- 2. Revenue By Executive Bar Race -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 lg:col-span-4 h-72 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Revenue by Executive</h3>
+                <div class="relative flex-1 min-h-0"><canvas id="execRevBarChart"></canvas></div>
+            </div>
+
+            <!-- 3. Top 10 Farms Data Ledger Panel -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 lg:col-span-4 h-72 flex flex-col justify-between">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Top Farms by Revenue</h3>
+                <div class="overflow-y-auto flex-1 custom-scrollbar text-[11px] divide-y divide-slate-800">
+                    <div class="flex justify-between py-1.5 font-bold text-slate-400"><span>Farm Name</span><span>Revenue (₹)</span></div>
+                    <div class="flex justify-between py-1 text-white"><span>Swasthik Poultry Farm</span><span class="font-bold text-emerald-400">₹85,600</span></div>
+                    <div class="flex justify-between py-1 text-white"><span>Green Valley Farms</span><span class="font-bold text-emerald-400">₹78,450</span></div>
+                    <div class="flex justify-between py-1 text-white"><span>Sri Lakshmi Poultry</span><span class="font-bold text-emerald-400">₹72,300</span></div>
+                    <div class="flex justify-between py-1 text-white"><span>Venkateswara Farms</span><span class="font-bold text-emerald-400">₹68,900</span></div>
+                    <div class="flex justify-between py-1 text-white"><span>Poultry Care Farm</span><span class="font-bold text-emerald-400">₹65,780</span></div>
                 </div>
-                <!-- KPI 6 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Sum(Poten. Qty)</span>
-                    <h3 class="text-2xl font-black text-white mt-2">{{ total_potential_qty|default:"85,000" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Calculated Potential Capacity</p>
-                </div>
-                <!-- KPI 7 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Sum(Target Qty)</span>
-                    <h3 class="text-2xl font-black text-white mt-2">{{ total_target_qty|default:"50,000" }}</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Allocated Milestone Target</p>
-                </div>
-                <!-- KPI 8 -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm border-l-4 border-l-amber-500">
-                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Average(conv %)</span>
-                    <h3 class="text-2xl font-black text-amber-400 mt-2">{{ conversion_pct|default:"74.2" }}%</h3>
-                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Mean Conversion Efficiency</p>
+                <div class="flex justify-between pt-2 border-t border-slate-700 font-bold text-xs text-white">
+                    <span>Total Top Yield</span><span>₹6,27,430</span>
                 </div>
             </div>
         </div>
 
-        <!-- =========================================================
-             📍 DASHBOARD 2: GEOGRAPHIC ANALYSIS
-             ========================================================= -->
-        <div id="geo-analysis" class="tab-content space-y-6">
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block mb-1">Regional State Filter</label>
-                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-semibold focus:border-emerald-500 focus:outline-none"><option>All States Selected</option></select>
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block mb-1">District Territory Filter</label>
-                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-semibold focus:border-emerald-500 focus:outline-none"><option>All Districts Selected</option></select>
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block mb-1">Field Executive Filter</label>
-                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-semibold focus:border-emerald-500 focus:outline-none"><option>All Corporate Personnel</option></select>
+        <!-- ================= PRODUCT & BREAKDOWN LAYER GRID ================= -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Donut 1: Product Sales Distribution -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-72 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Product Sales (Qty)</h3>
+                <div class="relative flex-1 min-h-0 flex justify-center"><canvas id="prodSalesDonut"></canvas></div>
+            </div>
+
+            <!-- Donut 2: Farm Observed Problems -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-72 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Farm Problem Observed</h3>
+                <div class="relative flex-1 min-h-0 flex justify-center"><canvas id="problemsDonut"></canvas></div>
+            </div>
+
+            <!-- Process Pipeline Funnel Emulation -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-72 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-3">Process Stage (Visits)</h3>
+                <div class="flex-1 flex flex-col justify-center space-y-2 text-xs font-bold px-2">
+                    <div><div class="flex justify-between text-[10px] mb-0.5 text-slate-400"><span>Inquiry (100%)</span><span>1,248</span></div><div class="w-full bg-slate-800 h-3.5 rounded-sm overflow-hidden"><div class="bg-blue-700 h-full w-[100%]"></div></div></div>
+                    <div><div class="flex justify-between text-[10px] mb-0.5 text-slate-400"><span>Discussion</span><span>986</span></div><div class="w-full bg-slate-800 h-3.5 rounded-sm overflow-hidden"><div class="bg-blue-500 h-full w-[79%]"></div></div></div>
+                    <div><div class="flex justify-between text-[10px] mb-0.5 text-slate-400"><span>Demo / Trial</span><span>642</span></div><div class="w-full bg-slate-800 h-3.5 rounded-sm overflow-hidden"><div class="bg-sky-400 h-full w-[51%]"></div></div></div>
+                    <div><div class="flex justify-between text-[10px] mb-0.5 text-slate-400"><span>Order</span><span>428</span></div><div class="w-full bg-slate-800 h-3.5 rounded-sm overflow-hidden"><div class="bg-amber-500 h-full w-[34%]"></div></div></div>
+                    <div><div class="flex justify-between text-[10px] mb-0.5 text-slate-400"><span>Repeat Order (28.2%)</span><span>352</span></div><div class="w-full bg-slate-800 h-3.5 rounded-sm overflow-hidden"><div class="bg-emerald-500 h-full w-[28%]"></div></div></div>
                 </div>
             </div>
-            <div class="bg-slate-900 p-5 rounded-xl border border-slate-800">
-                <div class="mb-4">
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Live GIS Telemetry Framework</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Circle radius dynamically calibrated relative to local revenue and active distribution volumes.</p>
+
+            <!-- Matrix Sector Matrix Blocks -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-72 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Sector Segment</h3>
+                <div class="flex-1 grid grid-cols-3 grid-rows-3 gap-2 text-white font-extrabold text-[11px] p-1">
+                    <div class="bg-emerald-600 col-span-2 row-span-3 rounded-lg p-3 flex flex-col justify-between">
+                        <span>Poultry</span><span class="text-lg">807 <span class="text-xs font-normal opacity-80">(64.7%)</span></span>
+                    </div>
+                    <div class="bg-sky-600 row-span-2 rounded-lg p-2 flex flex-col justify-between">
+                        <span>Animal Feed</span><span class="text-xs">276</span>
+                    </div>
+                    <div class="bg-amber-600 rounded-lg p-2 flex flex-col justify-between">
+                        <span>Aqua</span><span class="text-xs">123</span>
+                    </div>
                 </div>
-                <div id="geoMap" class="shadow-inner"></div>
             </div>
         </div>
 
-        <!-- =========================================================
-             👨‍💼 DASHBOARD 3: EXECUTIVE PERFORMANCE
-             ========================================================= -->
-        <div id="exec-performance" class="tab-content space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-80 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-4"><i class="fa-solid fa-ranking-star mr-1 text-emerald-400"></i> Executive Revenue Performance</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="execRevenueChart"></canvas></div>
-                </div>
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-80 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-4"><i class="fa-solid fa-map-pin mr-1 text-sky-400"></i> Operational Audit Log Counts</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="execVisitsChart"></canvas></div>
-                </div>
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-80 flex flex-col justify-between">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider"><i class="fa-solid fa-gauge-high mr-1 text-amber-400"></i> Pipeline Target Achievement Gauge</h3>
-                    <div class="relative w-full h-44 flex items-center justify-center"><canvas id="targetGaugeChart"></canvas></div>
+        <!-- ================= FOOTER TARGETS & LEDGER LOGS ROW ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Target Gauge Module -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 lg:col-span-3 h-64 flex flex-col justify-between">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider">Target vs Achievement</h3>
+                <div class="relative h-32 flex justify-center items-center"><canvas id="targetGauge"></canvas></div>
+                <div class="text-center text-[11px] font-bold space-y-0.5 text-slate-400">
+                    <div>Target Milestone Capacity: <span class="text-white">₹16,30,000</span></div>
+                    <div>Achieved Value: <span class="text-emerald-400">₹12,45,680</span></div>
                 </div>
             </div>
-            
-            <!-- Executive Data Grid Matrix -->
-            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
-                <div class="px-5 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Personnel Performance Ledger Matrix</h3>
-                    <span class="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Real-Time Sync</span>
+
+            <!-- Efficiency Columns -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 lg:col-span-4 h-64 flex flex-col">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Conversion % by Executive</h3>
+                <div class="relative flex-1 min-h-0"><canvas id="conversionBarChart"></canvas></div>
+            </div>
+
+            <!-- Recent Log Audits Matrix -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 lg:col-span-5 h-64 flex flex-col overflow-hidden">
+                <div class="p-3.5 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Recent Visit Summary</h3>
+                    <span class="text-[10px] font-bold text-emerald-400">Live Sync Logs</span>
                 </div>
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold border-b border-slate-800">
-                            <tr>
-                                <th class="p-4">Executive Identity</th>
-                                <th class="p-4 text-center">Visits Logged</th>
-                                <th class="p-4 text-right">Revenue Contributed</th>
-                                <th class="p-4 text-center">Conversion Ratio</th>
-                                <th class="p-4 text-right">Target Delta Compliance</th>
-                            </tr>
+                <div class="flex-1 overflow-x-auto custom-scrollbar text-[11px]">
+                    <table class="w-full text-left text-slate-300">
+                        <thead class="bg-slate-950 font-bold text-slate-400 uppercase tracking-wider sticky top-0 border-b border-slate-800">
+                            <tr><th class="p-2.5">Date</th><th class="p-2.5">Executive</th><th class="p-2.5">Farm</th><th class="p-2.5 text-right">Revenue</th><th class="p-2.5 text-center">GPS</th></tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-800/60 font-semibold">
-                            <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 text-white flex items-center space-x-2">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span>R. Karthikeyan</span>
-                                </td>
-                                <td class="p-4 text-center">54 Visits</td>
-                                <td class="p-4 text-right text-emerald-400">₹6,24,000</td>
-                                <td class="p-4 text-center text-slate-200">82.1%</td>
-                                <td class="p-4 text-right text-sky-400">94.5% Achieved</td>
-                            </tr>
-                            <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 text-white flex items-center space-x-2">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span>A. Anand</span>
-                                </td>
-                                <td class="p-4 text-center">32 Visits</td>
-                                <td class="p-4 text-right text-emerald-400">₹4,10,000</td>
-                                <td class="p-4 text-center text-slate-200">71.4%</td>
-                                <td class="p-4 text-right text-sky-400">82.0% Achieved</td>
-                            </tr>
-                            <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 text-white flex items-center space-x-2">
-                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                    <span>M. Priya</span>
-                                </td>
-                                <td class="p-4 text-center">47 Visits</td>
-                                <td class="p-4 text-right text-emerald-400">₹5,30,000</td>
-                                <td class="p-4 text-center text-slate-200">78.5%</td>
-                                <td class="p-4 text-right text-sky-400">106.0% Overachieved</td>
-                            </tr>
+                        <tbody class="divide-y divide-slate-800 font-semibold">
+                            <tr><td class="p-2">18-May</td><td class="p-2 text-white">Selva Kumar</td><td class="p-2">Green Valley</td><td class="p-2 text-right text-teal-400">₹12,450</td><td class="p-2 text-center text-sky-400"><i class="fa-solid fa-location-dot"></i></td></tr>
+                            <tr><td class="p-2">18-May</td><td class="p-2 text-white">Karthi</td><td class="p-2">Sri Lakshmi</td><td class="p-2 text-right text-teal-400">₹9,800</td><td class="p-2 text-center text-sky-400"><i class="fa-solid fa-location-dot"></i></td></tr>
+                            <tr><td class="p-2">18-May</td><td class="p-2 text-white">Roshan</td><td class="p-2">Swasthik</td><td class="p-2 text-right text-teal-400">₹8,750</td><td class="p-2 text-center text-sky-400"><i class="fa-solid fa-location-dot"></i></td></tr>
                         </tbody>
                     </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- =========================================================
-             💊 DASHBOARD 4: PRODUCT PERFORMANCE
-             ========================================================= -->
-        <div id="product-perf" class="tab-content space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-80 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Product Catalog Allocation vs Total Sales Quantity</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="productSalesChart"></canvas></div>
-                </div>
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-80 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Aggregated Revenue Generation Mix Map</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="productTreemapAlternativeChart"></canvas></div>
-                </div>
-            </div>
-            
-            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
-                <div class="overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold border-b border-slate-800">
-                            <tr>
-                                <th class="p-4">Product Inventory Variant Formulation</th>
-                                <th class="p-4 text-center">Dispatched Qty Vol</th>
-                                <th class="p-4 text-right">Aggregated Net Revenue</th>
-                                <th class="p-4 text-right">Base Market Unit Pricing</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-800/60 font-semibold">
-                            <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 text-white">NutriMix Pro-1 Bio-Complex</td>
-                                <td class="p-4 text-center">1,400 Units</td>
-                                <td class="p-4 text-right text-emerald-400">₹3,50,000</td>
-                                <td class="p-4 text-right text-slate-400">₹250.00 / Unit</td>
-                            </tr>
-                            <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 text-white">AquaGrow-X High-Yield Feed</td>
-                                <td class="p-4 text-center">950 Units</td>
-                                <td class="p-4 text-right text-emerald-400">₹2,15,000</td>
-                                <td class="p-4 text-right text-slate-400">₹226.31 / Unit</td>
-                            </tr>
-                            <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 text-white">VitaLayer Premium Calcium Compound</td>
-                                <td class="p-4 text-center">780 Units</td>
-                                <td class="p-4 text-right text-emerald-400">₹1,98,000</td>
-                                <td class="p-4 text-right text-slate-400">₹253.84 / Unit</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- =========================================================
-             💰 DASHBOARD 5: REVENUE ANALYSIS
-             ========================================================= -->
-        <div id="rev-analysis" class="tab-content space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 lg:col-span-7 h-80 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Chronological Matrix: Visit Log Date vs Yield Revenue Pipeline</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="revenueTimelineChart"></canvas></div>
-                </div>
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 lg:col-span-5 h-80 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Cyclical Monthly Revenue Baseline Progression</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="revenueAreaChart"></canvas></div>
-                </div>
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 lg:col-span-12 h-96 flex flex-col">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2">Strategic Revenue Segment Contribution Drift Profile</h3>
-                    <div class="relative flex-1 min-h-0"><canvas id="revenueWaterfallChart"></canvas></div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- INTERACTIVE SCRIPT COMPONENT LAYER -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- CHART RENDERING CORE ENGINES -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // 🧭 ADVANCED TAB INTERACTION ROUTER
-        let biMapInstance = null;
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('bg-emerald-600', 'text-white', 'shadow');
-                btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
-            });
-            
-            document.getElementById(tabId).classList.add('active');
-            const targetBtn = document.getElementById(`btn-${tabId}`);
-            targetBtn.classList.remove('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
-            targetBtn.classList.add('bg-emerald-600', 'text-white', 'shadow');
-
-            if (tabId === 'geo-analysis') {
-                setTimeout(() => {
-                    if (!biMapInstance) {
-                        biMapInstance = L.map('geoMap', { zoomControl: true }).setView([11.2189, 78.1673], 7);
-                        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-                            attribution: '&copy; CartoDB'
-                        }).addTo(biMapInstance);
-                        
-                        const spatialRecords = [
-                            { area: 'Namakkal Zone Hub', lat: 11.2189, lng: 78.1673, rev: '₹6,50,000', qty: 1400 },
-                            { area: 'Tiruppur Outpost Sub', lat: 11.1085, lng: 77.3411, rev: '₹4,10,000', qty: 950 },
-                            { area: 'Erode Regional Cluster', lat: 11.3410, lng: 77.7172, rev: '₹5,30,000', qty: 1120 }
-                        ];
-                        
-                        spatialRecords.forEach(rec => {
-                            L.circle([rec.lat, rec.lng], {
-                                color: '#10b981', weight: 1.5, radius: rec.qty * 12, fillColor: '#10b981', fillOpacity: 0.25
-                            }).addTo(biMapInstance).bindPopup(`
-                                <div class="bg-slate-900 text-slate-200 p-2 text-xs rounded border border-slate-700">
-                                    <strong class="text-white block mb-1">${rec.area}</strong>
-                                    Gross Revenue: <span class="text-emerald-400 font-bold">${rec.rev}</span><br>
-                                    Sales Load: <span class="text-sky-400">${rec.qty} Units</span>
-                                </div>
-                            `, { className: 'custom-leaflet-popup', bgPos: [0,0] });
-                        });
-                    }
-                    biMapInstance.invalidateSize();
-                }, 200);
-            }
-        }
-
-        // 📊 PROFESSIONAL CHART OBJECT DESIGN THEMES
         document.addEventListener("DOMContentLoaded", () => {
-            // Apply Inter font configurations to global chart options
             Chart.defaults.color = '#94a3b8';
-            Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
+            Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.4)';
             Chart.defaults.font.family = "'Inter', sans-serif";
-            Chart.defaults.font.weight = '500';
 
-            const optionsTemplate = {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { borderDash: [4, 4] }, ticks: { font: { size: 10, weight: '600' } } },
-                    y: { grid: { borderDash: [4, 4] }, ticks: { font: { size: 10, weight: '600' } } }
-                }
-            };
+            const optionsBase = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
-            // Executive Gross Revenue Chart Setup
-            new Chart(document.getElementById('execRevenueChart').getContext('2d'), {
-                type: 'bar',
-                data: { labels: ['Karthikeyan', 'Anand', 'Priya'], datasets: [{ data: [624000, 410000, 530000], backgroundColor: 'rgba(16, 185, 129, 0.85)', hoverBackgroundColor: '#10b981', borderRadius: 6, barThickness: 16 }] },
-                options: { ...optionsTemplate, indexAxis: 'y' }
+            // Line Trend
+            new Chart(document.getElementById('revTrendChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], datasets: [{ data: [0.65, 0.78, 0.89, 1.05, 1.24, 1.31], borderColor: '#10b981', tension: 0.2, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.04)' }] },
+                options: optionsBase
             });
 
-            // Executive Operational Log Field Visits Setup
-            new Chart(document.getElementById('execVisitsChart').getContext('2d'), {
+            // Executive Horizontal Progress 
+            new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
                 type: 'bar',
-                data: { labels: ['Karthikeyan', 'Anand', 'Priya'], datasets: [{ data: [54, 32, 47], backgroundColor: 'rgba(59, 130, 246, 0.85)', hoverBackgroundColor: '#3b82f6', borderRadius: 6, barThickness: 20 }] },
-                options: optionsTemplate
+                data: { labels: ['Selva', 'Karthi', 'Roshan', 'Sai', 'Shyam'], datasets: [{ data: [254300, 210500, 186700, 168400, 142600], backgroundColor: '#3b82f6', borderRadius: 4, barThickness: 12 }] },
+                options: { ...optionsBase, indexAxis: 'y' }
             });
 
-            // High Precision Milestones Target Gauge
-            new Chart(document.getElementById('targetGaugeChart').getContext('2d'), {
+            // Product Sales Breakdown Donut
+            new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
                 type: 'doughnut',
-                data: { labels: ['Sales Complete', 'Delta Gap'], datasets: [{ data: [84.2, 15.8], backgroundColor: ['#0284c7', '#1e293b'], borderWidth: 0 }] },
-                options: { rotation: -90, circumference: 180, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '78%' }
+                data: { labels: ['Electromet', 'Hazifix', 'Alpha', 'Wetlock', 'Others'], datasets: [{ data: [5620, 3280, 2450, 1250, 1400], backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#ec4899', '#64748b'], borderWidth: 0 }] },
+                options: { ...optionsBase, cutout: '65%' }
             });
 
-            // Product Performance Metrics
-            new Chart(document.getElementById('productSalesChart').getContext('2d'), {
+            // Problems Donut Breakdowns
+            new Chart(document.getElementById('problemsDonut').getContext('2d'), {
+                type: 'doughnut',
+                data: { labels: ['Disease', 'Feed Quality', 'Water', 'Vaccination', 'Others'], datasets: [{ data: [428, 300, 198, 150, 110], backgroundColor: ['#06b6d4', '#eab308', '#f43f5e', '#10b981', '#64748b'], borderWidth: 0 }] },
+                options: { ...optionsBase, cutout: '65%' }
+            });
+
+            // Arc Performance Meter Gauge
+            new Chart(document.getElementById('targetGauge').getContext('2d'), {
+                type: 'doughnut',
+                data: { labels: ['Achieved', 'Remaining'], datasets: [{ data: [76.42, 23.58], backgroundColor: ['#f97316', '#1e293b'], borderWidth: 0 }] },
+                options: { rotation: -90, circumference: 180, cutout: '80%', ...optionsBase }
+            });
+
+            // Conversion Conversion Metrics Bar
+            new Chart(document.getElementById('conversionBarChart').getContext('2d'), {
                 type: 'bar',
-                data: { labels: ['NutriMix Pro-1', 'AquaGrow-X', 'VitaLayer Premium'], datasets: [{ data: [1400, 950, 780], backgroundColor: '#c084fc', borderRadius: 5, barThickness: 14 }] },
-                options: { ...optionsTemplate, indexAxis: 'y' }
-            });
-
-            // Revenue Volume Allocation Mix Matrix
-            new Chart(document.getElementById('productTreemapAlternativeChart').getContext('2d'), {
-                type: 'bar',
-                data: { labels: ['NutriMix Pro-1', 'AquaGrow-X', 'VitaLayer Premium'], datasets: [{ data: [350000, 215000, 198000], backgroundColor: ['#fb7185', '#38bdf8', '#fbbf24'], borderRadius: 6, barThickness: 28 }] },
-                options: optionsTemplate
-            });
-
-            // Continuous Revenue Stream Analysis Template
-            new Chart(document.getElementById('revenueTimelineChart').getContext('2d'), {
-                type: 'line',
-                data: { labels: ['Jul 01', 'Jul 05', 'Jul 10', 'Jul 15', 'Jul 18'], datasets: [{ data: [45000, 89000, 52000, 120000, 95000], borderColor: '#34d399', borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: '#34d399', tension: 0.22 }] },
-                options: optionsTemplate
-            });
-
-            // Cyclical Area Line Chart 
-            new Chart(document.getElementById('revenueAreaChart').getContext('2d'), {
-                type: 'line',
-                data: { labels: ['M1-Early', 'M1-Mid', 'M2-Start', 'M2-Mid', 'Current Cycle'], datasets: [{ data: [220000, 410000, 390000, 580000, 720000], fill: true, backgroundColor: 'rgba(56, 189, 248, 0.06)', borderColor: '#38bdf8', borderWidth: 2, pointRadius: 2, tension: 0.3 }] },
-                options: optionsTemplate
-            });
-
-            // Business Portfolio Contribution Drift Matrix Blueprint
-            new Chart(document.getElementById('revenueWaterfallChart').getContext('2d'), {
-                type: 'bar',
-                data: { labels: ['Base Entry Baseline', 'Poultry Vertical Net Surge', 'Aqua Portfolio System Expansion', 'Target Compliance Variance Delta', 'Final Consolidated Structural Margin Valuation'], datasets: [{ data: [300000, 250000, 110000, -40000, 620000], backgroundColor: ['#475569', '#10b981', '#10b981', '#f43f5e', '#0284c7'], borderRadius: 4, barThickness: 40 }] },
-                options: optionsTemplate
+                data: { labels: ['Selva', 'Karthi', 'Roshan', 'Sai', 'Shyam'], datasets: [{ data: [89.6, 85.3, 82.1, 78.4, 74.6], backgroundColor: '#8b5cf6', borderRadius: 4, barThickness: 16 }] },
+                options: optionsBase
             });
         });
     </script>
