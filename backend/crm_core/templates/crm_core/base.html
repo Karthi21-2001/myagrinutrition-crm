@@ -36,20 +36,23 @@
                 </div>
             </div>
 
-            <!-- Navigation Links -->
+            <!-- Navigation Links with Active CSS State Detection -->
             <nav class="flex-1 px-4 py-4 space-y-1">
-                <a href="{% url 'dashboard_home' %}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg hover:bg-slate-800 transition group">
-                    <i class="fa-solid fa-chart-pie mr-3 text-slate-400 group-hover:text-emerald-400 w-5 text-center"></i>
+                <a href="{% url 'dashboard_home' %}" 
+                   class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition group {% if request.resolver_match.url_name == 'dashboard_home' %}bg-emerald-600 text-white shadow-md{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+                    <i class="fa-solid fa-chart-pie mr-3 {% if request.resolver_match.url_name == 'dashboard_home' %}text-white{% else %}text-slate-400 group-hover:text-emerald-400{% endif %} w-5 text-center"></i>
                     Dashboard
                 </a>
                 
-                <a href="{% url 'dashboard_analytics' %}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg hover:bg-slate-800 transition group">
-                    <i class="fa-solid fa-chart-line mr-3 text-slate-400 group-hover:text-emerald-400 w-5 text-center"></i>
+                <a href="{% url 'dashboard_analytics' %}" 
+                   class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition group {% if request.resolver_match.url_name == 'dashboard_analytics' %}bg-emerald-600 text-white shadow-md{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+                    <i class="fa-solid fa-chart-line mr-3 {% if request.resolver_match.url_name == 'dashboard_analytics' %}text-white{% else %}text-slate-400 group-hover:text-emerald-400{% endif %} w-5 text-center"></i>
                     Advanced Analytics
                 </a>
 
-                <a href="{% url 'render_visit_form' %}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg hover:bg-slate-800 transition group">
-                    <i class="fa-solid fa-route mr-3 text-slate-400 group-hover:text-emerald-400 w-5 text-center"></i>
+                <a href="{% url 'render_visit_form' %}" 
+                   class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition group {% if request.resolver_match.url_name == 'render_visit_form' %}bg-emerald-600 text-white shadow-md{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+                    <i class="fa-solid fa-route mr-3 {% if request.resolver_match.url_name == 'render_visit_form' %}text-white{% else %}text-slate-400 group-hover:text-emerald-400{% endif %} w-5 text-center"></i>
                     Log Field Visit
                 </a>
             </nav>
