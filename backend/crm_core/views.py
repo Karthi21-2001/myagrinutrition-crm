@@ -252,10 +252,13 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
+    # 📊 Expanded comprehensive headers to fully incorporate field observations and pipeline states
     headers = [
         'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
-        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated', 'Live GPS Link'
+        'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
+        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
+        'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -274,6 +277,7 @@ def export_visits_to_excel(request):
         v = p.visit
         f = v.farm if v else None
         
+        # Core Parameters
         ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
         ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
         ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
@@ -284,12 +288,29 @@ def export_visits_to_excel(request):
         ws_data.cell(row=current_row, column=8, value=f.state if f else "")
         ws_data.cell(row=current_row, column=9, value=f.district if f else "")
         ws_data.cell(row=current_row, column=10, value=f.area if f else "")
-        ws_data.cell(row=current_row, column=11, value=p.product_name)
-        ws_data.cell(row=current_row, column=12, value=p.sale_quantity)
-        ws_data.cell(row=current_row, column=13, value=float(p.primary_price))
-        ws_data.cell(row=current_row, column=14, value=float(p.revenue_generated))
         
-        gps_cell = ws_data.cell(row=current_row, column=15)
+        # 🟢 Added: Farm Problem & Poultry Shed Population Inventories
+        ws_data.cell(row=current_row, column=11, value=v.farm_problem if v and v.farm_problem else "None reported")
+        ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
+        ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
+        ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
+        ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
+        
+        # Immediate Order Metrics
+        ws_data.cell(row=current_row, column=16, value=p.product_name)
+        ws_data.cell(row=current_row, column=17, value=p.sale_quantity)
+        ws_data.cell(row=current_row, column=18, value=float(p.primary_price))
+        ws_data.cell(row=current_row, column=14 + 5, value=float(p.revenue_generated)) # Column 19
+        
+        # 🟢 Added: Dynamic Pipeline Projections Matrix Data
+        ws_data.cell(row=current_row, column=20, value=p.potential_quantity)
+        ws_data.cell(row=current_row, column=21, value=p.target_quantity)
+        ws_data.cell(row=current_row, column=22, value=p.unit_type)
+        ws_data.cell(row=current_row, column=23, value=p.process_status)
+        ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%")
+        
+        # Live Geolocation Links
+        gps_cell = ws_data.cell(row=current_row, column=25)
         if f and f.latitude and f.longitude:
             gps_cell.value = "View on Map"
             gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
@@ -298,20 +319,25 @@ def export_visits_to_excel(request):
             gps_cell.value = "No GPS Data"
             gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-        for c_idx in range(1, 16):
-            ws_data.cell(row=current_row, column=c_idx).border = thin_border
+        # Style application pass across all 25 active layout boundaries
+        for c_idx in range(1, 26):
+            cell_item = ws_data.cell(row=current_row, column=c_idx)
+            cell_item.border = thin_border
+            if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]:  # Align numerical tracking data sets centrally
+                cell_item.alignment = Alignment(horizontal="center")
+                
         current_row += 1
 
+    # Format column layout adjustments safely
     for col in ws_data.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 15)
+        ws_data.column_dimensions[col_letter].width = max(max_len + 4, 14)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
-
 
 # ==========================================
 # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
@@ -429,39 +455,76 @@ def executive_analytics_view(request):
 # ==========================================
 
 def get_location_details(request):
+    """
+    Processes incoming map telemetry coordinates dynamically.
+    Uses a multi-tier API setup to guarantee live lookups anywhere in India.
+    """
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
     
     if not lat or not lon:
         return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
         
+    # --- TIER 1: PRIMARY LOOKUP (OpenStreetMap Nominatim) ---
     try:
-        headers = {'User-Agent': 'AgriNutritionCRM/1.0 (contact@myagrinutrition.com)'}
+        headers = {
+            'User-Agent': 'AgriNutritionCRM_Production_Engine/2.0 (operations@myagrinutrition.com)'
+        }
         api_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
         
-        response = requests.get(api_url, headers=headers, timeout=5)
-        
+        response = requests.get(api_url, headers=headers, timeout=4)
         if response.status_code == 200:
             data = response.json()
             address = data.get('address', {})
             
-            district = address.get('district') or address.get('county') or address.get('subdistrict') or 'Unknown District'
-            area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or 'Unknown Area'
-            state = address.get('state', 'Unknown State')
+            district = address.get('district') or address.get('county') or address.get('subdistrict') or address.get('city_district') or address.get('state_district')
+            area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or address.get('city') or address.get('road')
+            state = address.get('state')
             
+            if district and area and state:
+                return JsonResponse({
+                    'state': state.strip(),
+                    'district': district.replace('District', '').strip(),
+                    'area': area.strip()
+                })
+    except Exception:
+        pass  # Fail gracefully over to Tier 2 if blocked or timed out
+
+    # --- TIER 2: AUTOMATIC LIVE BACKUP (BigDataCloud Client API) ---
+    try:
+        backup_url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
+        backup_response = requests.get(backup_url, timeout=4)
+        
+        if backup_response.status_code == 200:
+            b_data = backup_response.json()
+            
+            state = b_data.get('principalSubdivision', 'Unknown State')
+            area = b_data.get('locality', '').strip()
+            
+            # Deep scan the administrative lookup array to extract the local District name dynamically
+            district = 'Unknown District'
+            for admin_layer in b_data.get('informative', []):
+                if admin_layer.get('order') == 4 or 'district' in admin_layer.get('description', '').lower():
+                    district = admin_layer.get('name', district)
+                    break
+            
+            if not area and b_data.get('lookupSource'):
+                area = b_data.get('lookupSource')
+
             return JsonResponse({
                 'state': state,
-                'district': district,
-                'area': area
+                'district': district.replace('District', '').strip(),
+                'area': area if area else f"Zone ({lat[:7]}, {lon[:7]})"
             })
-            
     except Exception:
         pass
-        
+
+    # --- TIER 3: EMERGENCY TELEMETRY STRIP (If completely offline/both APIs fail) ---
+    # Instead of guessing text, it feeds the coordinate fingerprints back so the form can still submit.
     return JsonResponse({
-        'state': 'Unknown State',
-        'district': 'Detected Location',
-        'area': f"Lat: {lat[:7]}, Lon: {lon[:7]}"
+        'state': 'Live GPS Active',
+        'district': f"Dist: {lat[:7]}N",
+        'area': f"Loc: {lon[:7]}E"
     })
 
 
