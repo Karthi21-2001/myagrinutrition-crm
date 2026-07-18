@@ -19,9 +19,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-yi(fw7m(n=3e%i%+m4%00imcyq8*uf(_0p)_u9pyxtmk*a3i_5')
 
-# 🛠️ TEMPORARY DEBUG OVERRIDE FOR ERROR TRACKING
-# Hardcoded to True to bypass Render's environment checking and unmask the 500 error
-DEBUG = True
+# SECURITY WARNING: don't run with debug turned on in production!
+# Automatically set DEBUG to False in Render production, True locally
+DEBUG = os.environ.get('RENDER', 'False') == 'False'
 
 # 🚀 ALLOWED NETWORK INTERFACES & TUNNELS
 ALLOWED_HOSTS = [
