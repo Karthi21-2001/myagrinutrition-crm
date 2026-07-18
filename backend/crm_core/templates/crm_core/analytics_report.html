@@ -14,18 +14,16 @@
 
     <style>
         :root {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
-            --bg-input: #0f172a;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
+            --bg-main: #0b0f19;
+            --bg-card: #131c2e;
+            --bg-input: #0b0f19;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --primary: #06b6d4;
+            --primary-hover: #0891b2;
             --success: #10b981;
-            --success-hover: #059669;
-            --accent-pipeline: #6366f1;
-            --border: #334155;
-            --border-focus: #60a5fa;
+            --border: #1e293b;
+            --border-focus: #38bdf8;
         }
         body {
             font-family: 'Inter', sans-serif;
@@ -34,31 +32,30 @@
         }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: var(--bg-main); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 100px; }
         
         input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1);
+            filter: invert(0.8);
             cursor: pointer;
-            opacity: 0.7;
         }
     </style>
 </head>
 <body class="min-h-full flex flex-col antialiased custom-scrollbar pb-12">
 
     <!-- 📊 TOP WORKSPACE HEADER BAR -->
-    <header class="border-b border-slate-800/80 px-6 py-5 bg-[#1e293b]/40 backdrop-blur-md sticky top-0 z-50">
+    <header class="border-b border-slate-800 bg-[#131c2e]/60 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
         <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 class="text-xl font-extrabold tracking-tight text-white uppercase flex items-center gap-2">
-                    <span class="text-blue-500"><i class="fa-solid fa-chart-pie"></i></span>
+                <h1 class="text-xl font-black tracking-tight text-white uppercase flex items-center gap-2">
+                    <span class="text-cyan-400"><i class="fa-solid fa-chart-pie"></i></span>
                     My AgriNutrition Analytics
                 </h1>
-                <p class="text-xs text-[var(--text-muted)] font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
             </div>
             
             <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
                 <!-- 🎯 EXECUTIVE DROPDOWN SELECTOR -->
-                <select id="executiveFilter" class="bg-[var(--bg-input)] border border-[var(--border)] text-white font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
+                <select id="executiveFilter" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
                     <option value="ALL">👥 All Executives</option>
                     <option value="Selva">👤 Selva Kumar</option>
                     <option value="Karthi">👤 Karthi Keyan</option>
@@ -68,17 +65,17 @@
                 </select>
 
                 <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
-                    <input type="date" value="2026-01-01" class="w-full bg-transparent text-white outline-none font-medium cursor-pointer [color-scheme:dark]">
+                    <input type="date" value="2026-01-01" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
                 <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
-                    <input type="date" value="2026-12-31" class="w-full bg-transparent text-white outline-none font-medium cursor-pointer [color-scheme:dark]">
+                    <input type="date" value="2026-12-31" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
-                <select class="bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-main)] rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
+                <select class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
                     <option>All Sectors</option>
                     <option>🐓 Poultry Sector</option>
                     <option>🐟 Aqua Sector</option>
                 </select>
-                <a href="/crm/export/excel/" class="bg-[#0284c7] hover:bg-[#0369a1] text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-sky-950/20">
+                <a href="/crm/export/excel/" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
                     <i class="fa-solid fa-file-excel"></i> Export Matrix
                 </a>
             </div>
@@ -91,48 +88,48 @@
         <!-- ================= STATISTICAL KPI CARD DECK ================= -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
-                <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-blue-400"></i></div>
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-sky-400"></i></div>
                 <h3 id="kpiVisits" class="text-2xl font-black text-white mt-2">{{ total_visits|default:"1,248" }}</h3>
-                <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 12.5% vs Last Month</span>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 12.5%</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
-                <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-user-tie text-purple-400"></i></div>
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-user-tie text-violet-400"></i></div>
                 <h3 id="kpiExecs" class="text-2xl font-black text-white mt-2">{{ total_executives|default:"8" }}</h3>
-                <span class="text-[9px] text-[var(--text-muted)] font-bold mt-1">Live Tracking Enabled</span>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Live Tracking Active</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
-                <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-wheat-api text-amber-400"></i></div>
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-wheat-api text-amber-400"></i></div>
                 <h3 id="kpiFarms" class="text-2xl font-black text-white mt-2">{{ total_farms|default:"842" }}</h3>
-                <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 9.8% expansion</span>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 9.8% expansion</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
-                <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-boxes-stacked text-orange-400"></i></div>
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-boxes-stacked text-orange-400"></i></div>
                 <h3 id="kpiQty" class="text-2xl font-black text-white mt-2">{{ total_qty|default:"15,680" }} <span class="text-xs font-medium text-slate-400">Units</span></h3>
-                <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 15.4% velocity</span>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 15.4% velocity</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
-                <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-indian-rupee-sign text-[var(--success)]"></i></div>
-                <h3 id="kpiRevenue" class="text-2xl font-black text-[var(--success)] mt-2">₹{{ total_revenue|default:"68,45,680" }}</h3>
-                <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 18.6% Target Trajectory</span>
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-indian-rupee-sign text-emerald-400"></i></div>
+                <h3 id="kpiRevenue" class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|default:"68,45,680" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 18.6% Growth</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
-                <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
                 <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"5,120" }}</h3>
-                <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 5.3% check-size</span>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 5.3%</span>
             </div>
         </div>
 
         <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <!-- Month-wise Running Trend -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <div class="flex justify-between items-start">
                         <div>
                             <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Month-Wise Revenue Review</h3>
-                            <p class="text-[10px] text-[var(--text-muted)]">Fiscal performance scaling across active financial months</p>
+                            <p class="text-[10px] text-slate-400">Fiscal performance scaling across active financial months</p>
                         </div>
-                        <span class="text-[10px] text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 border border-blue-500/20 rounded-md">Line Matrix</span>
+                        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20 rounded-md">Monthly Ledger</span>
                     </div>
                 </div>
                 <div class="relative flex-1 min-h-0 mt-4">
@@ -140,15 +137,15 @@
                 </div>
             </div>
 
-            <!-- Year-wise Running Trend (MATCHING DESIGN) -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between">
+            <!-- Year-wise Running Trend -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <div class="flex justify-between items-start">
                         <div>
                             <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Year-Wise Revenue Review</h3>
-                            <p class="text-[10px] text-[var(--text-muted)]">Historical macro conversion comparison parameters</p>
+                            <p class="text-[10px] text-slate-400">Historical macro conversion comparison parameters</p>
                         </div>
-                        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20 rounded-md">Year Matrix</span>
+                        <span class="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 border border-cyan-500/20 rounded-md">Yearly Ledger</span>
                     </div>
                 </div>
                 <div class="relative flex-1 min-h-0 mt-4">
@@ -160,28 +157,28 @@
         <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <!-- Executive Performance Chart -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Revenue By Executive</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Performance breakdown across primary product orders</p>
+                    <p class="text-[10px] text-slate-400">Performance breakdown across primary product orders</p>
                 </div>
                 <div class="relative flex-1 min-h-0 mt-4"><canvas id="execRevBarChart"></canvas></div>
             </div>
 
             <!-- Product Volume Breakdown -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Product Allocation (Order Volume)</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Distribution ratio of standard units booked in fields</p>
+                    <p class="text-[10px] text-slate-400">Distribution ratio of standard units booked in fields</p>
                 </div>
                 <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="prodSalesDonut"></canvas></div>
             </div>
 
             <!-- Top Farm Yields -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Top Farms by Booking Revenue</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Highest converting farm accounts this period</p>
+                    <p class="text-[10px] text-slate-400">Highest converting farm accounts this period</p>
                 </div>
                 <div id="farmLedgerContainer" class="overflow-y-auto flex-1 custom-scrollbar text-xs divide-y divide-slate-800/60 mt-4 pr-1">
                     <!-- Populated Dynamically -->
@@ -190,70 +187,81 @@
         </div>
 
         <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <!-- 📍 ADDED: Visits By State Matrix -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Visits by State</h3>
+                    <p class="text-[10px] text-slate-400">Geographic footprint breakdown across core territories</p>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="stateVisitsChart"></canvas>
+                </div>
+            </div>
+
             <!-- Diagnostic Problems Observations Matrix -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Field Problems Observed</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Aggregated insights from field symptoms and stressors logs</p>
+                    <p class="text-[10px] text-slate-400">Aggregated insights from symptoms logs</p>
                 </div>
                 <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="problemsDonut"></canvas></div>
             </div>
 
             <!-- Funnel Status Conversion Matrix -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Pipeline Temperature</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Conversion states of open discussed products</p>
+                    <p class="text-[10px] text-slate-400">Conversion states of open discussed products</p>
                 </div>
                 <div class="flex-1 flex flex-col justify-center space-y-3 font-semibold text-xs mt-2 px-1">
                     <div>
-                        <div class="flex justify-between text-[10px] mb-1 text-[var(--text-muted)]"><span>💥 Hot Deals Pipeline</span><span id="funnelHot">34%</span></div>
-                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800"><div id="barHot" class="bg-red-500 h-full rounded-full" style="width: 34%"></div></div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>💥 Hot Deals Pipeline</span><span id="funnelHot">34%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800"><div id="barHot" class="bg-rose-500 h-full rounded-full" style="width: 34%"></div></div>
                     </div>
                     <div>
-                        <div class="flex justify-between text-[10px] mb-1 text-[var(--text-muted)]"><span>🔥 Warm Leads Engagement</span><span id="funnelWarm">51%</span></div>
-                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800"><div id="barWarm" class="bg-indigo-500 h-full rounded-full" style="width: 51%"></div></div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>🔥 Warm Leads Engagement</span><span id="funnelWarm">51%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800"><div id="barWarm" class="bg-amber-500 h-full rounded-full" style="width: 51%"></div></div>
                     </div>
                     <div>
-                        <div class="flex justify-between text-[10px] mb-1 text-[var(--text-muted)]"><span>❄️ Cold Accounts Analysis</span><span id="funnelCold">15%</span></div>
-                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800"><div id="barCold" class="bg-blue-400 h-full rounded-full" style="width: 15%"></div></div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>❄️ Cold Accounts Analysis</span><span id="funnelCold">15%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800"><div id="barCold" class="bg-slate-500 h-full rounded-full" style="width: 15%"></div></div>
                     </div>
                 </div>
             </div>
 
             <!-- Dynamic Sector Segmentation Block Matrix -->
-            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between">
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Business Sector Distribution</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Volume alignment between business verticals</p>
+                    <p class="text-[10px] text-slate-400">Volume alignment between business verticals</p>
                 </div>
                 <div class="flex-1 grid grid-cols-2 gap-3 font-bold text-xs p-1 mt-4">
-                    <div class="bg-amber-600/10 border border-amber-600/30 rounded-xl p-4 flex flex-col justify-between shadow-inner">
-                        <div class="flex justify-between items-center text-amber-400 text-lg"><span class="text-xs uppercase tracking-wide font-bold">Poultry</span>🐓</div>
-                        <div class="mt-2"><span id="sectorPoultry" class="text-2xl font-black text-white">65%</span><p class="text-[9px] font-medium text-amber-500/80 mt-0.5">Broiler/Layer Dominance</p></div>
+                    <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                        <div class="flex justify-between items-center text-amber-400 text-lg"><span class="text-xs uppercase tracking-wide font-bold text-slate-200">Poultry</span> Rooster </div>
+                        <div class="mt-2"><span id="sectorPoultry" class="text-2xl font-black text-white">65%</span><p class="text-[9px] font-medium text-amber-500/70 mt-0.5">Broiler/Layer Matrix</p></div>
                     </div>
-                    <div class="bg-sky-600/10 border border-sky-600/30 rounded-xl p-4 flex flex-col justify-between shadow-inner">
-                        <div class="flex justify-between items-center text-sky-400 text-lg"><span class="text-xs uppercase tracking-wide font-bold">Aqua</span>🐟</div>
-                        <div class="mt-2"><span id="sectorAqua" class="text-2xl font-black text-white">35%</span><p class="text-[9px] font-medium text-sky-500/80 mt-0.5">Shrimp/Fish Tracking</p></div>
+                    <div class="bg-sky-500/5 border border-sky-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                        <div class="flex justify-between items-center text-sky-400 text-lg"><span class="text-xs uppercase tracking-wide font-bold text-slate-200">Aqua</span> Fish </div>
+                        <div class="mt-2"><span id="sectorAqua" class="text-2xl font-black text-white">35%</span><p class="text-[9px] font-medium text-sky-500/70 mt-0.5">Shrimp Tracking</p></div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- ================= LIVE LOG ENTRIES AUDIT MATRIX LEDGER ================= -->
-        <div class="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-lg">
-            <div class="p-4 border-b border-slate-800/60 bg-slate-900/40 flex justify-between items-center">
+        <div class="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-xl">
+            <div class="p-4 border-b border-slate-800 bg-slate-900/20 flex justify-between items-center">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider">Recent Visit Summary Log</h3>
-                    <p class="text-[10px] text-[var(--text-muted)]">Real-time incoming stream from frontline field reports</p>
+                    <p class="text-[10px] text-slate-400">Real-time incoming stream from frontline field reports</p>
                 </div>
-                <span class="text-[10px] font-bold text-[var(--success)] bg-[var(--success)]/10 px-2.5 py-1 rounded-full border border-[var(--success)]/20 animate-pulse">Live Sync Active</span>
+                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 animate-pulse">Live Sync Active</span>
             </div>
             
             <div class="overflow-x-auto custom-scrollbar text-xs">
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-[var(--bg-main)] font-bold text-[var(--text-muted)] uppercase tracking-wider text-[10px] border-b border-slate-800">
+                    <thead class="bg-[var(--bg-main)] font-bold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
                         <tr>
                             <th class="p-3.5 pl-5">Date Logged</th>
                             <th class="p-3.5">Executive Name</th>
@@ -263,8 +271,8 @@
                             <th class="p-3.5 text-center">GPS Routing</th>
                         </tr>
                     </thead>
-                    <tbody id="visitLogTableBody" class="divide-y divide-slate-800/50 font-medium text-slate-300">
-                        <!-- Content managed by filter matrix engine -->
+                    <tbody id="visitLogTableBody" class="divide-y divide-slate-800/40 font-medium text-slate-300">
+                        <!-- Content managed by engine -->
                     </tbody>
                 </table>
             </div>
@@ -272,28 +280,22 @@
 
     </main>
 
-    <!-- CHART.JS INTEGRATION CORE PLATFORM -->
+    <!-- CHART.JS INTEGRATION -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Repository Matrix mapping Data Profiles
         const dashboardData = {
             "ALL": {
                 kpis: { visits: "1,248", execs: "5", farms: "842", qty: "15,680", rev: "₹68,45,680", avg: "₹5,120" },
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [340000, 410000, 390000, 480000, 560000, 610000, 580000, 620000, 690000, 710000, 730000, 725680],
-                yearLabels: ['2024', '2025', '2026'],
-                yearData: [4901200, 5592400, 6845680],
-                execLabels: ['Selva', 'Karthi', 'Roshan', 'Sai', 'Shyam'],
-                execData: [254300, 210500, 186700, 168400, 142600],
-                prodData: [5620, 3280, 2450, 1250, 1400],
-                problemsData: [428, 300, 198, 150, 110],
-                funnel: { hot: "34%", warm: "51%", cold: "15%" },
-                sectors: { poultry: "65%", aqua: "35%" },
+                yearLabels: ['2024', '2025', '2026'], yearData: [4901200, 5592400, 6845680],
+                execLabels: ['Selva', 'Karthi', 'Roshan', 'Sai', 'Shyam'], execData: [254300, 210500, 186700, 168400, 142600],
+                stateLabels: ['Andhra Pradesh', 'Telangana', 'Karnataka', 'Tamil Nadu'], stateData: [452, 328, 214, 198],
+                prodData: [5620, 3280, 2450, 1250, 1400], problemsData: [428, 300, 198, 150, 110],
+                funnel: { hot: "34%", warm: "51%", cold: "15%" }, sectors: { poultry: "65%", aqua: "35%" },
                 farms: [
-                    { name: "Swasthik Poultry Farm", rev: "₹85,600" },
-                    { name: "Green Valley Rice Farm", rev: "₹78,450" },
-                    { name: "Sri Lakshmi Hatcheries", rev: "₹72,300" },
-                    { name: "Venkateswara Aqua Complex", rev: "₹68,900" }
+                    { name: "Swasthik Poultry Farm", rev: "₹85,600" }, { name: "Green Valley Rice Farm", rev: "₹78,450" },
+                    { name: "Sri Lakshmi Hatcheries", rev: "₹72,300" }, { name: "Venkateswara Aqua Complex", rev: "₹68,900" }
                 ],
                 visits: [
                     { date: "18-May-2026", exec: "Selva Kumar", farm: "Green Valley Rice Farm", owner: "Rajesh Kumar", geo: "Namakkal, TN", rev: "₹12,450.00" },
@@ -307,11 +309,9 @@
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [110000, 130000, 120000, 140000, 155000, 170000, 160000, 165000, 180000, 182000, 190000, 152300],
                 yearLabels: ['2024', '2025', '2026'], yearData: [1210000, 1450000, 1854300],
-                execLabels: ['Selva'], execData: [254300],
-                prodData: [2100, 950, 600, 300, 170],
-                problemsData: [120, 80, 50, 40, 20],
-                funnel: { hot: "45%", warm: "40%", cold: "15%" },
-                sectors: { poultry: "80%", aqua: "20%" },
+                execLabels: ['Selva'], execData: [254300], stateLabels: ['Tamil Nadu', 'Karnataka'], stateData: [198, 112],
+                prodData: [2100, 950, 600, 300, 170], problemsData: [120, 80, 50, 40, 20],
+                funnel: { hot: "45%", warm: "40%", cold: "15%" }, sectors: { poultry: "80%", aqua: "20%" },
                 farms: [{ name: "Green Valley Rice Farm", rev: "₹78,450" }, { name: "Anand Broiler Unit", rev: "₹45,200" }],
                 visits: [{ date: "18-May-2026", exec: "Selva Kumar", farm: "Green Valley Rice Farm", owner: "Rajesh Kumar", geo: "Namakkal, TN", rev: "₹12,450.00" }]
             },
@@ -320,11 +320,9 @@
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [90000, 110000, 105000, 125000, 130000, 142000, 135000, 138000, 149000, 155000, 160000, 171500],
                 yearLabels: ['2024', '2025', '2026'], yearData: [1050000, 1210000, 1510500],
-                execLabels: ['Karthi'], execData: [210500],
-                prodData: [1200, 1100, 800, 400, 390],
-                problemsData: [95, 110, 45, 30, 10],
-                funnel: { hot: "25%", warm: "60%", cold: "15%" },
-                sectors: { poultry: "40%", aqua: "60%" },
+                execLabels: ['Karthi'], execData: [210500], stateLabels: ['Andhra Pradesh'], stateData: [290],
+                prodData: [1200, 1100, 800, 400, 390], problemsData: [95, 110, 45, 30, 10],
+                funnel: { hot: "25%", warm: "60%", cold: "15%" }, sectors: { poultry: "40%", aqua: "60%" },
                 farms: [{ name: "Sri Lakshmi Poultry Complex", rev: "₹72,300" }, { name: "Nellore Shrimp Farm", rev: "₹51,000" }],
                 visits: [{ date: "18-May-2026", exec: "Karthi Keyan", farm: "Sri Lakshmi Poultry Complex", owner: "M. Swamy", geo: "Nellore, AP", rev: "₹9,800.00" }]
             },
@@ -333,11 +331,9 @@
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [80000, 95000, 90000, 105000, 112000, 118000, 110000, 115000, 122000, 130000, 140000, 139700],
                 yearLabels: ['2024', '2025', '2026'], yearData: [910000, 1090000, 1286700],
-                execLabels: ['Roshan'], execData: [186700],
-                prodData: [950, 800, 650, 350, 200],
-                problemsData: [110, 60, 48, 50, 30],
-                funnel: { hot: "30%", warm: "50%", cold: "20%" },
-                sectors: { poultry: "50%", aqua: "50%" },
+                execLabels: ['Roshan'], execData: [186700], stateLabels: ['Karnataka'], stateData: [240],
+                prodData: [950, 800, 650, 350, 200], problemsData: [110, 60, 48, 50, 30],
+                funnel: { hot: "30%", warm: "50%", cold: "20%" }, sectors: { poultry: "50%", aqua: "50%" },
                 farms: [{ name: "Venkateswara Aqua Complex", rev: "₹68,900" }],
                 visits: [{ date: "17-May-2026", exec: "Roshan Singh", farm: "Venkateswara Aqua Complex", owner: "K. Rao", geo: "Kochi, Kerala", rev: "₹15,200.00" }]
             },
@@ -346,11 +342,9 @@
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [70000, 80000, 85000, 92000, 100000, 105000, 102000, 108000, 115000, 121000, 124000, 131400],
                 yearLabels: ['2024', '2025', '2026'], yearData: [820000, 980000, 1168400],
-                execLabels: ['Sai'], execData: [168400],
-                prodData: [870, 730, 520, 320, 380],
-                problemsData: [73, 30, 35, 20, 40],
-                funnel: { hot: "35%", warm: "50%", cold: "15%" },
-                sectors: { poultry: "90%", aqua: "10%" },
+                execLabels: ['Sai'], execData: [168400], stateLabels: ['Andhra Pradesh', 'Telangana'], stateData: [162, 66],
+                prodData: [870, 730, 520, 320, 380], problemsData: [73, 30, 35, 20, 40],
+                funnel: { hot: "35%", warm: "50%", cold: "15%" }, sectors: { poultry: "90%", aqua: "10%" },
                 farms: [{ name: "Swasthik Poultry Farm", rev: "₹85,600" }],
                 visits: [{ date: "16-May-2026", exec: "Sai Prasad", farm: "Swasthik Poultry Farm", owner: "S. Reddy", geo: "Guntur, AP", rev: "₹22,100.00" }]
             },
@@ -359,68 +353,89 @@
                 monthLabels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 monthData: [50000, 60000, 65000, 78000, 83000, 88000, 85000, 89000, 94000, 99000, 102000, 132780],
                 yearLabels: ['2024', '2025', '2026'], yearData: [710000, 840000, 1025780],
-                execLabels: ['Shyam'], execData: [142600],
-                prodData: [500, 500, 400, 200, 300],
-                problemsData: [30, 20, 20, 10, 10],
-                funnel: { hot: "30%", warm: "45%", cold: "25%" },
-                sectors: { poultry: "30%", aqua: "70%" },
+                execLabels: ['Shyam'], execData: [142600], stateLabels: ['Telangana'], stateData: [180],
+                prodData: [500, 500, 400, 200, 300], problemsData: [30, 20, 20, 10, 10],
+                funnel: { hot: "30%", warm: "45%", cold: "25%" }, sectors: { poultry: "30%", aqua: "70%" },
                 farms: [{ name: "Godavari Fish Culture", rev: "₹41,200" }],
                 visits: [{ date: "15-May-2026", exec: "Shyam Sundar", farm: "Godavari Fish Culture", owner: "N. Murthy", geo: "Eluru, AP", rev: "₹14,200.00" }]
             }
         };
 
         document.addEventListener("DOMContentLoaded", () => {
-            Chart.defaults.color = '#94a3b8';
-            Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.3)';
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
             Chart.defaults.font.family = "'Inter', sans-serif";
 
             const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
-            // 📈 Month-wise Performance Linear Trend Engine
-            let trendChart = new Chart(document.getElementById('monthWiseTrendChart').getContext('2d'), {
+            // Context creation for Line Gradients
+            const ctxMonth = document.getElementById('monthWiseTrendChart').getContext('2d');
+            const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
+            gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+            gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+            const ctxYear = document.getElementById('yearWiseTrendChart').getContext('2d');
+            const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
+            gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+            gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+            // Month-Wise Line Chart Initialization
+            let trendChart = new Chart(ctxMonth, {
                 type: 'line',
-                data: { labels: [], datasets: [{ label: 'Monthly Revenue', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.05)', borderWidth: 2.5, tension: 0.35, fill: true, pointBackgroundColor: '#10b981' }] },
+                data: { labels: [], datasets: [{ label: 'Monthly Net', data: [], borderColor: '#10b981', backgroundColor: gradMonth, borderWidth: 2.5, tension: 0.38, fill: true, pointBackgroundColor: '#10b981', pointHoverRadius: 6 }] },
                 options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
             });
 
-            // 📅 NEW: Year-wise Matching Linear Trend Engine
-            let yearTrendChart = new Chart(document.getElementById('yearWiseTrendChart').getContext('2d'), {
+            // Year-Wise Line Chart Initialization
+            let yearTrendChart = new Chart(ctxYear, {
                 type: 'line',
-                data: { labels: [], datasets: [{ label: 'Yearly Revenue', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.05)', borderWidth: 2.5, tension: 0.35, fill: true, pointBackgroundColor: '#3b82f6' }] },
+                data: { labels: [], datasets: [{ label: 'Yearly Aggregate', data: [], borderColor: '#06b6d4', backgroundColor: gradYear, borderWidth: 2.5, tension: 0.38, fill: true, pointBackgroundColor: '#06b6d4', pointHoverRadius: 6 }] },
                 options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
             });
 
             let execChart = new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
                 type: 'bar',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: '#3b82f6', borderRadius: 6, barThickness: 12 }] },
-                options: { ...baseOptions, indexAxis: 'y' }
+                data: { labels: [], datasets: [{ data: [], backgroundColor: '#38bdf8', borderRadius: 4, barThickness: 10 }] },
+                options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
+            });
+
+            // 📍 INITIALIZED NEW CHART: State Performance (using map data from image)
+            let stateChart = new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels: [], 
+                    datasets: [{ 
+                        data: [], 
+                        backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#10b981'], 
+                        borderRadius: 4, 
+                        barThickness: 12 
+                    }] 
+                },
+                options: { ...baseOptions, indexAxis: 'y', scales: { x: { grid: { display: false } } } }
             });
 
             let prodChart = new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
                 type: 'doughnut',
-                data: { labels: ['BioShield V2', 'Growth Booster', 'Alpha Mineral', 'Wetlock Mix', 'Others'], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#64748b'], borderWidth: 0 }] },
-                options: { ...baseOptions, cutout: '70%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 9 } } } } }
+                data: { labels: ['BioShield V2', 'Growth Booster', 'Alpha Mineral', 'Wetlock Mix', 'Others'], datasets: [{ data: [], backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#475569'], borderWidth: 0 }] },
+                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
             });
 
             let probChart = new Chart(document.getElementById('problemsDonut').getContext('2d'), {
                 type: 'doughnut',
-                data: { labels: ['Clinical Symptoms', 'Pest Outbreaks', 'Weather Stressors', 'Water Quality', 'Feed Issues'], datasets: [{ data: [], backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#64748b'], borderWidth: 0 }] },
-                options: { ...baseOptions, cutout: '70%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 9 } } } } }
+                data: { labels: ['Clinical Symptoms', 'Pest Outbreaks', 'Weather Stressors', 'Water Quality', 'Feed Issues'], datasets: [{ data: [], backgroundColor: ['#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#475569'], borderWidth: 0 }] },
+                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
             });
 
-            // Master Refresh Filter Function
             function updateDashboard(selectedKey) {
                 const data = dashboardData[selectedKey];
 
-                // 1. Refresh KPI UI Cards
                 document.getElementById('kpiVisits').innerText = data.kpis.visits;
                 document.getElementById('kpiExecs').innerText = data.kpis.execs;
                 document.getElementById('kpiFarms').innerText = data.kpis.farms;
-                document.getElementById('kpiQty').innerHTML = `${data.kpis.qty} <span class="text-xs font-medium text-slate-400">Units</span>`;
+                document.getElementById('kpiQty').innerHTML = `${data.kpis.qty} <span class="text-xs font-medium text-slate-500">Units</span>`;
                 document.getElementById('kpiRevenue').innerText = data.kpis.rev;
                 document.getElementById('kpiAvgValue').innerText = data.kpis.avg;
 
-                // 2. Refresh Funnel UI Status Bars
                 document.getElementById('funnelHot').innerText = data.funnel.hot;
                 document.getElementById('barHot').style.width = data.funnel.hot;
                 document.getElementById('funnelWarm').innerText = data.funnel.warm;
@@ -428,45 +443,33 @@
                 document.getElementById('funnelCold').innerText = data.funnel.cold;
                 document.getElementById('barCold').style.width = data.funnel.cold;
 
-                // 3. Refresh Sector Text parameters
                 document.getElementById('sectorPoultry').innerText = data.sectors.poultry;
                 document.getElementById('sectorAqua').innerText = data.sectors.aqua;
 
-                // 4. Re-inject Top Farm Records
-                let farmHTML = `<div class="flex justify-between py-2 font-bold text-[var(--text-muted)] uppercase tracking-wide text-[10px]"><span>Farm Identity</span><span>Revenue</span></div>`;
+                let farmHTML = `<div class="flex justify-between py-2 font-bold text-slate-500 uppercase tracking-wide text-[10px]"><span>Farm Identity</span><span>Revenue</span></div>`;
                 data.farms.forEach(f => {
-                    farmHTML += `
-                    <div class="flex justify-between py-2.5 items-center">
-                        <span class="font-medium text-white">${f.name}</span>
-                        <span class="font-bold text-[var(--success)]">${f.rev}</span>
-                    </div>`;
+                    farmHTML += `<div class="flex justify-between py-2.5 items-center"><span class="font-medium text-slate-200">${f.name}</span><span class="font-bold text-emerald-400">${f.rev}</span></div>`;
                 });
                 document.getElementById('farmLedgerContainer').innerHTML = farmHTML;
 
-                // 5. Filter Live Logs Audit Table
                 let visitHTML = '';
                 data.visits.forEach(v => {
                     visitHTML += `
-                    <tr class="hover:bg-slate-800/20 transition duration-150">
-                        <td class="p-3.5 pl-5 font-semibold text-slate-400">${v.date}</td>
-                        <td class="p-3.5 text-white font-bold">${v.exec}</td>
-                        <td class="p-3.5 flex flex-col">
-                            <span class="font-bold text-slate-200">${v.farm}</span>
-                            <span class="text-[10px] text-[var(--text-muted)]">Owner: ${v.owner}</span>
-                        </td>
+                    <tr class="hover:bg-slate-800/10 transition duration-150">
+                        <td class="p-3.5 pl-5 font-semibold text-slate-500">${v.date}</td>
+                        <td class="p-3.5 text-slate-200 font-bold">${v.exec}</td>
+                        <td class="p-3.5 flex flex-col"><span class="font-bold text-slate-300">${v.farm}</span><span class="text-[10px] text-slate-500">Owner: ${v.owner}</span></td>
                         <td class="p-3.5 text-slate-400">${v.geo}</td>
-                        <td class="p-3.5 text-right font-bold text-teal-400 pr-5">${v.rev}</td>
-                        <td class="p-3.5 text-center"><a href="#" class="text-blue-400 text-sm"><i class="fa-solid fa-location-dot"></i></a></td>
+                        <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">${v.rev}</td>
+                        <td class="p-3.5 text-center"><a href="#" class="text-slate-500 hover:text-cyan-400 text-sm"><i class="fa-solid fa-location-dot"></i></a></td>
                     </tr>`;
                 });
                 document.getElementById('visitLogTableBody').innerHTML = visitHTML;
 
-                // 6. Dynamic Chart Engine Updates
                 trendChart.data.labels = data.monthLabels;
                 trendChart.data.datasets[0].data = data.monthData;
                 trendChart.update();
 
-                // Year Chart Update (Matching layout structure)
                 yearTrendChart.data.labels = data.yearLabels;
                 yearTrendChart.data.datasets[0].data = data.yearData;
                 yearTrendChart.update();
@@ -475,6 +478,11 @@
                 execChart.data.datasets[0].data = data.execData;
                 execChart.update();
 
+                // Update Geographic Chart Data
+                stateChart.data.labels = data.stateLabels;
+                stateChart.data.datasets[0].data = data.stateData;
+                stateChart.update();
+
                 prodChart.data.datasets[0].data = data.prodData;
                 prodChart.update();
 
@@ -482,12 +490,10 @@
                 probChart.update();
             }
 
-            // Bind Event to Selector Trigger
             document.getElementById('executiveFilter').addEventListener('change', (e) => {
                 updateDashboard(e.target.value);
             });
 
-            // Initial Trigger Initialization
             updateDashboard("ALL");
         });
     </script>
