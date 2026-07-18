@@ -188,14 +188,14 @@
 
         <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <!-- 📍 ADDED: Visits By State Matrix -->
+            <!-- 📍 Fixed and optimized: Visits By State Layout Block -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
-                <div>
+                <div class="mb-2">
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Visits by State</h3>
-                    <p class="text-[10px] text-slate-400">Geographic footprint breakdown across core territories</p>
+                    <p class="text-[10px] text-slate-400">Geographic footprints across core territories</p>
                 </div>
-                <div class="relative flex-1 min-h-0 mt-4">
-                    <canvas id="stateVisitsChart"></canvas>
+                <div class="relative flex-1 w-full min-h-0">
+                    <canvas id="stateVisitsChart" style="position: relative; height:100%; width:100%"></canvas>
                 </div>
             </div>
 
@@ -399,7 +399,7 @@
                 options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
             });
 
-            // 📍 INITIALIZED NEW CHART: State Performance (using map data from image)
+            // 📍 FIXED INITIALIZATION: State Map Metrics Bar Chart Config
             let stateChart = new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
                 type: 'bar',
                 data: { 
@@ -411,7 +411,16 @@
                         barThickness: 12 
                     }] 
                 },
-                options: { ...baseOptions, indexAxis: 'y', scales: { x: { grid: { display: false } } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    indexAxis: 'y', 
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                        y: { grid: { display: false }, ticks: { color: '#f1f5f9', font: { weight: 'bold' } } }
+                    } 
+                }
             });
 
             let prodChart = new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
@@ -478,7 +487,7 @@
                 execChart.data.datasets[0].data = data.execData;
                 execChart.update();
 
-                // Update Geographic Chart Data
+                // Update Geographic Chart Data Safely
                 stateChart.data.labels = data.stateLabels;
                 stateChart.data.datasets[0].data = data.stateData;
                 stateChart.update();
