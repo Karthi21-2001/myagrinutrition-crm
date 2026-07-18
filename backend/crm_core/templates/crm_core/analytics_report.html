@@ -6,6 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise Analytics Command Suite</title>
 
+    <!-- Google Fonts: Inter (Matches the modern geometric reference typography) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
     <!-- Tailwind CSS Engine & FontAwesome Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,7 +19,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
-        /* Premium custom styling overlaying Tailwind components */
+        /* Global Typography Override to match screenshot exactly */
+        body {
+            font-family: 'Inter', sans-serif !important;
+        }
+
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 100px; }
@@ -32,7 +41,7 @@
         .leaflet-container { background: #0f172a !important; }
     </style>
 </head>
-<body class="h-full text-slate-300 font-sans antialiased custom-scrollbar flex flex-col">
+<body class="h-full text-slate-300 antialiased custom-scrollbar flex flex-col">
 
     <!-- 📊 APPLICATION GLOBAL NAV BAR -->
     <header class="bg-slate-900 border-b border-slate-800/80 sticky top-0 z-40 px-6 py-4">
@@ -42,8 +51,8 @@
                     <i class="fa-solid fa-chart-line text-emerald-400 text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold text-white tracking-tight uppercase">AgriNutritional Business Intelligence</h1>
-                    <p class="text-xs text-slate-400 font-medium">Data Sync Cycle: Active Operational Terminal</p>
+                    <h1 class="text-xl font-black text-white tracking-tight uppercase">My AgriNutrition</h1>
+                    <p class="text-xs text-slate-400 font-medium tracking-wide">Live Management Performance & Pipeline Telemetry</p>
                 </div>
             </div>
             
@@ -61,13 +70,11 @@
     <!-- 🎛️ BI NAVIGATION CONTROL MATRIX -->
     <div class="bg-slate-900/50 border-b border-slate-900 px-6 py-2.5 sticky top-[73px] z-30 backdrop-blur-md">
         <div class="max-w-[1600px] mx-auto overflow-x-auto flex space-x-1.5 custom-scrollbar pb-1 sm:pb-0">
-            <button onclick="switchTab('exec-summary')" id="btn-exec-summary" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg bg-emerald-600 text-white shadow transition-all whitespace-nowrap">📊 Executive Summary</button>
-            <button onclick="switchTab('geo-analysis')" id="btn-geo-analysis" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">📍 Geographic Distribution</button>
-            <button onclick="switchTab('exec-performance')" id="btn-exec-performance" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">👨‍💼 Executive Performance</button>
-            <button onclick="switchTab('poultry-segment')" id="btn-poultry-segment" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">🐔 Segment Allocations</button>
-            <button onclick="switchTab('bird-population')" id="btn-bird-population" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">🐣 Bird Populations</button>
-            <button onclick="switchTab('product-perf')" id="btn-product-perf" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">💊 Product Performance</button>
-            <button onclick="switchTab('rev-analysis')" id="btn-rev-analysis" class="tab-btn px-4 py-2 text-xs font-semibold tracking-wider uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">💰 Revenue Intelligence</button>
+            <button onclick="switchTab('exec-summary')" id="btn-exec-summary" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg bg-emerald-600 text-white shadow transition-all whitespace-nowrap">📊 Executive Summary</button>
+            <button onclick="switchTab('geo-analysis')" id="btn-geo-analysis" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">📍 Geographic Distribution</button>
+            <button onclick="switchTab('exec-performance')" id="btn-exec-performance" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">👨‍💼 Executive Performance</button>
+            <button onclick="switchTab('product-perf')" id="btn-product-perf" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">💊 Product Performance</button>
+            <button onclick="switchTab('rev-analysis')" id="btn-rev-analysis" class="tab-btn px-4 py-2 text-xs font-bold tracking-wide uppercase rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all whitespace-nowrap">💰 Revenue Intelligence</button>
         </div>
     </div>
 
@@ -82,63 +89,63 @@
                 <!-- KPI 1 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group">
                     <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase">Count(Visit Date)</span>
-                        <span class="text-xs font-medium text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Operational</span>
+                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Count(Visit Date)</span>
+                        <span class="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">Operational</span>
                     </div>
-                    <h3 class="text-3xl font-extrabold text-white mt-3 tracking-tight group-hover:text-sky-400 transition">{{ total_visits|default:"1,420" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-2">Total Field Visits</p>
+                    <h3 class="text-3xl font-black text-sky-400 mt-3 tracking-tight transition">{{ total_visits|default:"1,420" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Total Field Visits</p>
                 </div>
                 <!-- KPI 2 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group">
                     <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase">Distinct Executive</span>
+                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Distinct Executive</span>
                     </div>
-                    <h3 class="text-3xl font-extrabold text-white mt-3 tracking-tight group-hover:text-indigo-400 transition">{{ total_executives|default:"18" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-2">Active Field Executives</p>
+                    <h3 class="text-3xl font-black text-white mt-3 tracking-tight group-hover:text-indigo-400 transition">{{ total_executives|default:"18" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Active Field Executives</p>
                 </div>
                 <!-- KPI 3 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group">
                     <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase">Distinct Farm Name</span>
+                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Distinct Farm Name</span>
                     </div>
-                    <h3 class="text-3xl font-extrabold text-white mt-3 tracking-tight group-hover:text-purple-400 transition">{{ total_farms_visited|default:"342" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-2">Unique Farms Audited</p>
+                    <h3 class="text-3xl font-black text-white mt-3 tracking-tight group-hover:text-purple-400 transition">{{ total_farms_visited|default:"342" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Unique Farms Audited</p>
                 </div>
                 <!-- KPI 4 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700/80 transition group-emerald">
                     <div class="flex justify-between items-start">
-                        <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase">Sum(Revenue)</span>
-                        <span class="text-xs font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Financial</span>
+                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Sum(Revenue)</span>
+                        <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">Financial</span>
                     </div>
-                    <h3 class="text-3xl font-extrabold text-emerald-400 mt-3 tracking-tight">₹{{ total_revenue|default:"18,45,600" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-2">Aggregated Revenue</p>
+                    <h3 class="text-3xl font-black text-emerald-400 mt-3 tracking-tight">₹{{ total_revenue|default:"18,45,600" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">Aggregated Revenue</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 <!-- KPI 5 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-                    <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase block">Sum(Sale Qty)</span>
-                    <h3 class="text-2xl font-bold text-white mt-2">{{ total_sales_qty|default:"42,150" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-1">Total Metric Sales Qty</p>
+                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Sum(Sale Qty)</span>
+                    <h3 class="text-2xl font-black text-white mt-2">{{ total_sales_qty|default:"42,150" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Total Metric Sales Qty</p>
                 </div>
                 <!-- KPI 6 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-                    <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase block">Sum(Poten. Qty)</span>
-                    <h3 class="text-2xl font-bold text-white mt-2">{{ total_potential_qty|default:"85,000" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-1">Calculated Potential Capacity</p>
+                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Sum(Poten. Qty)</span>
+                    <h3 class="text-2xl font-black text-white mt-2">{{ total_potential_qty|default:"85,000" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Calculated Potential Capacity</p>
                 </div>
                 <!-- KPI 7 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-                    <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase block">Sum(Target Qty)</span>
-                    <h3 class="text-2xl font-bold text-white mt-2">{{ total_target_qty|default:"50,000" }}</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-1">Allocated Milestone Target</p>
+                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Sum(Target Qty)</span>
+                    <h3 class="text-2xl font-black text-white mt-2">{{ total_target_qty|default:"50,000" }}</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Allocated Milestone Target</p>
                 </div>
                 <!-- KPI 8 -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm border-l-4 border-l-amber-500">
-                    <span class="text-[10px] font-mono font-bold text-slate-500 tracking-wider uppercase block">Average(conv %)</span>
-                    <h3 class="text-2xl font-bold text-amber-400 mt-2">{{ conversion_pct|default:"74.2" }}%</h3>
-                    <p class="text-xs font-semibold text-slate-400 mt-1">Mean Conversion Efficiency</p>
+                    <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Average(conv %)</span>
+                    <h3 class="text-2xl font-black text-amber-400 mt-2">{{ conversion_pct|default:"74.2" }}%</h3>
+                    <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-wide">Mean Conversion Efficiency</p>
                 </div>
             </div>
         </div>
@@ -150,15 +157,15 @@
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block mb-1">Regional State Filter</label>
-                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-medium focus:border-emerald-500 focus:outline-none"><option>All States Selected</option></select>
+                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-semibold focus:border-emerald-500 focus:outline-none"><option>All States Selected</option></select>
                 </div>
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block mb-1">District Territory Filter</label>
-                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-medium focus:border-emerald-500 focus:outline-none"><option>All Districts Selected</option></select>
+                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-semibold focus:border-emerald-500 focus:outline-none"><option>All Districts Selected</option></select>
                 </div>
                 <div>
                     <label class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block mb-1">Field Executive Filter</label>
-                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-medium focus:border-emerald-500 focus:outline-none"><option>All Corporate Personnel</option></select>
+                    <select class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-semibold focus:border-emerald-500 focus:outline-none"><option>All Corporate Personnel</option></select>
                 </div>
             </div>
             <div class="bg-slate-900 p-5 rounded-xl border border-slate-800">
@@ -197,7 +204,7 @@
                 </div>
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold border-b border-slate-800">
                             <tr>
                                 <th class="p-4">Executive Identity</th>
                                 <th class="p-4 text-center">Visits Logged</th>
@@ -206,36 +213,36 @@
                                 <th class="p-4 text-right">Target Delta Compliance</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-800/60 font-medium">
+                        <tbody class="divide-y divide-slate-800/60 font-semibold">
                             <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 font-bold text-white flex items-center space-x-2">
+                                <td class="p-4 text-white flex items-center space-x-2">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                     <span>R. Karthikeyan</span>
                                 </td>
-                                <td class="p-4 text-center font-mono">54 Visits</td>
-                                <td class="p-4 text-right text-emerald-400 font-bold">₹6,24,000</td>
+                                <td class="p-4 text-center">54 Visits</td>
+                                <td class="p-4 text-right text-emerald-400">₹6,24,000</td>
                                 <td class="p-4 text-center text-slate-200">82.1%</td>
-                                <td class="p-4 text-right text-sky-400 font-semibold">94.5% Achieved</td>
+                                <td class="p-4 text-right text-sky-400">94.5% Achieved</td>
                             </tr>
                             <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 font-bold text-white flex items-center space-x-2">
+                                <td class="p-4 text-white flex items-center space-x-2">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                     <span>A. Anand</span>
                                 </td>
-                                <td class="p-4 text-center font-mono">32 Visits</td>
-                                <td class="p-4 text-right text-emerald-400 font-bold">₹4,10,000</td>
+                                <td class="p-4 text-center">32 Visits</td>
+                                <td class="p-4 text-right text-emerald-400">₹4,10,000</td>
                                 <td class="p-4 text-center text-slate-200">71.4%</td>
-                                <td class="p-4 text-right text-sky-400 font-semibold">82.0% Achieved</td>
+                                <td class="p-4 text-right text-sky-400">82.0% Achieved</td>
                             </tr>
                             <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 font-bold text-white flex items-center space-x-2">
+                                <td class="p-4 text-white flex items-center space-x-2">
                                     <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                     <span>M. Priya</span>
                                 </td>
-                                <td class="p-4 text-center font-mono font-medium">47 Visits</td>
-                                <td class="p-4 text-right text-emerald-400 font-bold">₹5,30,000</td>
+                                <td class="p-4 text-center">47 Visits</td>
+                                <td class="p-4 text-right text-emerald-400">₹5,30,000</td>
                                 <td class="p-4 text-center text-slate-200">78.5%</td>
-                                <td class="p-4 text-right text-sky-400 font-semibold">106.0% Overachieved</td>
+                                <td class="p-4 text-right text-sky-400">106.0% Overachieved</td>
                             </tr>
                         </tbody>
                     </table>
@@ -244,67 +251,7 @@
         </div>
 
         <!-- =========================================================
-             🐔 DASHBOARD 4: POULTRY SEGMENT ANALYSIS
-             ========================================================= -->
-        <div id="poultry-segment" class="tab-content space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 lg:col-span-8 flex flex-col h-[380px]">
-                    <div class="mb-4">
-                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">Sector vs Sub-Segment Structural Cross-Matrix</h3>
-                        <p class="text-[11px] text-slate-400 mt-0.5">Comprehensive macro-level segment performance evaluated sideways</p>
-                    </div>
-                    <div class="relative flex-1 min-h-0"><canvas id="poultryGroupedBarChart"></canvas></div>
-                </div>
-                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 lg:col-span-4 flex flex-col h-[380px]">
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-4">Total Aggregate Visits by Vertical Sector</h3>
-                    <div class="relative flex-1 min-h-0 flex items-center justify-center"><canvas id="sectorPieChart"></canvas></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- =========================================================
-             🐣 DASHBOARD 5: BIRD POPULATION
-             ========================================================= -->
-        <div id="bird-population" class="tab-content space-y-6">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm">
-                    <div>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Chicks Demographics</p>
-                        <h4 class="text-2xl font-black text-white mt-1">32,450</h4>
-                    </div>
-                    <div class="text-2xl bg-cyan-500/10 text-cyan-400 p-3 rounded-xl border border-cyan-500/10">🐥</div>
-                </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm">
-                    <div>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Growers Count</p>
-                        <h4 class="text-2xl font-black text-white mt-1">21,100</h4>
-                    </div>
-                    <div class="text-2xl bg-amber-500/10 text-amber-400 p-3 rounded-xl border border-amber-500/10">🐔</div>
-                </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm">
-                    <div>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Active Layers Portfolio</p>
-                        <h4 class="text-2xl font-black text-white mt-1">56,000</h4>
-                    </div>
-                    <div class="text-2xl bg-rose-500/10 text-rose-400 p-3 rounded-xl border border-rose-500/10">🥚</div>
-                </div>
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm">
-                    <div>
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Culling Pipeline Status</p>
-                        <h4 class="text-2xl font-black text-white mt-1">4,800</h4>
-                    </div>
-                    <div class="text-2xl bg-slate-800 text-slate-400 p-3 rounded-xl border border-slate-700/60">🐔</div>
-                </div>
-            </div>
-            
-            <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 h-96 flex flex-col">
-                <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-4">Corporate Farm Name vs Granular Bird Populations Stratification</h3>
-                <div class="relative flex-1 min-h-0"><canvas id="birdClusteredChart"></canvas></div>
-            </div>
-        </div>
-
-        <!-- =========================================================
-             💊 DASHBOARD 6: PRODUCT PERFORMANCE
+             💊 DASHBOARD 4: PRODUCT PERFORMANCE
              ========================================================= -->
         <div id="product-perf" class="tab-content space-y-6">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -321,7 +268,7 @@
             <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left text-xs text-slate-300">
-                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+                        <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider font-bold border-b border-slate-800">
                             <tr>
                                 <th class="p-4">Product Inventory Variant Formulation</th>
                                 <th class="p-4 text-center">Dispatched Qty Vol</th>
@@ -329,24 +276,24 @@
                                 <th class="p-4 text-right">Base Market Unit Pricing</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-800/60 font-medium">
+                        <tbody class="divide-y divide-slate-800/60 font-semibold">
                             <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 font-bold text-white">NutriMix Pro-1 Bio-Complex</td>
-                                <td class="p-4 text-center font-mono">1,400 Units</td>
-                                <td class="p-4 text-right text-emerald-400 font-bold">₹3,50,000</td>
-                                <td class="p-4 text-right text-slate-400 font-mono">₹250.00 / Unit</td>
+                                <td class="p-4 text-white">NutriMix Pro-1 Bio-Complex</td>
+                                <td class="p-4 text-center">1,400 Units</td>
+                                <td class="p-4 text-right text-emerald-400">₹3,50,000</td>
+                                <td class="p-4 text-right text-slate-400">₹250.00 / Unit</td>
                             </tr>
                             <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 font-bold text-white">AquaGrow-X High-Yield Feed</td>
-                                <td class="p-4 text-center font-mono">950 Units</td>
-                                <td class="p-4 text-right text-emerald-400 font-bold">₹2,15,000</td>
-                                <td class="p-4 text-right text-slate-400 font-mono">₹226.31 / Unit</td>
+                                <td class="p-4 text-white">AquaGrow-X High-Yield Feed</td>
+                                <td class="p-4 text-center">950 Units</td>
+                                <td class="p-4 text-right text-emerald-400">₹2,15,000</td>
+                                <td class="p-4 text-right text-slate-400">₹226.31 / Unit</td>
                             </tr>
                             <tr class="hover:bg-slate-800/20 transition">
-                                <td class="p-4 font-bold text-white">VitaLayer Premium Calcium Compound</td>
-                                <td class="p-4 text-center font-mono">780 Units</td>
-                                <td class="p-4 text-right text-emerald-400 font-bold">₹1,98,000</td>
-                                <td class="p-4 text-right text-slate-400 font-mono">₹253.84 / Unit</td>
+                                <td class="p-4 text-white">VitaLayer Premium Calcium Compound</td>
+                                <td class="p-4 text-center">780 Units</td>
+                                <td class="p-4 text-right text-emerald-400">₹1,98,000</td>
+                                <td class="p-4 text-right text-slate-400">₹253.84 / Unit</td>
                             </tr>
                         </tbody>
                     </table>
@@ -355,7 +302,7 @@
         </div>
 
         <!-- =========================================================
-             💰 DASHBOARD 7: REVENUE ANALYSIS
+             💰 DASHBOARD 5: REVENUE ANALYSIS
              ========================================================= -->
         <div id="rev-analysis" class="tab-content space-y-6">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -412,10 +359,10 @@
                             L.circle([rec.lat, rec.lng], {
                                 color: '#10b981', weight: 1.5, radius: rec.qty * 12, fillColor: '#10b981', fillOpacity: 0.25
                             }).addTo(biMapInstance).bindPopup(`
-                                <div class="bg-slate-900 text-slate-200 p-2 text-xs font-sans rounded border border-slate-700">
+                                <div class="bg-slate-900 text-slate-200 p-2 text-xs rounded border border-slate-700">
                                     <strong class="text-white block mb-1">${rec.area}</strong>
                                     Gross Revenue: <span class="text-emerald-400 font-bold">${rec.rev}</span><br>
-                                    Sales Load: <span class="text-sky-400 font-mono">${rec.qty} Units</span>
+                                    Sales Load: <span class="text-sky-400">${rec.qty} Units</span>
                                 </div>
                             `, { className: 'custom-leaflet-popup', bgPos: [0,0] });
                         });
@@ -427,17 +374,19 @@
 
         // 📊 PROFESSIONAL CHART OBJECT DESIGN THEMES
         document.addEventListener("DOMContentLoaded", () => {
+            // Apply Inter font configurations to global chart options
             Chart.defaults.color = '#94a3b8';
             Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.5)';
-            Chart.defaults.font.family = "Segoe UI, system-ui, sans-serif";
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.font.weight = '500';
 
             const optionsTemplate = {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { grid: { borderDash: [4, 4] }, ticks: { font: { size: 10 } } },
-                    y: { grid: { borderDash: [4, 4] }, ticks: { font: { size: 10 } } }
+                    x: { grid: { borderDash: [4, 4] }, ticks: { font: { size: 10, weight: '600' } } },
+                    y: { grid: { borderDash: [4, 4] }, ticks: { font: { size: 10, weight: '600' } } }
                 }
             };
 
@@ -460,46 +409,6 @@
                 type: 'doughnut',
                 data: { labels: ['Sales Complete', 'Delta Gap'], datasets: [{ data: [84.2, 15.8], backgroundColor: ['#0284c7', '#1e293b'], borderWidth: 0 }] },
                 options: { rotation: -90, circumference: 180, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '78%' }
-            });
-
-            // Clean Grouped Side-by-Side Horizontal Bar Chart for Poultry Alignment
-            new Chart(document.getElementById('poultryGroupedBarChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: ['Broiler', 'Grower', 'Layer', 'Breeder', 'Culling Birds'],
-                    datasets: [
-                        { label: 'Poultry', data: [45, 20, 35, 18, 12], backgroundColor: '#f43f5e', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.75 },
-                        { label: 'Aqua', data: [0, 15, 8, 0, 5], backgroundColor: '#06b6d4', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.75 },
-                        { label: 'Dairy', data: [10, 30, 15, 22, 2], backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.75 }
-                    ]
-                },
-                options: {
-                    ...optionsTemplate,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
-                    scales: { x: { grid: { color: '#1e293b' } }, y: { grid: { display: false } } }
-                }
-            });
-
-            // Corporate Sectors Pie Structuring
-            new Chart(document.getElementById('sectorPieChart').getContext('2d'), {
-                type: 'pie',
-                data: { labels: ['Poultry Vertical', 'Aqua System', 'Dairy Asset'], datasets: [{ data: [65, 20, 15], backgroundColor: ['rgba(244, 63, 94, 0.8)', 'rgba(6, 182, 212, 0.8)', 'rgba(16, 185, 129, 0.8)'], borderWidth: 1, borderColor: '#0f172a' }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
-            });
-
-            // Deep Demographics Clustered Chart
-            new Chart(document.getElementById('birdClusteredChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: ['Apex Corporate Broilers', 'Greenfield Layer Frameworks', 'Coastal Aqua Outpost'],
-                    datasets: [
-                        { label: 'Chicks Intake', data: [12000, 4000, 16450], backgroundColor: '#22d3ee', borderRadius: 4 },
-                        { label: 'Growers Shift', data: [8000, 13100, 0], backgroundColor: '#fbbf24', borderRadius: 4 },
-                        { label: 'Active Layers', data: [0, 36000, 20000], backgroundColor: '#f472b6', borderRadius: 4 }
-                    ]
-                },
-                options: { ...optionsTemplate, plugins: { legend: { display: true, position: 'top' } } }
             });
 
             // Product Performance Metrics
