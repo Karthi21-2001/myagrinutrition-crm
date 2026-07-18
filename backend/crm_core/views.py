@@ -217,27 +217,28 @@ def export_visits_to_excel(request):
     business_type = request.GET.get('business_type', 'All').strip()
     sub_segment_filter = request.GET.get('sub_segment', 'All').strip()
 
+    # 🎯 NOTICE: Filters are updated to reference fields from the FarmVisitReport model directly
     export_filters = Q()
 
     if business_type and business_type != 'All':
-        export_filters &= Q(visit__farm__business_type__iexact=business_type)
+        export_filters &= Q(farm__business_type__iexact=business_type)
     if sub_segment_filter and sub_segment_filter != 'All':
-        export_filters &= Q(visit__farm__sub_segment__iexact=sub_segment_filter)
+        export_filters &= Q(farm__sub_segment__iexact=sub_segment_filter)
     if state_filter and state_filter != 'All':
-        export_filters &= Q(visit__farm__state__iexact=state_filter)
+        export_filters &= Q(farm__state__iexact=state_filter)
     if district_filter and district_filter != 'All':
-        export_filters &= Q(visit__farm__district__iexact=district_filter)
+        export_filters &= Q(farm__district__iexact=district_filter)
     if executive_filter and executive_filter != 'All':
-        export_filters &= Q(visit__executive__username__iexact=executive_filter)
+        export_filters &= Q(executive__username__iexact=executive_filter)
 
     if start_date_str:
         try:
-            export_filters &= Q(visit__visit_date__date__gte=start_date_str)
+            export_filters &= Q(visit_date__date__gte=start_date_str)
         except ValueError:
             pass
     if end_date_str:
         try:
-            export_filters &= Q(visit__visit_date__date__lte=end_date_str)
+            export_filters &= Q(visit_date__date__lte=end_date_str)
         except ValueError:
             pass
 
@@ -252,7 +253,6 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
-    # 📊 Expanded comprehensive headers to fully incorporate field observations and pipeline states
     headers = [
         'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
@@ -268,67 +268,74 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    all_products = VisitedProductDetail.objects.filter(export_filters).select_related(
-        'visit__farm', 'visit__executive'
-    ).order_by('-visit__visit_date')
+    # 📈 CHANGE 1: Query the core FarmVisitReport model so no logs are missed
+    all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
+        'farm', 'executive'
+    ).order_by('-visit_date')
     
     current_row = 2
-    for p in all_products:
-        v = p.visit
+    for v in all_visits:
         f = v.farm if v else None
         
-        # Core Parameters
-        ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
-        ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
-        ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
-        ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
-        ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
-        ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-        ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and f.sub_segment else "") 
-        ws_data.cell(row=current_row, column=8, value=f.state if f else "")
-        ws_data.cell(row=current_row, column=9, value=f.district if f else "")
-        ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+        # Pull any products logged for this specific visit report
+        products = VisitedProductDetail.objects.filter(visit=v)
         
-        # 🟢 Added: Farm Problem & Poultry Shed Population Inventories
-        ws_data.cell(row=current_row, column=11, value=v.farm_problem if v and v.farm_problem else "None reported")
-        ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
-        ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
-        ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
-        ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
+        # If it's a general consultation with NO products, create a single row placeholder list
+        product_loop_list = products if products.exists() else [None]
         
-        # Immediate Order Metrics
-        ws_data.cell(row=current_row, column=16, value=p.product_name)
-        ws_data.cell(row=current_row, column=17, value=p.sale_quantity)
-        ws_data.cell(row=current_row, column=18, value=float(p.primary_price))
-        ws_data.cell(row=current_row, column=14 + 5, value=float(p.revenue_generated)) # Column 19
-        
-        # 🟢 Added: Dynamic Pipeline Projections Matrix Data
-        ws_data.cell(row=current_row, column=20, value=p.potential_quantity)
-        ws_data.cell(row=current_row, column=21, value=p.target_quantity)
-        ws_data.cell(row=current_row, column=22, value=p.unit_type)
-        ws_data.cell(row=current_row, column=23, value=p.process_status)
-        ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%")
-        
-        # Live Geolocation Links
-        gps_cell = ws_data.cell(row=current_row, column=25)
-        if f and f.latitude and f.longitude:
-            gps_cell.value = "View on Map"
-            gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
-            gps_cell.font = Font(name="Segoe UI", size=11, color="0000FF", underline="single")
-        else:
-            gps_cell.value = "No GPS Data"
-            gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
+        for p in product_loop_list:
+            # Core Parameters
+            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
+            ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
+            ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
+            ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
+            ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
+            ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
+            ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and f.sub_segment else "") 
+            ws_data.cell(row=current_row, column=8, value=f.state if f else "")
+            ws_data.cell(row=current_row, column=9, value=f.district if f else "")
+            ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+            
+            # Farm Problem & Population Inventories
+            ws_data.cell(row=current_row, column=11, value=v.farm_problem if v and v.farm_problem else "None reported")
+            ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
+            ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
+            ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
+            ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
+            
+            # Immediate Order Metrics (Failsafe for General Consults)
+            ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
+            ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
+            ws_data.cell(row=current_row, column=18, value=float(p.primary_price) if p else 0.0)
+            ws_data.cell(row=current_row, column=19, value=float(p.revenue_generated) if p else 0.0)
+            
+            # Dynamic Pipeline Projections Matrix Data
+            ws_data.cell(row=current_row, column=20, value=p.potential_quantity if p else 0)
+            ws_data.cell(row=current_row, column=21, value=p.target_quantity if p else 0)
+            ws_data.cell(row=current_row, column=22, value=p.unit_type if p else "N/A")
+            ws_data.cell(row=current_row, column=23, value=p.process_status if p else "N/A")
+            ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%" if p else "0%")
+            
+            # Live Geolocation Links
+            gps_cell = ws_data.cell(row=current_row, column=25)
+            if f and f.latitude and f.longitude:
+                gps_cell.value = "View on Map"
+                gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
+                gps_cell.font = Font(name="Segoe UI", size=11, color="0000FF", underline="single")
+            else:
+                gps_cell.value = "No GPS Data"
+                gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-        # Style application pass across all 25 active layout boundaries
-        for c_idx in range(1, 26):
-            cell_item = ws_data.cell(row=current_row, column=c_idx)
-            cell_item.border = thin_border
-            if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]:  # Align numerical tracking data sets centrally
-                cell_item.alignment = Alignment(horizontal="center")
-                
-        current_row += 1
+            # Style application pass across all 25 active columns
+            for c_idx in range(1, 26):
+                cell_item = ws_data.cell(row=current_row, column=c_idx)
+                cell_item.border = thin_border
+                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]:  
+                    cell_item.alignment = Alignment(horizontal="center")
+                    
+            current_row += 1
 
-    # Format column layout adjustments safely
+    # Auto-adjust column widths safely
     for col in ws_data.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(col[0].column)
@@ -338,7 +345,6 @@ def export_visits_to_excel(request):
     response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
     wb.save(response)
     return response
-
 # ==========================================
 # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
 # ==========================================
