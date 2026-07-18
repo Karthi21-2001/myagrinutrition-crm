@@ -36,7 +36,6 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: var(--bg-main); }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
         
-        /* Date field color scheme handling */
         input[type="date"]::-webkit-calendar-picker-indicator {
             filter: invert(1);
             cursor: pointer;
@@ -57,13 +56,12 @@
                 <p class="text-xs text-[var(--text-muted)] font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
             </div>
             
-            <!-- Quick Timeline & Geographic Filters -->
             <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
                 <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[140px]">
-                    <input type="date" value="2026-05-01" class="w-full bg-transparent text-white outline-none font-medium cursor-pointer [color-scheme:dark]">
+                    <input type="date" value="2026-01-01" class="w-full bg-transparent text-white outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
                 <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[140px]">
-                    <input type="date" value="2026-05-31" class="w-full bg-transparent text-white outline-none font-medium cursor-pointer [color-scheme:dark]">
+                    <input type="date" value="2026-12-31" class="w-full bg-transparent text-white outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
                 <select class="bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text-main)] rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
                     <option>All Sectors</option>
@@ -82,37 +80,31 @@
 
         <!-- ================= STATISTICAL KPI CARD DECK ================= -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <!-- Card 1 -->
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-blue-400"></i></div>
                 <h3 class="text-2xl font-black text-white mt-2">{{ total_visits|default:"1,248" }}</h3>
                 <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 12.5% vs Last Month</span>
             </div>
-            <!-- Card 2 -->
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-user-tie text-purple-400"></i></div>
                 <h3 class="text-2xl font-black text-white mt-2">{{ total_executives|default:"8" }}</h3>
                 <span class="text-[9px] text-[var(--text-muted)] font-bold mt-1">Live Reporting Synchronized</span>
             </div>
-            <!-- Card 3 -->
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-wheat-api text-amber-400"></i></div>
                 <h3 class="text-2xl font-black text-white mt-2">{{ total_farms|default:"842" }}</h3>
                 <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 9.8% expansion</span>
             </div>
-            <!-- Card 4 -->
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-boxes-stacked text-orange-400"></i></div>
                 <h3 class="text-2xl font-black text-white mt-2">{{ total_qty|default:"15,680" }} <span class="text-xs font-medium text-slate-400">Units</span></h3>
                 <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 15.4% velocity</span>
             </div>
-            <!-- Card 5 -->
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
                 <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-indian-rupee-sign text-[var(--success)]"></i></div>
-                <h3 class="text-2xl font-black text-[var(--success)] mt-2">₹{{ total_revenue|default:"12,45,680" }}</h3>
+                <h3 class="text-2xl font-black text-[var(--success)] mt-2">₹{{ total_revenue|default:"68,45,680" }}</h3>
                 <span class="text-[9px] text-[var(--success)] font-bold mt-1"><i class="fa-solid fa-caret-up"></i> 18.6% Target Trajectory</span>
             </div>
-            <!-- Card 6 -->
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-[var(--text-muted)]"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Book Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
                 <h3 class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"5,120" }}</h3>
@@ -120,10 +112,82 @@
             </div>
         </div>
 
+        <!-- ================= 📈 NEW: MONTH-WISE & YEAR-WISE MACRO REVENUE MATRIX ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Month-wise Running Trend -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-8 h-80 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Month-Wise Revenue Review</h3>
+                            <p class="text-[10px] text-[var(--text-muted)]">Fiscal performance scaling across active financial months</p>
+                        </div>
+                        <span class="text-[10px] text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 border border-blue-500/20 rounded-md">Line Matrix</span>
+                    </div>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="monthWiseTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Year-wise Comparison Ledger -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Year-Wise Revenue Matrix</h3>
+                    <p class="text-[10px] text-[var(--text-muted)]">Historical macro conversion comparison parameters</p>
+                </div>
+                <div class="flex-1 overflow-y-auto custom-scrollbar mt-4 space-y-3 pr-1">
+                    {% for year in yearly_revenue_list %}
+                    <div class="bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-extrabold text-white tracking-wide"><i class="fa-solid fa-calendar-days text-slate-500 mr-1.5"></i>FY {{ year.year_label }}</span>
+                            <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Visits Confirmed: {{ year.visit_count }}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-black text-[var(--success)]">₹{{ year.revenue }}</span>
+                            <span class="block text-[8px] text-[var(--success)] font-medium"><i class="fa-solid fa-arrow-trend-up"></i> {{ year.growth_pct }}% YoY</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <!-- Fallback Year Matrix Data if backend array is empty -->
+                    <div class="bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-extrabold text-white tracking-wide"><i class="fa-solid fa-calendar-days text-slate-500 mr-1.5"></i>FY 2026</span>
+                            <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Visits Confirmed: 1,248</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-black text-[var(--success)]">₹68,45,680</span>
+                            <span class="block text-[8px] text-[var(--success)] font-medium"><i class="fa-solid fa-arrow-trend-up"></i> +22.4% YoY</span>
+                        </div>
+                    </div>
+                    <div class="bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 flex justify-between items-center opacity-75">
+                        <div>
+                            <span class="text-xs font-extrabold text-slate-300 tracking-wide"><i class="fa-solid fa-calendar-days text-slate-600 mr-1.5"></i>FY 2025</span>
+                            <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Visits Confirmed: 1,020</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-black text-slate-300">₹55,92,400</span>
+                            <span class="block text-[8px] text-indigo-400 font-medium"><i class="fa-solid fa-arrow-trend-up"></i> +14.1% YoY</span>
+                        </div>
+                    </div>
+                    <div class="bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 flex justify-between items-center opacity-50">
+                        <div>
+                            <span class="text-xs font-extrabold text-slate-400 tracking-wide"><i class="fa-solid fa-calendar-days text-slate-700 mr-1.5"></i>FY 2024</span>
+                            <p class="text-[9px] text-[var(--text-muted)] mt-0.5">Visits Confirmed: 890</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-black text-slate-400">₹49,01,200</span>
+                            <span class="block text-[8px] text-slate-500 font-medium">Base Benchmark</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
         <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            <!-- 1. Executive Performance Chart -->
+            <!-- Executive Performance Chart -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Revenue By Executive</h3>
@@ -132,7 +196,7 @@
                 <div class="relative flex-1 min-h-0 mt-4"><canvas id="execRevBarChart"></canvas></div>
             </div>
 
-            <!-- 2. Product Volume Breakdown -->
+            <!-- Product Volume Breakdown -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Product Allocation (Order Volume)</h3>
@@ -141,7 +205,7 @@
                 <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="prodSalesDonut"></canvas></div>
             </div>
 
-            <!-- 3. Top Farm Yields (Data Ledger) -->
+            <!-- Top Farm Yields -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Top Farms by Booking Revenue</h3>
@@ -157,7 +221,6 @@
                         <span class="font-bold text-[var(--success)]">₹{{ farm.total_rev }}</span>
                     </div>
                     {% empty %}
-                    <!-- Dynamic Fallback Mock Data Matrix -->
                     <div class="flex justify-between py-2.5 items-center">
                         <span class="font-medium text-white">Swasthik Poultry Farm</span><span class="font-bold text-[var(--success)]">₹85,600</span>
                     </div>
@@ -177,8 +240,7 @@
 
         <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <!-- 1. Diagnostic Problems Observations Matrix -->
+            <!-- Diagnostic Problems Observations Matrix -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Field Problems Observed</h3>
@@ -187,10 +249,10 @@
                 <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="problemsDonut"></canvas></div>
             </div>
 
-            <!-- 2. Funnel Status Conversion Matrix -->
+            <!-- Funnel Status Conversion Matrix -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between">
                 <div>
-                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Pipeline Pipeline Temperature</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Pipeline Temperature</h3>
                     <p class="text-[10px] text-[var(--text-muted)]">Conversion states of open discussed products</p>
                 </div>
                 <div class="flex-1 flex flex-col justify-center space-y-3 font-semibold text-xs mt-2 px-1">
@@ -209,7 +271,7 @@
                 </div>
             </div>
 
-            <!-- 3. Dynamic Sector Segmentation Block Matrix -->
+            <!-- Dynamic Sector Segmentation Block Matrix -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Business Sector Distribution</h3>
@@ -272,7 +334,6 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <!-- Fallback Placeholder Rows matching user criteria styling -->
                         <tr class="hover:bg-slate-800/20 transition">
                             <td class="p-3.5 pl-5 font-semibold text-slate-400">18-May-2026</td>
                             <td class="p-3.5 text-white font-bold">Selva Kumar</td>
@@ -301,12 +362,37 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // Configuration overrides to native layout parameters
             Chart.defaults.color = '#94a3b8';
             Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.3)';
             Chart.defaults.font.family = "'Inter', sans-serif";
 
             const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
+
+            // 📈 NEW: Month-wise Performance Linear Trend Engine
+            new Chart(document.getElementById('monthWiseTrendChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: {{ month_labels|safe|default:"['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']" }},
+                    datasets: [{
+                        label: 'Monthly Revenue',
+                        data: {{ month_data|safe|default:"[340000, 410000, 390000, 480000, 560000, 610000, 580000, 620000, 690000, 710000, 730000, 725680]" }},
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        borderWidth: 2.5,
+                        tension: 0.35,
+                        fill: true,
+                        pointBackgroundColor: '#10b981',
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    ...baseOptions,
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } }
+                    }
+                }
+            });
 
             // Chart A: Executive Performance Metrics Chart Engine
             new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
@@ -334,7 +420,7 @@
                         borderWidth: 0
                     }]
                 },
-                options: { ...baseOptions, cutout: '70%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 9 } } } } }
+                options: { ...cutoutOptions = { ...baseOptions, cutout: '70%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 9 } } } } } }
             });
 
             // Chart C: Field Diagnostics Symptoms Chart 
