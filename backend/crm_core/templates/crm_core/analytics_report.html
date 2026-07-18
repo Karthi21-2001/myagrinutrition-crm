@@ -1,33 +1,37 @@
-{% extends 'crm_core/base.html' %}
 {% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Analytics Center</title>
 
-{% block title %}Executive Analytics | AgriCRM{% endblock %}
-{% block page_heading %}Advanced Analytics Center{% endblock %}
+    <!-- Tailwind CSS v4 Engine CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
-{% block content %}
-<!-- Custom Dashboard Styling Overrides safely contained within the block -->
-<style>
-    .dashboard-body { background-color: #0f172a; color: #cbd5e1; font-family: 'Segoe UI', system-ui, sans-serif; }
-    .dashboard-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
-    .filter-select { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 0.875rem; transition: border-color 0.15s ease; }
-    .filter-select:focus { border-color: #38bdf8; outline: none; }
-    .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
-    
-    /* High-Density Performance Cards */
-    .kpi-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: transform 0.2s ease, border-color 0.2s ease; }
-    .kpi-card:hover { transform: translateY(-2px); border-color: #475569; }
-    
-    /* Custom scrollbar configurations for dashboard matrices */
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-</style>
+    <!-- Custom Analytics Styles -->
+    <style>
+        body { background-color: #0f172a; color: #cbd5e1; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; }
+        .dashboard-body { background-color: #0f172a; min-height: 100vh; }
+        .dashboard-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+        .filter-select { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 0.875rem; transition: border-color 0.15s ease; }
+        .filter-select:focus { border-color: #38bdf8; outline: none; }
+        .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+        
+        /* High-Density Performance Cards */
+        .kpi-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: transform 0.2s ease, border-color 0.2s ease; }
+        .kpi-card:hover { transform: translateY(-2px); border-color: #475569; }
+        
+        /* Custom scrollbar configurations for dashboard matrices */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body>
 
-<!-- Tailwinds CSS v4 Engine CDN dependency inject for custom container -->
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
-<div class="dashboard-body p-4 md:p-8 rounded-xl">
+<div class="dashboard-body p-4 md:p-8">
 
     <!-- TOP NAVIGATION & MANAGEMENT ACTION PANEL HEADER -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -370,6 +374,10 @@
             } catch(e) { return defaultVal; }
         };
 
+        // Pre-fill filter state date Pickers if initialized via view context
+        document.getElementById('startDateInput').value = "{{ selected_start_date|default:'' }}";
+        document.getElementById('endDateInput').value = "{{ selected_end_date|default:'' }}";
+
         const comboLabels = safeParse('{{ combo_labels_js|safe }}');
         const comboRevenue = safeParse('{{ combo_revenue_js|safe }}');
         const comboVolume = safeParse('{{ combo_volume_js|safe }}');
@@ -515,4 +523,5 @@
         .catch(error => console.error("Error updates:", error));
     }
 </script>
-{% endblock %}
+</body>
+</html>
