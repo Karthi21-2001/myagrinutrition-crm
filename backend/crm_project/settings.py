@@ -114,7 +114,8 @@ if DATABASE_URL:
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
-            ssl_require=True  # 🔒 Render PostgreSQL requires SSL in production!
+            # Ensure compatibility with varying PostgreSQL connection string formats on Render
+            ssl_require=True
         )
     }
 else:
@@ -149,7 +150,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'  # 🌍 Updated from UTC to match your regional operations matrix
 USE_I18N = True
 USE_TZ = True
 
@@ -157,6 +158,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # 🚀 Tells Django where to collect production static files
+
+# 📂 WhiteNoise Production Optimization Engine
+# Prevents unhandled 500 crashes if a template requests a missing static asset or manifest manifest matching fails
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Tell Django to use our custom user model globally
 AUTH_USER_MODEL = 'accounts.CustomUser'
