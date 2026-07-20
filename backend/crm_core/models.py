@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 
+
 class Farm(models.Model):
     """
     Tracks foundational details of the farm, owner structural data, 
@@ -34,9 +35,9 @@ class Farm(models.Model):
         blank=True, 
         null=True,
         help_text="Specific operational sub-classification or industry segment."
-    )  # <-- Added Field
+    )
     
-    # 🐥 Poultry Shed Population Inventory Tracking Metrics
+    # Poultry Shed Population Inventory Tracking Metrics
     chicks_count = models.IntegerField(default=0, verbose_name="Chicks Population")
     grower_count = models.IntegerField(default=0, verbose_name="Grower Population")
     layer_count = models.IntegerField(default=0, verbose_name="Layer Population")
@@ -118,11 +119,11 @@ class VisitedProductDetail(models.Model):
         ('Hot', '💥 Hot'),
     ]
 
-    # Explicit related_name='products' definition securely resolves backward field resolution issues
+    # Explicit related_name='visited_products' matches prefetch_related lookups
     visit = models.ForeignKey(
         FarmVisitReport, 
         on_delete=models.CASCADE, 
-        related_name='products'
+        related_name='visited_products'
     )
     product_name = models.CharField(max_length=255)
     
