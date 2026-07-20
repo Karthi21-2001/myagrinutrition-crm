@@ -295,7 +295,7 @@ def export_visits_to_excel(request):
 
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
             
-            # Resolved FieldError by pulling from Farm model instance
+            # Pull directly from Farm model instance
             ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
@@ -410,9 +410,7 @@ def get_dashboard_context(request):
             visit_filters &= Q(visit_date__year=sel_year)
             product_filters &= Q(visit__visit_date__year=sel_year)
 
-        # -------------------------------------------------------------
-        # 1. KPI Aggregations (Revenue, Quantities & Avg Order Value)
-        # -------------------------------------------------------------
+        # 1. KPI Aggregations
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
             total=Sum('revenue_generated')
         )['total'] or 0.0
@@ -435,9 +433,7 @@ def get_dashboard_context(request):
         total_leads = VisitedProductDetail.objects.filter(product_filters).count()
         conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
 
-        # -------------------------------------------------------------
         # 2. Combined Time Series Analytics
-        # -------------------------------------------------------------
         time_series_data = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -451,9 +447,7 @@ def get_dashboard_context(request):
         combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
-        # -------------------------------------------------------------
         # 3. Product Performance & Pricing
-        # -------------------------------------------------------------
         product_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
@@ -478,9 +472,7 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
-        # -------------------------------------------------------------
         # 4. Executive & Funnel Performance
-        # -------------------------------------------------------------
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
@@ -503,9 +495,7 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
-        # -------------------------------------------------------------
         # 5. Geographic & Telemetry Audits
-        # -------------------------------------------------------------
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
@@ -527,9 +517,7 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # -------------------------------------------------------------
-        # 6. Demographics, Issues & Visit Trends (Resolved FieldError)
-        # -------------------------------------------------------------
+        # 6. Demographics, Issues & Visit Trends
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('farm__chicks_count'),
             growers=Sum('farm__grower_count'),
@@ -567,9 +555,7 @@ def get_dashboard_context(request):
             .order_by('-visit_count')
         )
 
-        # -------------------------------------------------------------
         # 7. Month-Wise & Year-Wise Financial Trends
-        # -------------------------------------------------------------
         month_wise_qs = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -637,7 +623,6 @@ def get_dashboard_context(request):
 
         'visit_frequency_exec': visit_frequency_exec,
         
-        # Financial Ledgers & Chart Series JSON
         'month_wise_cycle': month_wise_qs,
         'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
         'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
@@ -668,54 +653,38 @@ def dashboard_home(request):
         context = get_dashboard_context(request)
         return render(request, 'crm_core/dashboard.html', context)
     except Exception as e:
-        error_message = traceback.format_exc()
-        return HttpResponse(
-            f"<h3>Diagnostic Traceback (Dashboard Home Failing):</h3><pre>{error_message}</pre>", 
-            content_type="text/html"
-        )
+        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
+        messages.error(request, "Failed to load dashboard data.")
+        return render(request, 'crm_core/dashboard.html', {})
 
 
-@login_required(login_url='/crm/login/')
-def dashboard_analytics(request):
-    try:
-        context = get_dashboard_context(request)
-        return render(request, 'crm_core/analytics_report.html', context)
-    except Exception as e:
-        error_message = traceback.format_exc()
-        return HttpResponse(
-            f"<h3>Diagnostic Traceback (Dashboard Analytics Failing):</h3><pre>{error_message}</pre>", 
-            content_type="text/html"
-        )
+# ==========================================
+# 📍 REVERSE GEOCODING API
+# ==========================================
 
+def get_location_details(request):
+    """
+    Reverse geocoding endpoint to resolve Lat/Lng into State, District, Area.
+    """
+    lat = request.GET.get('lat')
+    lon = request.GET.get('lon')
 
-@login_required(login_url='/crm/login/')
-def executive_analytics_view(request):
-    try:
-        context = get_dashboard_context(request)
-        return render(request, 'crm_core/analytics_report.html', context)
-    except Exception as e:
-        error_message = traceback.format_exc()
-        return HttpResponse(
-            f"<h3>Diagnostic Traceback (Executive Analytics Failing):</h3><pre>{error_message}</pre>", 
-            content_type="text/html"
-        )
-
-
-@login_required(login_url='/crm/login/')
-def clear_dashboard_data(request):
-    """Utility endpoint to purge field report records safely during testing."""
-    if not (request.user.is_staff or request.user.is_superuser):
-        messages.error(request, "Permission denied. Admin privileges required.")
-        return redirect('dashboard_home')
+    if not lat or not lon:
+        return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
 
     try:
-        with transaction.atomic():
-            VisitedProductDetail.objects.all().delete()
-            FarmVisitReport.objects.all().delete()
-            Farm.objects.all().delete()
-        messages.success(request, "All telemetry, visit logs, and farm master data purged successfully.")
-    except Exception as e:
-        logger.error(f"Error purging database records: {str(e)}", exc_info=True)
-        messages.error(request, f"Failed to reset CRM telemetry: {str(e)}")
+        response = requests.get(
+            f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en",
+            timeout=5
+        )
+        data = response.json()
 
-    return redirect('dashboard_home')
+        return JsonResponse({
+            'status': 'success',
+            'state': data.get('principalSubdivision', 'Tamil Nadu'),
+            'district': data.get('localityInfo', {}).get('administrative', [{}])[-1].get('name', '') if 'localityInfo' in data else data.get('city', ''),
+            'area': data.get('locality', '') or data.get('city', ''),
+        })
+    except Exception as e:
+        logger.error(f"Geocoding failed: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
