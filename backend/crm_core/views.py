@@ -3,32 +3,33 @@ import logging
 import traceback
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.db.models.functions import TruncMonth
 
 from .models import Farm, FarmVisitReport, VisitedProductDetail
 
-User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
 def executive_analytics_view(request):
     """
-    Bulletproof Analytics View - Catches exceptions and logs tracebacks to Render console.
+    Analytics View - Runs database queries safely inside request context.
     """
+    User = get_user_model()
+    
     try:
-        # 1. Capture Filters
+        # Request Parameters
         selected_executive = request.GET.get('executive', 'ALL')
         start_date = request.GET.get('start_date', '')
         end_date = request.GET.get('end_date', '')
         selected_sector = request.GET.get('sector', 'ALL')
 
-        # 2. QuerySets
+        # Base Queries
         visits = FarmVisitReport.objects.select_related('executive', 'farm').all()
         products = VisitedProductDetail.objects.select_related('visit', 'visit__farm', 'visit__executive').all()
 
-        # 3. Apply Active Filters Safely
+        # Filtering
         if selected_executive and selected_executive != 'ALL':
             if selected_executive.isdigit():
                 visits = visits.filter(executive_id=int(selected_executive))
@@ -45,9 +46,9 @@ def executive_analytics_view(request):
             visits = visits.filter(visit_date__range=[start_date, end_date])
             products = products.filter(visit__visit_date__range=[start_date, end_date])
 
-        # 4. KPI Calculations
+        # KPIs
         total_visits = visits.count()
-
+        
         revenue_agg = products.aggregate(total_rev=Sum('revenue_generated'))
         total_revenue = float(revenue_agg['total_rev'] or 0.0)
 
@@ -55,11 +56,10 @@ def executive_analytics_view(request):
         total_qty = qty_agg['total_qty'] or 0
 
         avg_revenue = (total_revenue / total_visits) if total_visits > 0 else 0.0
-
         total_executives = User.objects.filter(is_active=True).count()
         total_farms = visits.values('farm').distinct().count()
 
-        # 5. Sector Calculations
+        # Sector percentages
         poultry_count = visits.filter(farm__business_type__iexact='Poultry').count()
         aqua_count = visits.filter(farm__business_type__iexact='Aqua').count()
         sector_total = poultry_count + aqua_count
@@ -67,7 +67,7 @@ def executive_analytics_view(request):
         sector_poultry_pct = round((poultry_count / sector_total) * 100, 1) if sector_total > 0 else 0
         sector_aqua_pct = round((aqua_count / sector_total) * 100, 1) if sector_total > 0 else 0
 
-        # 6. Monthly Data
+        # Monthly Trends
         month_labels, month_values = [], []
         if products.exists():
             month_data = (
@@ -81,7 +81,7 @@ def executive_analytics_view(request):
                     month_labels.append(item['month'].strftime('%b %Y'))
                     month_values.append(float(item['total'] or 0))
 
-        # 7. Executive Breakdown
+        # Executive Breakdown
         exec_labels, exec_values = [], []
         if products.exists():
             exec_data = (
@@ -94,7 +94,7 @@ def executive_analytics_view(request):
                 exec_labels.append(name)
                 exec_values.append(float(item['total'] or 0))
 
-        # 8. Top Farms
+        # Top Farms
         top_farms = []
         if products.exists():
             top_farms_qs = (
@@ -115,7 +115,6 @@ def executive_analytics_view(request):
             'selected_sector': selected_sector,
             'executives_list': User.objects.filter(is_active=True),
 
-            # Metrics
             'total_visits': total_visits,
             'total_executives': total_executives,
             'total_farms': total_farms,
@@ -126,7 +125,6 @@ def executive_analytics_view(request):
             'sector_poultry_pct': sector_poultry_pct,
             'sector_aqua_pct': sector_aqua_pct,
 
-            # Charts
             'month_labels_json': json.dumps(month_labels),
             'month_data_json': json.dumps(month_values),
             'exec_labels_json': json.dumps(exec_labels),
@@ -136,7 +134,6 @@ def executive_analytics_view(request):
             'state_labels_json': json.dumps([]),
             'state_data_json': json.dumps([]),
 
-            # Tables
             'top_farms': top_farms,
             'recent_visits': visits.order_by('-visit_date')[:10],
         }
@@ -144,15 +141,12 @@ def executive_analytics_view(request):
         return render(request, 'analytics.html', context)
 
     except Exception as e:
-        # Print full error stack trace to Render logs for easy debugging
-        print("=== ERROR IN EXECUTIVE_ANALYTICS_VIEW ===")
+        print("=== EXCEPTION ENCOUNTERED IN EXECUTIVE_ANALYTICS_VIEW ===")
         print(traceback.format_exc())
-        logger.error(f"Error rendering analytics page: {str(e)}")
         
-        # Render clean zero fallback context instead of breaking the page
         fallback_context = {
             'selected_executive': 'ALL',
-            'executives_list': User.objects.filter(is_active=True),
+            'executives_list': User.objects.filter(is_active=True) if User else [],
             'total_visits': 0,
             'total_executives': 0,
             'total_farms': 0,
