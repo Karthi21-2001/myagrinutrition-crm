@@ -298,7 +298,7 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird', 0) if f else 0)
+            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird_count', 0) if f else 0)
 
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
@@ -369,7 +369,11 @@ def get_dashboard_context(request):
     problems_list = []
     segment_breakdown = []
     visit_frequency_exec = []
+    
+    # Safe Initialization to Prevent UnboundLocalError
+    month_wise_qs = VisitedProductDetail.objects.none()
     month_wise_labels, month_wise_data = [], []
+    year_wise_qs = VisitedProductDetail.objects.none()
     year_wise_labels, year_wise_data = [], []
     recent_visits_queryset = FarmVisitReport.objects.none()
 
@@ -516,12 +520,12 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # 6. Demographics, Issues & Visit Trends
+        # 6. Demographics, Issues & Visit Trends (FIXED Field Name)
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('farm__chicks_count'),
             growers=Sum('farm__grower_count'),
             layers=Sum('farm__layer_count'),
-            culling=Sum('farm__culling_bird')
+            culling=Sum('farm__culling_bird_count')
         )
         if bird_population:
             bird_counts = [
@@ -720,24 +724,10 @@ def get_location_details(request):
 
         return JsonResponse({
             'status': 'success',
-            'state': data.get('principalSubdivision', 'Tamil Nadu'),
-            'district': data.get('localityInfo', {}).get('administrative', [{}])[-1].get('name', '') if 'localityInfo' in data else data.get('city', ''),
-            'area': data.get('locality', '') or data.get('city', ''),
+            'state': data.get('principalSubdivision', ''),
+            'district': data.get('locality', '') or data.get('city', ''),
+            'area': data.get('locality', '')
         })
     except Exception as e:
-        logger.error(f"Geocoding failed: {str(e)}")
+        logger.error(f"Error in reverse geocoding: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-def get_dependent_filters(request):
-    """
-    Returns dynamically filtered districts or executives based on selected state.
-    """
-    state = request.GET.get('state', '').strip()
-    
-    districts = Farm.objects.filter(state__iexact=state).values_list('district', flat=True).distinct() if state else []
-    
-    return JsonResponse({
-        'status': 'success',
-        'districts': list(districts)
-    })
