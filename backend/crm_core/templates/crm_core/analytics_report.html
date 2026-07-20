@@ -74,7 +74,6 @@
                     <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
                 </select>
                 
-                <!-- 📥 EXPORT LINK UPDATED HERE -->
                 <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
                     <i class="fa-solid fa-file-excel"></i> Export Matrix
                 </a>
@@ -132,7 +131,6 @@
 
         <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Month-wise Running Trend -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <div class="flex justify-between items-start">
@@ -148,7 +146,6 @@
                 </div>
             </div>
 
-            <!-- Year-wise Running Trend -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <div class="flex justify-between items-start">
@@ -167,7 +164,6 @@
 
         <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Executive Performance Chart -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Revenue By Executive</h3>
@@ -176,7 +172,6 @@
                 <div class="relative flex-1 min-h-0 mt-4"><canvas id="execRevBarChart"></canvas></div>
             </div>
 
-            <!-- Product Volume Breakdown -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Product Allocation (Order Volume)</h3>
@@ -185,7 +180,6 @@
                 <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="prodSalesDonut"></canvas></div>
             </div>
 
-            <!-- Top Farm Yields -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Top Farms by Booking Revenue</h3>
@@ -210,7 +204,6 @@
 
         <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <!-- Visits By State Layout Block -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div class="mb-2">
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Visits by State</h3>
@@ -221,7 +214,6 @@
                 </div>
             </div>
 
-            <!-- Diagnostic Problems Observations Matrix -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Field Problems Observed</h3>
@@ -230,7 +222,6 @@
                 <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="problemsDonut"></canvas></div>
             </div>
 
-            <!-- Funnel Status Conversion Matrix -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Pipeline Temperature</h3>
@@ -258,7 +249,6 @@
                 </div>
             </div>
 
-            <!-- Business Sector Distribution -->
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
                 <div>
                     <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Business Sector Distribution</h3>
@@ -340,10 +330,49 @@
 
     </main>
 
+    <!-- SAFE DJANGO TO JS DATA EMBEDDING -->
+    {{ month_labels_json|json_script:"ds-month-labels" }}
+    {{ month_data_json|json_script:"ds-month-data" }}
+    {{ year_labels_json|json_script:"ds-year-labels" }}
+    {{ year_data_json|json_script:"ds-year-data" }}
+    {{ exec_labels_json|json_script:"ds-exec-labels" }}
+    {{ exec_data_json|json_script:"ds-exec-data" }}
+    {{ state_labels_json|json_script:"ds-state-labels" }}
+    {{ state_data_json|json_script:"ds-state-data" }}
+    {{ prod_labels_json|json_script:"ds-prod-labels" }}
+    {{ prod_data_json|json_script:"ds-prod-data" }}
+    {{ problem_labels_json|json_script:"ds-problem-labels" }}
+    {{ problem_data_json|json_script:"ds-problem-data" }}
+
     <!-- CHART.JS INTEGRATION -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
+            // Helper function to safely read json_script content
+            const readData = (id) => {
+                const element = document.getElementById(id);
+                if (!element) return [];
+                try {
+                    let parsed = JSON.parse(element.textContent);
+                    return typeof parsed === 'string' ? JSON.parse(parsed) : (parsed || []);
+                } catch (e) {
+                    return [];
+                }
+            };
+
+            const monthLabels = readData("ds-month-labels");
+            const monthData = readData("ds-month-data");
+            const yearLabels = readData("ds-year-labels");
+            const yearData = readData("ds-year-data");
+            const execLabels = readData("ds-exec-labels");
+            const execData = readData("ds-exec-data");
+            const stateLabels = readData("ds-state-labels");
+            const stateData = readData("ds-state-data");
+            const prodLabels = readData("ds-prod-labels");
+            const prodData = readData("ds-prod-data");
+            const problemLabels = readData("ds-problem-labels");
+            const problemData = readData("ds-problem-data");
+
             Chart.defaults.color = '#64748b';
             Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
             Chart.defaults.font.family = "'Inter', sans-serif";
@@ -351,121 +380,141 @@
             const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
             // Month Trend Chart
-            const ctxMonth = document.getElementById('monthWiseTrendChart').getContext('2d');
-            const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
-            gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
-            gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+            const ctxMonth = document.getElementById('monthWiseTrendChart')?.getContext('2d');
+            if (ctxMonth) {
+                const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
+                gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+                gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
-            new Chart(ctxMonth, {
-                type: 'line',
-                data: { 
-                    labels: {{ month_labels_json|safe|default:"[]" }}, 
-                    datasets: [{ 
-                        label: 'Monthly Net', 
-                        data: {{ month_data_json|safe|default:"[]" }}, 
-                        borderColor: '#10b981', 
-                        backgroundColor: gradMonth, 
-                        borderWidth: 2.5, 
-                        tension: 0.38, 
-                        fill: true, 
-                        pointBackgroundColor: '#10b981', 
-                        pointHoverRadius: 6 
-                    }] 
-                },
-                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
-            });
+                new Chart(ctxMonth, {
+                    type: 'line',
+                    data: { 
+                        labels: monthLabels, 
+                        datasets: [{ 
+                            label: 'Monthly Net', 
+                            data: monthData, 
+                            borderColor: '#10b981', 
+                            backgroundColor: gradMonth, 
+                            borderWidth: 2.5, 
+                            tension: 0.38, 
+                            fill: true, 
+                            pointBackgroundColor: '#10b981', 
+                            pointHoverRadius: 6 
+                        }] 
+                    },
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                });
+            }
 
             // Year Trend Chart
-            const ctxYear = document.getElementById('yearWiseTrendChart').getContext('2d');
-            const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
-            gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
-            gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+            const ctxYear = document.getElementById('yearWiseTrendChart')?.getContext('2d');
+            if (ctxYear) {
+                const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
+                gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+                gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
-            new Chart(ctxYear, {
-                type: 'line',
-                data: { 
-                    labels: {{ year_labels_json|safe|default:"[]" }}, 
-                    datasets: [{ 
-                        label: 'Yearly Aggregate', 
-                        data: {{ year_data_json|safe|default:"[]" }}, 
-                        borderColor: '#06b6d4', 
-                        backgroundColor: gradYear, 
-                        borderWidth: 2.5, 
-                        tension: 0.38, 
-                        fill: true, 
-                        pointBackgroundColor: '#06b6d4', 
-                        pointHoverRadius: 6 
-                    }] 
-                },
-                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
-            });
+                new Chart(ctxYear, {
+                    type: 'line',
+                    data: { 
+                        labels: yearLabels, 
+                        datasets: [{ 
+                            label: 'Yearly Aggregate', 
+                            data: yearData, 
+                            borderColor: '#06b6d4', 
+                            backgroundColor: gradYear, 
+                            borderWidth: 2.5, 
+                            tension: 0.38, 
+                            fill: true, 
+                            pointBackgroundColor: '#06b6d4', 
+                            pointHoverRadius: 6 
+                        }] 
+                    },
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                });
+            }
 
             // Exec Bar Chart
-            new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
-                type: 'bar',
-                data: { 
-                    labels: {{ exec_labels_json|safe|default:"[]" }}, 
-                    datasets: [{ 
-                        data: {{ exec_data_json|safe|default:"[]" }}, 
-                        backgroundColor: '#38bdf8', 
-                        borderRadius: 4, 
-                        barThickness: 10 
-                    }] 
-                },
-                options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
-            });
+            const ctxExec = document.getElementById('execRevBarChart')?.getContext('2d');
+            if (ctxExec) {
+                new Chart(ctxExec, {
+                    type: 'bar',
+                    data: { 
+                        labels: execLabels, 
+                        datasets: [{ 
+                            data: execData, 
+                            backgroundColor: '#38bdf8', 
+                            borderRadius: 4, 
+                            barThickness: 10 
+                        }] 
+                    },
+                    options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
+                });
+            }
 
             // State Visits Chart
-            new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
-                type: 'bar',
-                data: { 
-                    labels: {{ state_labels_json|safe|default:"[]" }}, 
-                    datasets: [{ 
-                        data: {{ state_data_json|safe|default:"[]" }}, 
-                        backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#10b981'], 
-                        borderRadius: 4, 
-                        barThickness: 12 
-                    }] 
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } },
-                    indexAxis: 'y', 
-                    scales: { 
-                        x: { grid: { display: false }, ticks: { color: '#64748b' } },
-                        y: { grid: { display: false }, ticks: { color: '#f1f5f9', font: { weight: 'bold' } } }
-                    } 
-                }
-            });
+            const ctxState = document.getElementById('stateVisitsChart')?.getContext('2d');
+            if (ctxState) {
+                new Chart(ctxState, {
+                    type: 'bar',
+                    data: { 
+                        labels: stateLabels, 
+                        datasets: [{ 
+                            data: stateData, 
+                            backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#10b981'], 
+                            borderRadius: 4, 
+                            barThickness: 12 
+                        }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { legend: { display: false } },
+                        indexAxis: 'y', 
+                        scales: { 
+                            x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                            y: { grid: { display: false }, ticks: { color: '#f1f5f9', font: { weight: 'bold' } } }
+                        } 
+                    }
+                });
+            }
 
             // Product Sales Donut
-            new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
-                type: 'doughnut',
-                data: { 
-                    labels: {{ prod_labels_json|safe|default:"[]" }}, 
-                    datasets: [{ 
-                        data: {{ prod_data_json|safe|default:"[]" }}, 
-                        backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#475569'], 
-                        borderWidth: 0 
-                    }] 
-                },
-                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
-            });
+            const ctxProd = document.getElementById('prodSalesDonut')?.getContext('2d');
+            if (ctxProd) {
+                new Chart(ctxProd, {
+                    type: 'doughnut',
+                    data: { 
+                        labels: prodLabels, 
+                        datasets: [{ 
+                            data: prodData, 
+                            backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#475569'], 
+                            borderWidth: 0 
+                        }] 
+                    },
+                    options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
+                });
+            }
 
             // Problems Donut
-            new Chart(document.getElementById('problemsDonut').getContext('2d'), {
-                type: 'doughnut',
-                data: { 
-                    labels: {{ problem_labels_json|safe|default:"[]" }}, 
-                    datasets: [{ 
-                        data: {{ problem_data_json|safe|default:"[]" }}, 
-                        backgroundColor: ['#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#475569'], 
-                        borderWidth: 0 
-                    }] 
-                },
-                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
-            });
+            const ctxProb = document.getElementById('problemsDonut')?.getContext('2d');
+            if (ctxProb) {
+                new Chart(ctxProb, {
+                    type: 'doughnut',
+                    data: { 
+                        labels: problemLabels, 
+                        datasets: [{ 
+                            data: problemLabels, 
+                            datasets: [{ 
+                                data: problemData, 
+                                backgroundColor: ['#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#475569'], 
+                                borderWidth: 0 
+                            }] 
+                        }],
+                        labels: problemLabels
+                    },
+                    options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
+                });
+            }
         });
     </script>
 </body>
