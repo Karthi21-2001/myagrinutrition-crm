@@ -294,10 +294,12 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=10, value=f.area if f else "")
 
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
-            ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
-            ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
-            ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
-            ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
+            
+            # Resolved FieldError by pulling from Farm model instance
+            ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird', 0) if f else 0)
 
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
@@ -422,13 +424,11 @@ def get_dashboard_context(request):
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
 
-        # Count distinct orders/line items that resulted in actual sales
         paid_orders_count = VisitedProductDetail.objects.filter(
             product_filters, 
             sale_quantity__gt=0
         ).count()
 
-        # Calculate Average Order Value
         avg_order_value = (total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
 
         closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
@@ -528,13 +528,13 @@ def get_dashboard_context(request):
         )
 
         # -------------------------------------------------------------
-        # 6. Demographics, Issues & Visit Trends
+        # 6. Demographics, Issues & Visit Trends (Resolved FieldError)
         # -------------------------------------------------------------
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-            chicks=Sum('chicks_count'),
-            growers=Sum('grower_count'),
-            layers=Sum('layer_count'),
-            culling=Sum('culling_bird')
+            chicks=Sum('farm__chicks_count'),
+            growers=Sum('farm__grower_count'),
+            layers=Sum('farm__layer_count'),
+            culling=Sum('farm__culling_bird')
         )
         if bird_population:
             bird_counts = [
@@ -568,7 +568,7 @@ def get_dashboard_context(request):
         )
 
         # -------------------------------------------------------------
-        # 7. Month-Wise & Year-Wise Financial Trends (Chart Axes Fix)
+        # 7. Month-Wise & Year-Wise Financial Trends
         # -------------------------------------------------------------
         month_wise_qs = (
             VisitedProductDetail.objects.filter(product_filters)
@@ -703,68 +703,19 @@ def executive_analytics_view(request):
 
 @login_required(login_url='/crm/login/')
 def clear_dashboard_data(request):
-    if not request.user.is_superuser:
-        messages.error(request, "Permission denied.")
+    """Utility endpoint to purge field report records safely during testing."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, "Permission denied. Admin privileges required.")
         return redirect('dashboard_home')
 
-    # Delete related logs
-    VisitedProductDetail.objects.all().delete()
-    FarmVisitReport.objects.all().delete()
+    try:
+        with transaction.atomic():
+            VisitedProductDetail.objects.all().delete()
+            FarmVisitReport.objects.all().delete()
+            Farm.objects.all().delete()
+        messages.success(request, "All telemetry, visit logs, and farm master data purged successfully.")
+    except Exception as e:
+        logger.error(f"Error purging database records: {str(e)}", exc_info=True)
+        messages.error(request, f"Failed to reset CRM telemetry: {str(e)}")
 
-    messages.success(request, "All dashboard metrics and visit logs have been reset.")
     return redirect('dashboard_home')
-
-
-# ==========================================
-# 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES
-# ==========================================
-
-def get_location_details(request):
-    lat = request.GET.get('lat')
-    lon = request.GET.get('lon')
-
-    if not lat or not lon:
-        return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
-
-    try:
-        headers = {
-            'User-Agent': 'AgriNutritionCRM_Production_Engine/2.0 (operations@myagrinutrition.com)'
-        }
-        api_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-
-        response = requests.get(api_url, headers=headers, timeout=4)
-        if response.status_code == 200:
-            data = response.json()
-            address = data.get('address', {})
-
-            district = address.get('district') or address.get('county') or address.get('subdistrict') or address.get('city_district') or address.get('state_district')
-            area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or address.get('city') or address.get('road')
-            state = address.get('state')
-
-            if district and area and state:
-                return JsonResponse({
-                    'state': state.strip(),
-                    'district': district.replace('District', '').strip(),
-                    'area': area.strip()
-                })
-    except Exception as e:
-        logger.warning(f"Nominatim lookup failed: {e}")
-
-    try:
-        backup_url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
-        response = requests.get(backup_url, timeout=4)
-        if response.status_code == 200:
-            data = response.json()
-            state = data.get('principalSubdivision', 'Tamil Nadu')
-            district = data.get('locality', '').replace('District', '').strip()
-            area = data.get('city') or data.get('locality') or ''
-
-            return JsonResponse({
-                'state': state,
-                'district': district,
-                'area': area
-            })
-    except Exception as e:
-        logger.error(f"Backup Geocode lookup failed: {e}")
-
-    return JsonResponse({'status': 'error', 'message': 'Reverse geocoding unresolvable'}, status=500)
