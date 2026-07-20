@@ -20,6 +20,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 
+# Clean Model Imports matching your models.py
 from .models import Farm, FarmVisitReport, VisitedProductDetail
 from .forms import ExecutiveSignUpForm
 
@@ -88,6 +89,12 @@ def save_farm_visit(request):
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
 
+        # Poultry Populations
+        chicks_count = int(request.POST.get('chicks_count') or 0)
+        grower_count = int(request.POST.get('grower_count') or 0)
+        layer_count = int(request.POST.get('layer_count') or 0)
+        culling_bird_count = int(request.POST.get('culling_bird_count') or 0)
+
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
 
@@ -113,17 +120,23 @@ def save_farm_visit(request):
                         'area': area,
                         'latitude': latitude,
                         'longitude': longitude,
+                        'chicks_count': chicks_count,
+                        'grower_count': grower_count,
+                        'layer_count': layer_count,
+                        'culling_bird_count': culling_bird_count,
                     }
                 )
 
                 if not created:
-                    if business_type:
-                        farm_instance.business_type = business_type
-                    if sub_segment:
-                        farm_instance.sub_segment = sub_segment
+                    farm_instance.business_type = business_type or farm_instance.business_type
+                    farm_instance.sub_segment = sub_segment or farm_instance.sub_segment
                     farm_instance.state = state
                     farm_instance.district = district
                     farm_instance.area = area
+                    farm_instance.chicks_count = chicks_count
+                    farm_instance.grower_count = grower_count
+                    farm_instance.layer_count = layer_count
+                    farm_instance.culling_bird_count = culling_bird_count
                     farm_instance.save()
 
                 visit_record = FarmVisitReport.objects.create(
@@ -200,7 +213,7 @@ def save_farm_visit(request):
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
-            messages.error(request, f"Database transaction block failed: {str(e)}")
+            messages.error(request, f"Database transaction failed: {str(e)}")
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
     return redirect('render_visit_form')
@@ -270,15 +283,15 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # Optimized DB Query using prefetch_related
+    # Using prefetch_related('products') mapped directly to model related_name
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
-    ).prefetch_related('visitedproductdetail_set').order_by('-visit_date')
+    ).prefetch_related('products').order_by('-visit_date')
 
     current_row = 2
     for v in all_visits:
         f = v.farm
-        products = list(v.visitedproductdetail_set.all())
+        products = list(v.products.all())  # Using 'products' related_name
         product_loop_list = products if products else [None]
 
         for p in product_loop_list:
@@ -294,10 +307,12 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=10, value=f.area if f else "")
 
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
-            ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
-            ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
-            ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
-            ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
+            
+            # Extracting livestock numbers directly off Farm instance
+            ws_data.cell(row=current_row, column=12, value=f.chicks_count if f else 0)
+            ws_data.cell(row=current_row, column=13, value=f.grower_count if f else 0)
+            ws_data.cell(row=current_row, column=14, value=f.layer_count if f else 0)
+            ws_data.cell(row=current_row, column=15, value=f.culling_bird_count if f else 0)
 
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
@@ -494,11 +509,12 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
+        # FIXED: Correct relation mapping across Farm model population fields
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-            chicks=Sum('chicks_count'),
-            growers=Sum('grower_count'),
-            layers=Sum('layer_count'),
-            culling=Sum('culling_bird')
+            chicks=Sum('farm__chicks_count'),
+            growers=Sum('farm__grower_count'),
+            layers=Sum('farm__layer_count'),
+            culling=Sum('farm__culling_bird_count')
         )
         if bird_population:
             bird_counts = [
@@ -547,7 +563,8 @@ def get_dashboard_context(request):
             .order_by('month')
         )
 
-        recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
+        # FIXED: Pre-fetching 'products' related_name
+        recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('products').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
@@ -717,10 +734,6 @@ def get_location_details(request):
 
 
 def get_dependent_filters(request):
-    """
-    Utility endpoint for dynamic drop-down filter dependencies (AJAX).
-    Returns relevant districts filtered by selected state.
-    """
     state_query = request.GET.get('state', '').strip()
     if state_query and state_query not in ['All', 'All States']:
         districts = list(
