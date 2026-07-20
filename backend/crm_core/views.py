@@ -1,27 +1,26 @@
 import csv
 import json
 import logging
-import traceback
 import openpyxl
 import requests
+import traceback
 
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from django.contrib import messages
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.forms import AuthenticationForm
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
+from django.db.models import Avg, Count, DecimalField, F, Q, Sum
+from django.db.models.functions import TruncMonth, TruncYear
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.csrf import csrf_exempt
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from django.shortcuts import render, redirect
-from django.http import JsonResponse, HttpResponse
-from django.db import transaction
-from django.db.models import Sum, Count, F, Avg, DecimalField, Q
-from django.db.models.functions import TruncMonth, TruncYear
-from django.core.serializers.json import DjangoJSONEncoder
-from django.contrib import messages
-from django.contrib.auth import login, logout, authenticate, get_user_model
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.views.decorators.csrf import csrf_exempt
-
-from .models import Farm, FarmVisitReport, VisitedProductDetail
 from .forms import ExecutiveSignUpForm
+from .models import Farm, FarmVisitReport, VisitedProductDetail
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -271,7 +270,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # Prefetch using updated related_name 'visited_products'
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
     ).prefetch_related('visited_products').order_by('-visit_date')
@@ -584,7 +582,7 @@ def get_dashboard_context(request):
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        # RECENT VISITS (Uses updated 'visited_products' related_name)
+        # RECENT VISITS
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
         ).select_related('farm').prefetch_related('visited_products').order_by('-visit_date')[:10]
@@ -714,22 +712,23 @@ def get_location_details(request):
     lon = request.GET.get('lon')
 
     if not lat or not lon:
-        return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
+        return JsonResponse({'status': 'error', 'message': 'Latitude and longitude parameters are required.'}, status=400)
 
     try:
-        headers = {'User-Agent': 'MyAgriNutritionCRM/1.0'}
         url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
+        headers = {'User-Agent': 'AgriNutritionCRM/1.0'}
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
             address = data.get('address', {})
             return JsonResponse({
                 'status': 'success',
                 'state': address.get('state', ''),
-                'district': address.get('state_district') or address.get('county') or address.get('district', ''),
-                'area': address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
+                'district': address.get('county', address.get('state_district', '')),
+                'area': address.get('suburb', address.get('village', address.get('town', address.get('city', ''))))
             })
-        return JsonResponse({'status': 'error', 'message': 'Geocoding service unavailable'}, status=502)
+        return JsonResponse({'status': 'error', 'message': 'Geocoding service unavailable.'}, status=502)
     except Exception as e:
-        logger.error(f"Reverse geocode error: {str(e)}")
+        logger.error(f"Error in get_location_details: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
