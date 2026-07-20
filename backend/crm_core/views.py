@@ -347,6 +347,7 @@ def get_dashboard_context(request):
     total_rev = 0.0
     vol_sold = 0
     v_count = 0
+    active_executives = 0
     total_farms_count = 0
     paid_orders_count = 0
     avg_order_value = 0.0
@@ -385,6 +386,9 @@ def get_dashboard_context(request):
     sel_executive = request.GET.get('executive', '').strip()
     sel_month = request.GET.get('month', '').strip()
     sel_year = request.GET.get('year', '').strip()
+    
+    start_date_str = request.GET.get('start_date', '').strip()
+    end_date_str = request.GET.get('end_date', '').strip()
 
     try:
         farm_filters = Q()
@@ -420,6 +424,20 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
+        if start_date_str:
+            try:
+                visit_filters &= Q(visit_date__date__gte=start_date_str)
+                product_filters &= Q(visit__visit_date__date__gte=start_date_str)
+            except ValueError:
+                pass
+
+        if end_date_str:
+            try:
+                visit_filters &= Q(visit_date__date__lte=end_date_str)
+                product_filters &= Q(visit__visit_date__date__lte=end_date_str)
+            except ValueError:
+                pass
+
         # 1. KPI Aggregations
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
             total=Sum('revenue_generated')
@@ -431,6 +449,8 @@ def get_dashboard_context(request):
 
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
+
+        active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
         paid_orders_count = VisitedProductDetail.objects.filter(
             product_filters, 
@@ -606,6 +626,7 @@ def get_dashboard_context(request):
     return {
         'total_revenue': total_rev,
         'total_visits': v_count,
+        'active_executives': active_executives,
         'total_farms': total_farms_count,
         'total_sales_volume': vol_sold,
         'paid_orders_count': paid_orders_count,
@@ -676,7 +697,6 @@ def dashboard_home(request):
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
     context = get_dashboard_context(request)
-    # Renders analytics_report.html with robust error fallbacks
     try:
         return render(request, 'crm_core/analytics_report.html', context)
     except Exception:
@@ -721,24 +741,22 @@ def get_location_details(request):
     lon = request.GET.get('lon')
 
     if not lat or not lon:
-        return JsonResponse({'status': 'error', 'message': 'Latitude and longitude parameters are required.'}, status=400)
+        return JsonResponse({'status': 'error', 'message': 'Latitude and Longitude parameters are required.'}, status=400)
 
     try:
-        headers = {'User-Agent': 'AgriCRM/1.0'}
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+        headers = {'User-Agent': 'AgriCRM/1.0'}
         response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            address = data.get('address', {})
+        data = response.json()
+
+        if response.status_code == 200 and 'address' in data:
+            address = data['address']
             return JsonResponse({
                 'status': 'success',
                 'state': address.get('state', ''),
                 'district': address.get('state_district', address.get('county', '')),
-                'area': address.get('suburb', address.get('village', address.get('town', ''))),
-                'raw': address
+                'area': address.get('suburb', address.get('town', address.get('village', '')))
             })
-        return JsonResponse({'status': 'error', 'message': 'Failed to retrieve location from geocoding service.'}, status=502)
+        return JsonResponse({'status': 'error', 'message': 'Location details not found.'}, status=404)
     except Exception as e:
-        logger.error(f"Error in get_location_details: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
