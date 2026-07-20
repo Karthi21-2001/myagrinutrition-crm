@@ -283,7 +283,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # Using prefetch_related('products') mapped directly to model related_name
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
     ).prefetch_related('products').order_by('-visit_date')
@@ -291,7 +290,7 @@ def export_visits_to_excel(request):
     current_row = 2
     for v in all_visits:
         f = v.farm
-        products = list(v.products.all())  # Using 'products' related_name
+        products = list(v.products.all())
         product_loop_list = products if products else [None]
 
         for p in product_loop_list:
@@ -308,7 +307,6 @@ def export_visits_to_excel(request):
 
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
             
-            # Extracting livestock numbers directly off Farm instance
             ws_data.cell(row=current_row, column=12, value=f.chicks_count if f else 0)
             ws_data.cell(row=current_row, column=13, value=f.grower_count if f else 0)
             ws_data.cell(row=current_row, column=14, value=f.layer_count if f else 0)
@@ -509,7 +507,6 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # FIXED: Correct relation mapping across Farm model population fields
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('farm__chicks_count'),
             growers=Sum('farm__grower_count'),
@@ -563,7 +560,6 @@ def get_dashboard_context(request):
             .order_by('month')
         )
 
-        # FIXED: Pre-fetching 'products' related_name
         recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('products').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
@@ -675,6 +671,7 @@ def get_location_details(request):
     if not lat or not lon:
         return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
 
+    # Strategy 1: OpenStreetMap Nominatim
     try:
         headers = {
             'User-Agent': 'AgriNutritionCRM_Production_Engine/2.0 (operations@myagrinutrition.com)'
@@ -699,53 +696,33 @@ def get_location_details(request):
     except Exception as e:
         logger.warning(f"Nominatim lookup failed: {e}")
 
+    # Strategy 2: BigDataCloud Fallback
     try:
         backup_url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
         backup_response = requests.get(backup_url, timeout=4)
 
         if backup_response.status_code == 200:
-            b_data = backup_response.json()
+            data = backup_response.json()
+            locality_info = data.get('localityInfo', {})
+            
+            # Resolve State, District, and Area from BigDataCloud locality tree
+            state = data.get('principalSubdivision', '')
+            district = data.get('locality', '')
+            area = data.get('city', '') or data.get('locality', '')
 
-            state = b_data.get('principalSubdivision', 'Unknown State')
-            area = b_data.get('locality', '').strip()
-
-            district = 'Unknown District'
-            for admin_layer in b_data.get('informative', []):
-                if admin_layer.get('order') == 4 or 'district' in admin_layer.get('description', '').lower():
-                    district = admin_layer.get('name', district)
-                    break
-
-            if not area and b_data.get('lookupSource'):
-                area = b_data.get('lookupSource')
+            if not district and 'administrative' in locality_info:
+                admin_levels = locality_info.get('administrative', [])
+                for level in admin_levels:
+                    if level.get('order') == 4 or 'district' in level.get('name', '').lower():
+                        district = level.get('name', '')
+                        break
 
             return JsonResponse({
-                'state': state,
-                'district': district.replace('District', '').strip(),
-                'area': area if area else f"Zone ({lat[:7]}, {lon[:7]})"
+                'state': state.strip() if state else "Tamil Nadu",
+                'district': district.replace('District', '').strip() if district else "",
+                'area': area.strip() if area else ""
             })
     except Exception as e:
-        logger.warning(f"BigDataCloud reverse-geocode failed: {e}")
+        logger.warning(f"BigDataCloud lookup failed: {e}")
 
-    return JsonResponse({
-        'state': 'Live GPS Active',
-        'district': f"Dist: {lat[:7]}N",
-        'area': f"Loc: {lon[:7]}E"
-    })
-
-
-def get_dependent_filters(request):
-    state_query = request.GET.get('state', '').strip()
-    if state_query and state_query not in ['All', 'All States']:
-        districts = list(
-            Farm.objects.filter(state__iexact=state_query)
-            .values_list('district', flat=True)
-            .distinct()
-            .exclude(district='')
-        )
-    else:
-        districts = list(
-            Farm.objects.values_list('district', flat=True)
-            .distinct()
-            .exclude(district='')
-        )
-    return JsonResponse({'districts': sorted(districts)})
+    return JsonResponse({'status': 'error', 'message': 'Unable to resolve coordinates into address'}, status=500)
