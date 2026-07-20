@@ -715,8 +715,8 @@ def get_location_details(request):
         return JsonResponse({'status': 'error', 'message': 'Latitude and longitude parameters are required.'}, status=400)
 
     try:
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-        headers = {'User-Agent': 'AgriNutritionCRM/1.0'}
+        headers = {'User-Agent': 'AgriCRM/1.0'}
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
         response = requests.get(url, headers=headers, timeout=5)
         
         if response.status_code == 200:
@@ -725,10 +725,11 @@ def get_location_details(request):
             return JsonResponse({
                 'status': 'success',
                 'state': address.get('state', ''),
-                'district': address.get('county', address.get('state_district', '')),
-                'area': address.get('suburb', address.get('village', address.get('town', address.get('city', ''))))
+                'district': address.get('state_district', address.get('county', '')),
+                'area': address.get('suburb', address.get('village', address.get('town', ''))),
+                'raw': address
             })
-        return JsonResponse({'status': 'error', 'message': 'Geocoding service unavailable.'}, status=502)
+        return JsonResponse({'status': 'error', 'message': 'Failed to retrieve location from geocoding service.'}, status=502)
     except Exception as e:
         logger.error(f"Error in get_location_details: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
