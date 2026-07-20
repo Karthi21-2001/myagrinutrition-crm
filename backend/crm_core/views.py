@@ -353,6 +353,9 @@ def get_dashboard_context(request):
     avg_order_value = 0.0
     conversion_rate = 0.0
 
+    hot_pct, warm_pct, cold_pct = 0.0, 0.0, 0.0
+    poultry_pct, aqua_pct = 0.0, 0.0
+
     combo_labels, combo_revenue, combo_volume = [], [], []
     top_prod_labels, top_prod_revenue = [], []
     pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
@@ -395,20 +398,22 @@ def get_dashboard_context(request):
         visit_filters = Q()
         product_filters = Q()
 
-        if sel_state and sel_state not in ['All', 'All States']:
-            farm_filters &= Q(state=sel_state)
-            visit_filters &= Q(farm__state=sel_state)
-            product_filters &= Q(visit__farm__state=sel_state)
-        if sel_district and sel_district not in ['All', 'All Districts']:
-            farm_filters &= Q(district=sel_district)
-            visit_filters &= Q(farm__district=sel_district)
-            product_filters &= Q(visit__farm__district=sel_district)
-        if sel_executive and sel_executive not in ['All', 'All Executives']:
-            farm_filters &= Q(executive__username=sel_executive)
-            visit_filters &= Q(executive__username=sel_executive)
-            product_filters &= Q(visit__executive__username=sel_executive)
+        if sel_state and sel_state not in ['All', 'All States', '']:
+            farm_filters &= Q(state__iexact=sel_state)
+            visit_filters &= Q(farm__state__iexact=sel_state)
+            product_filters &= Q(visit__farm__state__iexact=sel_state)
 
-        if sel_month and sel_month not in ['All', 'All Months']:
+        if sel_district and sel_district not in ['All', 'All Districts', '']:
+            farm_filters &= Q(district__iexact=sel_district)
+            visit_filters &= Q(farm__district__iexact=sel_district)
+            product_filters &= Q(visit__farm__district__iexact=sel_district)
+
+        if sel_executive and sel_executive not in ['All', 'All Executives', '']:
+            farm_filters &= Q(executive__username__iexact=sel_executive)
+            visit_filters &= Q(executive__username__iexact=sel_executive)
+            product_filters &= Q(visit__executive__username__iexact=sel_executive)
+
+        if sel_month and sel_month not in ['All', 'All Months', '']:
             try:
                 m_val = int(sel_month)
                 visit_filters &= Q(visit_date__month=m_val)
@@ -416,7 +421,7 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        if sel_year and sel_year != 'All':
+        if sel_year and sel_year not in ['All', '']:
             try:
                 y_val = int(sel_year)
                 visit_filters &= Q(visit_date__year=y_val)
@@ -438,7 +443,11 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        # 1. KPI Aggregations
+        # 1. Primary Metrics Aggregations
+        v_count = FarmVisitReport.objects.filter(visit_filters).count()
+        total_farms_count = Farm.objects.filter(farm_filters).count()
+        active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
+
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
             total=Sum('revenue_generated')
         )['total'] or 0.0
@@ -447,11 +456,6 @@ def get_dashboard_context(request):
             total_qty=Sum('sale_quantity')
         )['total_qty'] or 0
 
-        v_count = FarmVisitReport.objects.filter(visit_filters).count()
-        total_farms_count = Farm.objects.filter(farm_filters).count()
-
-        active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
-
         paid_orders_count = VisitedProductDetail.objects.filter(
             product_filters, 
             sale_quantity__gt=0
@@ -459,11 +463,25 @@ def get_dashboard_context(request):
 
         avg_order_value = (total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
 
-        closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
         total_leads = VisitedProductDetail.objects.filter(product_filters).count()
-        conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
+        if total_leads > 0:
+            hot_count = VisitedProductDetail.objects.filter(product_filters, process_status__iexact='Hot').count()
+            warm_count = VisitedProductDetail.objects.filter(product_filters, process_status__iexact='Warm').count()
+            cold_count = VisitedProductDetail.objects.filter(product_filters, process_status__iexact='Cold').count()
 
-        # 2. Combined Time Series Analytics
+            hot_pct = round((hot_count / total_leads) * 100, 1)
+            warm_pct = round((warm_count / total_leads) * 100, 1)
+            cold_pct = round((cold_count / total_leads) * 100, 1)
+            conversion_rate = hot_pct
+
+        if total_farms_count > 0:
+            poultry_cnt = Farm.objects.filter(farm_filters, business_type__iexact='Poultry').count()
+            aqua_cnt = Farm.objects.filter(farm_filters, business_type__iexact='Aqua').count()
+
+            poultry_pct = round((poultry_cnt / total_farms_count) * 100, 1)
+            aqua_pct = round((aqua_cnt / total_farms_count) * 100, 1)
+
+        # 2. Time Series
         time_series_data = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -477,7 +495,7 @@ def get_dashboard_context(request):
         combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
-        # 3. Product Performance & Pricing
+        # 3. Product Performance & Pricing Table
         product_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
@@ -502,14 +520,14 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
-        # 4. Executive & Funnel Performance
+        # 4. Executive Performance
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
             .annotate(
                 revenue=Sum('revenue_generated'),
                 total_items=Count('id'),
-                hot_items=Count('id', filter=Q(process_status='Hot'))
+                hot_items=Count('id', filter=Q(process_status__iexact='Hot'))
             )
             .order_by('-revenue')
         )
@@ -525,7 +543,7 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
-        # 5. Geographic & Telemetry Audits
+        # 5. Maps & Telemetry
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
@@ -547,7 +565,7 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # 6. Demographics & Issues
+        # 6. Demographics
         try:
             bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
                 chicks=Sum('farm__chicks_count'),
@@ -588,7 +606,7 @@ def get_dashboard_context(request):
             .order_by('-visit_count')
         )
 
-        # 7. Month-Wise & Year-Wise Financial Trends
+        # 7. Trends
         month_wise_qs = list(
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -611,14 +629,14 @@ def get_dashboard_context(request):
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        # RECENT VISITS
+        # 8. Tables
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
-        ).select_related('farm').prefetch_related('visited_products').order_by('-visit_date')[:10]
+        ).select_related('farm', 'executive').prefetch_related('visited_products').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
-        executive_list = User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct()
+        executive_list = User.objects.filter(is_active=True).values_list('username', flat=True).distinct()
 
     except Exception as e:
         logger.error(f"Error computing get_dashboard_context: {str(e)}", exc_info=True)
@@ -632,6 +650,12 @@ def get_dashboard_context(request):
         'paid_orders_count': paid_orders_count,
         'avg_order_value': avg_order_value,
         'conversion_rate': conversion_rate,
+
+        'hot_pct': hot_pct,
+        'warm_pct': warm_pct,
+        'cold_pct': cold_pct,
+        'poultry_pct': poultry_pct,
+        'aqua_pct': aqua_pct,
 
         'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
         'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
@@ -725,38 +749,11 @@ def clear_dashboard_data(request):
             with transaction.atomic():
                 VisitedProductDetail.objects.all().delete()
                 FarmVisitReport.objects.all().delete()
-            messages.success(request, "All visit logs and associated product details have been cleared.")
+                Farm.objects.all().delete()
+            messages.success(request, "Dashboard data successfully cleared.")
+            return redirect('dashboard_home')
         except Exception as e:
-            logger.error(f"Error clearing dashboard data: {str(e)}", exc_info=True)
-            messages.error(request, f"Failed to clear data: {str(e)}")
+            logger.error(f"Error clearing data: {str(e)}", exc_info=True)
+            messages.error(request, f"Failed to clear database logs: {str(e)}")
+            return redirect('dashboard_home')
     return redirect('dashboard_home')
-
-
-# ==========================================
-# 📍 REVERSE GEOCODING API
-# ==========================================
-
-def get_location_details(request):
-    lat = request.GET.get('lat')
-    lon = request.GET.get('lon')
-
-    if not lat or not lon:
-        return JsonResponse({'status': 'error', 'message': 'Latitude and Longitude parameters are required.'}, status=400)
-
-    try:
-        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-        headers = {'User-Agent': 'AgriCRM/1.0'}
-        response = requests.get(url, headers=headers, timeout=5)
-        data = response.json()
-
-        if response.status_code == 200 and 'address' in data:
-            address = data['address']
-            return JsonResponse({
-                'status': 'success',
-                'state': address.get('state', ''),
-                'district': address.get('state_district', address.get('county', '')),
-                'area': address.get('suburb', address.get('town', address.get('village', '')))
-            })
-        return JsonResponse({'status': 'error', 'message': 'Location details not found.'}, status=404)
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
