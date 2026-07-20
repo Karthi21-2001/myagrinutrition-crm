@@ -1,5 +1,5 @@
 /**
- * AgriNutrition Dashboard Analytics Script
+ * MyAgriNutrition Dashboard Analytics Script
  * Handles Chart.js initializations and dynamic data rendering.
  */
 
