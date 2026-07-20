@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Dynamic Tab Title Fallback -->
+    <title>{% block title %}MyAgrinutrition CRM{% endblock %}</title>
+    
+    <!-- TailWind CSS & Font Awesome Icons via CDN for instant modern UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Style Injection point if needed -->
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+
+    <div class="min-h-screen flex flex-col md:flex-row">
+        
+        <!-- 🧭 SIDEBAR NAVIGATION -->
+        <aside class="w-full md:w-64 bg-slate-900 text-slate-200 flex-shrink-0 flex flex-col shadow-xl">
+            <!-- Brand Logo Header -->
+            <div class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800">
+                <i class="fa-solid fa-wheat-awn text-emerald-400 text-2xl mr-3"></i>
+                <span class="font-bold text-lg tracking-wider text-white">AgriCRM Panel</span>
+            </div>
+            
+            <!-- User Profile Quick View -->
+            <div class="p-4 border-b border-slate-800 bg-slate-900/50 flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold">
+                    {{ request.user.username|slice:":2"|upper }}
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-white leading-none">{{ request.user.username }}</p>
+                    <p class="text-xs text-slate-400 mt-1">{% if request.user.is_staff %}Administrator{% else %}Field Executive{% endif %}</p>
+                </div>
+            </div>
+
+            <!-- Navigation Links with Bulletproof Active State Detection -->
+            <nav class="flex-1 px-4 py-4 space-y-1">
+                <a href="{% url 'dashboard_home' %}" 
+                   class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition group {% if request.resolver_match.url_name == 'dashboard_home' or 'dashboard_home' in request.resolver_match.view_name %}bg-emerald-600 text-white shadow-md{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+                    <i class="fa-solid fa-chart-pie mr-3 {% if request.resolver_match.url_name == 'dashboard_home' or 'dashboard_home' in request.resolver_match.view_name %}text-white{% else %}text-slate-400 group-hover:text-emerald-400{% endif %} w-5 text-center"></i>
+                    Dashboard
+                </a>
+                
+                <a href="{% url 'dashboard_analytics' %}" 
+                   class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition group {% if request.resolver_match.url_name == 'dashboard_analytics' or 'dashboard_analytics' in request.resolver_match.view_name %}bg-emerald-600 text-white shadow-md{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+                    <i class="fa-solid fa-chart-line mr-3 {% if request.resolver_match.url_name == 'dashboard_analytics' or 'dashboard_analytics' in request.resolver_match.view_name %}text-white{% else %}text-slate-400 group-hover:text-emerald-400{% endif %} w-5 text-center"></i>
+                    Advanced Analytics
+                </a>
+
+                <a href="{% url 'render_visit_form' %}" 
+                   class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition group {% if request.resolver_match.url_name == 'render_visit_form' or 'render_visit_form' in request.resolver_match.view_name %}bg-emerald-600 text-white shadow-md{% else %}text-slate-200 hover:bg-slate-800{% endif %}">
+                    <i class="fa-solid fa-route mr-3 {% if request.resolver_match.url_name == 'render_visit_form' or 'render_visit_form' in request.resolver_match.view_name %}text-white{% else %}text-slate-400 group-hover:text-emerald-400{% endif %} w-5 text-center"></i>
+                    Log Field Visit
+                </a>
+            </nav>
+
+            <!-- Bottom Logout Action -->
+            <div class="p-4 border-t border-slate-800">
+                <a href="{% url 'logout_user' %}" class="flex items-center px-4 py-3 text-sm font-medium rounded-lg text-rose-400 hover:bg-rose-950/30 hover:text-rose-300 transition">
+                    <i class="fa-solid fa-right-from-bracket mr-3 w-5 text-center"></i>
+                    Sign Out
+                </a>
+            </div>
+        </aside>
+
+        <!-- 🖥️ MAIN CONTENT AREA -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            
+            <!-- Global Top Bar Layout -->
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shadow-sm">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-xl font-bold text-slate-900">{% block page_heading %}Management Terminal{% endblock %}</h1>
+                </div>
+                <div class="text-sm text-slate-500 font-medium">
+                    <i class="fa-regular fa-calendar-days mr-1"></i> <span id="liveClock"></span>
+                </div>
+            </header>
+
+            <!-- Dynamic System Notifications Banner -->
+            {% if messages %}
+            <div class="px-6 pt-4 space-y-2">
+                {% for message in messages %}
+                <div class="p-4 rounded-lg flex items-center border {% if message.tags == 'error' %}bg-rose-50 border-rose-200 text-rose-800{% else %}bg-emerald-50 border-emerald-200 text-emerald-800{% endif %}">
+                    <i class="fa-solid {% if message.tags == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %} mr-3"></i>
+                    <p class="text-sm font-medium">{{ message }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Main Injectable Application Payload Block -->
+            <div class="flex-1 overflow-x-hidden overflow-y-auto p-6">
+                {% block content %}
+                <!-- Child templates populate content directly here -->
+                {% endblock %}
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Quick Javascript for UI Utilities -->
+    <script>
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('liveClock').textContent = now.toLocaleDateString('en-US', { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+            });
+        }
+        setInterval(updateClock, 60000);
+        updateClock();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

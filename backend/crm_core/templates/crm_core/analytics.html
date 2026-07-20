@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -28,6 +28,30 @@
             font-size: 2rem;
             font-weight: 700;
             color: #1a1a1a;
+        }
+
+        /* Added KPI Card Styling to match the dark theme */
+        .kpi-card { 
+            background-color: #1e293b; 
+            border: 1px solid #334155; 
+            border-radius: 12px; 
+            padding: 20px; 
+            border-left: 5px solid #38bdf8;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        }
+        .kpi-card .title { 
+            color: #94a3b8; 
+            font-size: 11px; 
+            font-weight: 700; 
+            letter-spacing: 0.75px; 
+            text-transform: uppercase; 
+        }
+        .kpi-card h2 { 
+            font-size: 2rem; 
+            font-weight: 700; 
+            color: #f8fafc; 
+            margin-top: 8px; 
+            margin-bottom: 0; 
         }
     </style>
 </head>
@@ -120,6 +144,14 @@
                 <option value="11">November</option>
                 <option value="12">December</option>
             </select>
+        </div>
+    </div>
+
+    <!-- KPI HIGHLIGHTS PANEL -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="kpi-card">
+            <span class="title">AVG ORDER VALUE</span>
+            <h2>₹{{ avg_order_value|floatformat:2 }}</h2>
         </div>
     </div>
 
