@@ -1,14 +1,4 @@
 import json
-
-context = {
-    # Send directly as Python lists (json_script handles serializing automatically):
-    'month_labels_json': ['Jan', 'Feb', 'Mar'],
-    'month_data_json': [1000, 2000, 1500],
-    # Or if you pre-serialize with json.dumps in Python:
-    'year_labels_json': json.dumps(['2024', '2025']),
-    'year_data_json': json.dumps([12000, 24000]),
-}--import csv
-import json
 import logging
 import openpyxl
 import requests
