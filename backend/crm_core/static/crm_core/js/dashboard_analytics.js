@@ -1,241 +1,172 @@
 /**
- * MyAgriNutrition Dashboard Analytics Script
- * Handles Chart.js initializations and dynamic data rendering.
- */
+ * MY AGRINUTRITION CRM - Analytical Canvas Engine
+ * Generates Power BI style chart elements over DOM canvas hooks.
+ * Location: C:\Users\USER\OneDrive\Desktop\CRM_Project\backend\crm_core\static\crm_core\js\dashboard.js
+ */
 
-document.addEventListener("DOMContentLoaded", () => {
-    // 1. Global Chart.js Styling Configurations
-    Chart.defaults.color = '#64748b';
-    Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
-    Chart.defaults.font.family = "'Inter', sans-serif";
+// Global declarations to hold chart references for async updates
+window.barChartEngine = null;
+window.pieChartEngine = null;
+window.yearChartEngine = null;
+window.monthChartEngine = null;
 
-    // Reusable Options Object
-    const baseOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false }
-        }
-    };
+document.addEventListener("DOMContentLoaded", function () {
+    // ---------------------------------------------------------
+    // 1. Initial Chart Initializations (Mounting Canvas Engines)
+    // ---------------------------------------------------------
 
-    /**
-     * Safe JSON Data Extractor
-     * Reads embedded JSON script tags from Django DOM safely
-     * @param {string} id - HTML Element ID
-     * @returns {Array} Parsed JSON array or fallback empty array
-     */
-    const getJsonData = (id) => {
-        try {
-            const element = document.getElementById(id);
-            return element ? JSON.parse(element.textContent) : [];
-        } catch (error) {
-            console.warn(`[Analytics Warning] Failed to parse JSON script ID "${id}":`, error);
-            return [];
-        }
-    };
+    // Fallback safe defaults if Django database query arrays are empty initially
+    const initialLabels = (typeof rawChartLabels !== 'undefined' && rawChartLabels.length) ? rawChartLabels : ["Namakkal", "Coimbatore", "Salem"];
+    const initialValues = (typeof rawChartData !== 'undefined' && rawChartData.length) ? rawChartData : [12, 19, 7];
 
-    // 2. Fetch Data Embeds from Django `json_script`
-    const monthLabels = getJsonData("ds-month-labels");
-    const monthData = getJsonData("ds-month-data");
-    const yearLabels = getJsonData("ds-year-labels");
-    const yearData = getJsonData("ds-year-data");
-    const execLabels = getJsonData("ds-exec-labels");
-    const execData = getJsonData("ds-exec-data");
-    const prodLabels = getJsonData("ds-prod-labels");
-    const prodData = getJsonData("ds-prod-data");
-    const problemLabels = getJsonData("ds-problem-labels");
-    const problemData = getJsonData("ds-problem-data");
-    const stateLabels = getJsonData("ds-state-labels");
-    const stateData = getJsonData("ds-state-data");
+    // Bar Chart Engine Initialization
+    const ctxBar = document.getElementById('districtBarChart')?.getContext('2d');
+    if (ctxBar) {
+        window.barChartEngine = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: initialLabels,
+                datasets: [{
+                    label: 'Visits Logged',
+                    data: initialValues,
+                    backgroundColor: '#38bdf8',
+                    borderColor: '#0284c7',
+                    borderWidth: 1,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                }
+            }
+        });
+    }
 
-    // ----------------------------------------------------
-    // 📈 3. MONTH-WISE TREND CHART (LINE)
-    // ----------------------------------------------------
-    const ctxMonth = document.getElementById('monthWiseTrendChart');
-    if (ctxMonth) {
-        const monthCanvas = ctxMonth.getContext('2d');
-        const gradMonth = monthCanvas.createLinearGradient(0, 0, 0, 250);
-        gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
-        gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+    // Pie/Doughnut Chart Engine Initialization
+    const ctxPie = document.getElementById('visitPieChart')?.getContext('2d');
+    if (ctxPie) {
+        window.pieChartEngine = new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+                labels: initialLabels,
+                datasets: [{
+                    data: initialValues,
+                    backgroundColor: ['#38bdf8', '#4ade80', '#fbbf24', '#f87171', '#a78bfa'],
+                    borderWidth: 2,
+                    borderColor: '#1e293b'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#cbd5e1', font: { size: 12 } } }
+                }
+            }
+        });
+    }
 
-        new Chart(ctxMonth, {
-            type: 'line',
-            data: {
-                labels: monthLabels.length ? monthLabels : ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-                datasets: [{
-                    label: 'Monthly Revenue',
-                    data: monthData.length ? monthData : [0, 0, 0, 0, 0],
-                    borderColor: '#10b981',
-                    backgroundColor: gradMonth,
-                    borderWidth: 2.5,
-                    tension: 0.38,
-                    fill: true,
-                    pointBackgroundColor: '#10b981',
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                ...baseOptions,
-                scales: {
-                    x: { grid: { display: false } },
-                    y: { 
-                        ticks: { 
-                            callback: (val) => '₹' + Number(val).toLocaleString('en-IN') 
-                        } 
-                    }
-                }
-            }
-        });
-    }
+    // Year Revenue Chart Engine Initialization
+    const ctxYear = document.getElementById('yearRevenueChart')?.getContext('2d');
+    if (ctxYear) {
+        window.yearChartEngine = new Chart(ctxYear, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Revenue Growth', data: [], borderColor: '#fbbf24', backgroundColor: 'rgba(251, 191, 36, 0.1)', borderWidth: 2, tension: 0.3, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
+        });
+    }
 
-    // ----------------------------------------------------
-    // 📈 4. YEAR-WISE TREND CHART (LINE)
-    // ----------------------------------------------------
-    const ctxYear = document.getElementById('yearWiseTrendChart');
-    if (ctxYear) {
-        const yearCanvas = ctxYear.getContext('2d');
-        const gradYear = yearCanvas.createLinearGradient(0, 0, 0, 250);
-        gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.25)');
-        gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+    // Month Revenue Chart Engine Initialization
+    const ctxMonth = document.getElementById('monthRevenueChart')?.getContext('2d');
+    if (ctxMonth) {
+        window.monthChartEngine = new Chart(ctxMonth, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Monthly Cycles', data: [], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.1)', borderWidth: 2, tension: 0.3, fill: true }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }, x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } } } }
+        });
+    }
 
-        new Chart(ctxYear, {
-            type: 'line',
-            data: {
-                labels: yearLabels.length ? yearLabels : ['2023', '2024', '2025', '2026'],
-                datasets: [{
-                    label: 'Yearly Aggregate',
-                    data: yearData.length ? yearData : [0, 0, 0, 0],
-                    borderColor: '#06b6d4',
-                    backgroundColor: gradYear,
-                    borderWidth: 2.5,
-                    tension: 0.38,
-                    fill: true,
-                    pointBackgroundColor: '#06b6d4',
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                ...baseOptions,
-                scales: {
-                    x: { grid: { display: false } },
-                    y: { 
-                        ticks: { 
-                            callback: (val) => '₹' + Number(val).toLocaleString('en-IN') 
-                        } 
-                    }
-                }
-            }
-        });
-    }
+    // ---------------------------------------------------------
+    // 2. Setup Event Listeners on HTML Filter Selectors
+    // ---------------------------------------------------------
+    const filterSelectors = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'monthSelect', 'yearSelect'];
+    filterSelectors.forEach(id => {
+        document.getElementById(id)?.addEventListener('change', applyFilters);
+    });
 
-    // ----------------------------------------------------
-    // 📊 5. EXECUTIVE REVENUE CHART (HORIZONTAL BAR)
-    // ----------------------------------------------------
-    const ctxExec = document.getElementById('execRevBarChart');
-    if (ctxExec) {
-        new Chart(ctxExec, {
-            type: 'bar',
-            data: {
-                labels: execLabels,
-                datasets: [{
-                    data: execData,
-                    backgroundColor: '#38bdf8',
-                    borderRadius: 4,
-                    barThickness: 10
-                }]
-            },
-            options: {
-                ...baseOptions,
-                indexAxis: 'y',
-                scales: {
-                    x: { ticks: { display: false }, grid: { display: false } }
-                }
-            }
-        });
-    }
-
-    // ----------------------------------------------------
-    // 🍩 6. PRODUCT ALLOCATION (DONUT)
-    // ----------------------------------------------------
-    const ctxProd = document.getElementById('prodSalesDonut');
-    if (ctxProd) {
-        new Chart(ctxProd, {
-            type: 'doughnut',
-            data: {
-                labels: prodLabels,
-                datasets: [{
-                    data: prodData,
-                    backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#475569'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                ...baseOptions,
-                cutout: '75%',
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'bottom',
-                        labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' }
-                    }
-                }
-            }
-        });
-    }
-
-    // ----------------------------------------------------
-    // 🍩 7. FIELD PROBLEMS OBSERVED (DONUT)
-    // ----------------------------------------------------
-    const ctxProblem = document.getElementById('problemsDonut');
-    if (ctxProblem) {
-        new Chart(ctxProblem, {
-            type: 'doughnut',
-            data: {
-                labels: problemLabels,
-                datasets: [{
-                    data: problemData,
-                    backgroundColor: ['#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#475569'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                ...baseOptions,
-                cutout: '75%',
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'bottom',
-                        labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' }
-                    }
-                }
-            }
-        });
-    }
-
-    // ----------------------------------------------------
-    // 🗺️ 8. STATE VISITS CHART (HORIZONTAL BAR)
-    // ----------------------------------------------------
-    const ctxState = document.getElementById('stateVisitsChart');
-    if (ctxState) {
-        new Chart(ctxState, {
-            type: 'bar',
-            data: {
-                labels: stateLabels,
-                datasets: [{
-                    data: stateData,
-                    backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#10b981'],
-                    borderRadius: 4,
-                    barThickness: 12
-                }]
-            },
-            options: {
-                ...baseOptions,
-                indexAxis: 'y',
-                scales: {
-                    x: { grid: { display: false }, ticks: { color: '#64748b' } },
-                    y: { grid: { display: false }, ticks: { color: '#f1f5f9', font: { weight: 'bold' } } }
-                }
-            }
-        });
-    }
+    // Run telemetry fetch on load to sync empty line charts
+    applyFilters();
 });
+
+// ---------------------------------------------------------
+// 3. Dynamic Async API Dispatcher (The Filter Logic)
+// ---------------------------------------------------------
+function applyFilters() {
+    // Gather values from HTML nodes using explicit DOM element IDs
+    const state = document.getElementById('stateSelect')?.value || 'All';
+    const country = document.getElementById('countrySelect')?.value || 'All';
+    const district = document.getElementById('districtSelect')?.value || 'All';
+    const executive = document.getElementById('executiveSelect')?.value || 'All';
+    const month = document.getElementById('monthSelect')?.value || 'All';
+    const year = document.getElementById('yearSelect')?.value || 'All';
+    const businessType = document.getElementById('businessTypeSelect')?.value || 'All';
+
+    // Construct the query parameter string dynamically
+    const queryParams = new URLSearchParams({
+        state: state,
+        country: country,
+        district: district,
+        executive: executive,
+        month: month,
+        year: year,
+        business_type: businessType
+    });
+
+    // Dispatch AJAX fetch context payload
+    fetch(`${window.location.pathname}?${queryParams.toString()}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error("Telemetry refresh fault generated.");
+        return response.json();
+    })
+    .then(data => {
+        // 📊 Update Graph 1: Field Visit Frequency Bar Chart
+        if (window.barChartEngine) {
+            window.barChartEngine.data.labels = data.labels && data.labels.length ? data.labels : ['No Visits Found'];
+            window.barChartEngine.data.datasets[0].data = data.values && data.values.length ? data.values : [0];
+            window.barChartEngine.update();
+        }
+
+        // 🎯 Update Graph 2: Zone-wise Breakdown Doughnut Chart
+        if (window.pieChartEngine) {
+            window.pieChartEngine.data.labels = data.zone_labels && data.zone_labels.length ? data.zone_labels : ['No Data Found'];
+            window.pieChartEngine.data.datasets[0].data = data.zone_data && data.zone_data.length ? data.zone_data : [0];
+            window.pieChartEngine.update();
+        }
+
+        // 📈 Update Graph 3: Year-wise Revenue Trends Line Chart
+        if (window.yearChartEngine) {
+            window.yearChartEngine.data.labels = data.year_labels && data.year_labels.length ? data.year_labels : ['No Trends'];
+            window.yearChartEngine.data.datasets[0].data = data.year_data && data.year_data.length ? data.year_data : [0];
+            window.yearChartEngine.update();
+        }
+
+        // 📅 Update Graph 4: Month-wise Revenue Cycle Line Chart
+        if (window.monthChartEngine) {
+            window.monthChartEngine.data.labels = data.month_labels && data.month_labels.length ? data.month_labels : ['No Data'];
+            window.monthChartEngine.data.datasets[0].data = data.month_data && data.month_data.length ? data.month_data : [0];
+            window.monthChartEngine.update();
+        }
+    })
+    .catch(error => {
+        console.error("Critical error cycle updates inside dynamic asset engine:", error);
+    });
+}
