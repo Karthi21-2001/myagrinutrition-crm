@@ -12,9 +12,11 @@ urlpatterns = [
     path('logout/', views.logout_user, name='logout_user'),
     
     # --- Permanent Password Recovery Admin Router ---
-    path('password-reset/', 
-         TemplateView.as_view(template_name='crm_core/password_reset.html'), 
-         name='password_reset'),
+    path(
+        'password-reset/', 
+        TemplateView.as_view(template_name='crm_core/password_reset.html'), 
+        name='password_reset'
+    ),
          
     # ==========================================
     # 🌱 CORE AGRI-FORM LAYOUT INTERFACES
