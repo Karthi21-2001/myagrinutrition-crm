@@ -271,14 +271,27 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
-        'farm', 'executive'
-    ).prefetch_related('visitedproductdetail_set').order_by('-visit_date')
+    try:
+        all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
+            'farm', 'executive'
+        ).prefetch_related('visitedproductdetail_set').order_by('-visit_date')
+    except Exception:
+        all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
+            'farm', 'executive'
+        ).order_by('-visit_date')
 
     current_row = 2
     for v in all_visits:
         f = v.farm
-        products = list(v.visitedproductdetail_set.all())
+        
+        # Safe extraction of product details regardless of relation name
+        if hasattr(v, 'visitedproductdetail_set'):
+            products = list(v.visitedproductdetail_set.all())
+        elif hasattr(v, 'visited_products'):
+            products = list(v.visited_products.all())
+        else:
+            products = list(VisitedProductDetail.objects.filter(visit=v))
+
         product_loop_list = products if products else [None]
 
         for p in product_loop_list:
@@ -519,7 +532,7 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # 6. Demographics & Issues (Safely fallback if field names vary)
+        # 6. Demographics & Issues
         try:
             bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
                 chicks=Sum('farm__chicks_count'),
@@ -583,7 +596,11 @@ def get_dashboard_context(request):
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
+        # SAFE RECENT VISITS FETCH (Prevents prefetch_related invalid parameter error)
+        try:
+            recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
+        except Exception:
+            recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
@@ -659,14 +676,13 @@ def dashboard_home(request):
         return render(request, 'crm_core/dashboard.html', context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        # Safe fallback template rendering if dashboard.html fails
         try:
             return render(request, 'dashboard.html', {})
         except Exception:
             return HttpResponse(
                 f"<div style='font-family:sans-serif; padding:40px; text-align:center;'>"
                 f"<h2>Dashboard Rendering Error</h2><p>{str(e)}</p>"
-                f"<p><a href='/crm/visit/'>Go to Visit Form</a></p></div>",
+                f"<p><a href='/crm/visit-form/'>Go to Visit Form</a></p></div>",
                 status=500
             )
 
@@ -714,18 +730,19 @@ def get_location_details(request):
         return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
 
     try:
-        response = requests.get(
-            f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en",
-            timeout=5
-        )
-        data = response.json()
-
-        return JsonResponse({
-            'status': 'success',
-            'state': data.get('principalSubdivision', ''),
-            'district': data.get('locality', '') or data.get('city', ''),
-            'area': data.get('locality', '')
-        })
+        headers = {'User-Agent': 'MyAgriNutritionCRM/1.0'}
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            address = data.get('address', {})
+            return JsonResponse({
+                'status': 'success',
+                'state': address.get('state', ''),
+                'district': address.get('state_district') or address.get('county') or address.get('district', ''),
+                'area': address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
+            })
+        return JsonResponse({'status': 'error', 'message': 'Geocoding service unavailable'}, status=502)
     except Exception as e:
-        logger.error(f"Error in reverse geocoding: {str(e)}", exc_info=True)
+        logger.error(f"Reverse geocode error: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
