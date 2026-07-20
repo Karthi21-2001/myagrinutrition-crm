@@ -1,220 +1,263 @@
 import json
+import openpyxl
+import requests
 from decimal import Decimal
-from django.shortcuts import render
+
+from django.shortcuts import render, redirect
+from django.http import JsonResponse, HttpResponse
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db.models import Sum, Count, Avg, Q
 from django.db.models.functions import TruncMonth, TruncYear
-from django.http import HttpResponse
+from django.views.decorators.http import require_GET, require_POST
 
-# Import your models here (adjust app path as needed)
-# from .models import Visit, Farm, Product, Problem
+from .models import VisitLog, PipelineItem, OrderItem
 
 User = get_user_model()
 
 
+# ==============================================================================
+# 1. FORM DISPLAY & SUBMISSION
+# ==============================================================================
+
+@login_required
+def render_form(request):
+    """Renders the HTML form template for field visits."""
+    return render(request, 'farm_visit_form.html')
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def save_visit_log(request):
+    """Saves field visit data along with dynamic pipeline and order items."""
+    POST = request.POST
+
+    visit = VisitLog(
+        executive=request.user,
+        farm_name=POST.get('farm_name', '').strip(),
+        owner_name=POST.get('owner_name', '').strip(),
+        contact_number=POST.get('contact_number', '').strip(),
+        latitude=POST.get('latitude') or None,
+        longitude=POST.get('longitude') or None,
+        district=POST.get('district', '').strip(),
+        area=POST.get('area', '').strip(),
+        state=POST.get('state', '').strip(),
+        business_type=POST.get('business_type', 'Poultry'),
+        sub_business_type=POST.get('sub_business_type', '').strip(),
+        farm_problem=POST.get('farm_problem', '').strip(),
+    )
+
+    if visit.business_type == 'Poultry':
+        visit.chicks_count = int(POST.get('chicks_count') or 0)
+        visit.grower_count = int(POST.get('grower_count') or 0)
+        visit.layer_count = int(POST.get('layer_count') or 0)
+        visit.culling_bird_count = int(POST.get('culling_bird_count') or 0)
+    elif visit.business_type == 'Aqua':
+        visit.pond_acre = float(POST.get('pond_acre') or 0.00)
+        visit.pond_doc = int(POST.get('pond_doc') or 0)
+        visit.fish_variety = POST.get('fish_variety', '').strip()
+
+    visit.save()
+
+    # Save Dynamic Pipeline Rows
+    pipeline_products = POST.getlist('pipeline_discussed_product[]')
+    potential_quantities = POST.getlist('pipeline_potential_quantity[]')
+    target_quantities = POST.getlist('pipeline_target_quantity[]')
+    pipeline_units = POST.getlist('pipeline_unit_type[]')
+    statuses = POST.getlist('pipeline_process_status[]')
+    conversions = POST.getlist('pipeline_conversion_percentage[]')
+
+    for i in range(len(pipeline_products)):
+        prod_name = pipeline_products[i].strip()
+        if prod_name:
+            PipelineItem.objects.create(
+                visit=visit,
+                product_name=prod_name,
+                potential_quantity=int(potential_quantities[i] or 0),
+                target_quantity=int(target_quantities[i] or 0),
+                unit_type=pipeline_units[i] if i < len(pipeline_units) else 'KG',
+                process_status=statuses[i] if i < len(statuses) else 'Warm',
+                conversion_percentage=int(conversions[i] or 0),
+            )
+
+    # Save Dynamic Order Rows
+    order_products = POST.getlist('discussed_product[]')
+    sale_quantities = POST.getlist('sale_quantity[]')
+    order_units = POST.getlist('unit_type[]')
+    prices = POST.getlist('primary_price[]')
+
+    for i in range(len(order_products)):
+        prod_name = order_products[i].strip()
+        if prod_name:
+            OrderItem.objects.create(
+                visit=visit,
+                product_name=prod_name,
+                sale_quantity=int(sale_quantities[i] or 0),
+                unit_type=order_units[i] if i < len(order_units) else 'KG',
+                primary_price=float(prices[i] or 0.00),
+            )
+
+    return redirect('analytics_dashboard')
+
+
+# ==============================================================================
+# 2. ANALYTICS DASHBOARD VIEW
+# ==============================================================================
+
+@login_required
 def analytics_dashboard(request):
-    # -------------------------------------------------------------------------
-    # 1. EXTRACT QUERY PARAMETERS & FILTERS
-    # -------------------------------------------------------------------------
+    """Computes KPIs, aggregation metrics, and chart payloads for the main dashboard."""
     selected_executive = request.GET.get('executive', 'ALL')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
     selected_sector = request.GET.get('sector', 'ALL')
 
-    # Base queryset for Visits
-    visits_qs = Visit.objects.all()
+    # Queryset filter chain
+    visits_qs = VisitLog.objects.all()
 
-    # Filter: Executive
     if selected_executive and selected_executive != 'ALL':
         visits_qs = visits_qs.filter(executive_id=selected_executive)
-
-    # Filter: Date Range
     if start_date:
-        visits_qs = visits_qs.filter(date__gte=start_date)
+        visits_qs = visits_qs.filter(created_at__date__gte=start_date)
     if end_date:
-        visits_qs = visits_qs.filter(date__lte=end_date)
-
-    # Filter: Sector (Poultry vs Aqua)
+        visits_qs = visits_qs.filter(created_at__date__lte=end_date)
     if selected_sector and selected_sector != 'ALL':
-        visits_qs = visits_qs.filter(sector__iexact=selected_sector)
+        visits_qs = visits_qs.filter(business_type__iexact=selected_sector)
 
-    # -------------------------------------------------------------------------
-    # 2. KPI CALCULATIONS
-    # -------------------------------------------------------------------------
+    # Metrics
     total_visits = visits_qs.count()
     total_executives = visits_qs.values('executive').distinct().count()
-    total_farms = visits_qs.values('farm').distinct().count()
+    total_farms = visits_qs.values('farm_name').distinct().count()
 
-    # Total order quantity & Revenue
-    aggregates = visits_qs.aggregate(
-        total_qty=Sum('order_quantity'),
-        total_revenue=Sum('order_value'),
-        avg_revenue=Avg('order_value')
+    order_aggregates = OrderItem.objects.filter(visit__in=visits_qs).aggregate(
+        total_qty=Sum('sale_quantity'),
+        total_revenue=Sum(models.F('sale_quantity') * models.F('primary_price'), output_field=models.DecimalField())
     )
 
-    total_qty = aggregates['total_qty'] or 0
-    total_revenue = aggregates['total_revenue'] or 0
-    avg_revenue = aggregates['avg_revenue'] or 0
+    total_qty = order_aggregates['total_qty'] or 0
+    total_revenue = order_aggregates['total_revenue'] or 0
+    avg_revenue = (total_revenue / total_visits) if total_visits > 0 else 0
 
-    # -------------------------------------------------------------------------
-    # 3. CHART 1 & 2: MONTH-WISE & YEAR-WISE REVENUE TRENDS
-    # -------------------------------------------------------------------------
-    # Monthly aggregate
+    # Chart 1: Monthly Trends
     monthly_data = (
-        visits_qs.annotate(month=TruncMonth('date'))
+        visits_qs.annotate(month=TruncMonth('created_at'))
         .values('month')
-        .annotate(revenue=Sum('order_value'))
+        .annotate(revenue=Sum(models.F('orders__sale_quantity') * models.F('orders__primary_price')))
         .order_by('month')
     )
     month_labels = [item['month'].strftime('%b %Y') for item in monthly_data if item['month']]
     month_values = [float(item['revenue'] or 0) for item in monthly_data]
 
-    # Yearly aggregate
-    yearly_data = (
-        visits_qs.annotate(year=TruncYear('date'))
-        .values('year')
-        .annotate(revenue=Sum('order_value'))
-        .order_by('year')
-    )
-    year_labels = [item['year'].strftime('%Y') for item in yearly_data if item['year']]
-    year_values = [float(item['revenue'] or 0) for item in yearly_data]
-
-    # -------------------------------------------------------------------------
-    # 4. CHART 3: REVENUE BY EXECUTIVE
-    # -------------------------------------------------------------------------
-    exec_data = (
-        visits_qs.values('executive__first_name', 'executive__username')
-        .annotate(revenue=Sum('order_value'))
-        .order_by('-revenue')[:10]
-    )
-    exec_labels = [
-        item['executive__first_name'] or item['executive__username']
-        for item in exec_data
-    ]
-    exec_values = [float(item['revenue'] or 0) for item in exec_data]
-
-    # -------------------------------------------------------------------------
-    # 5. CHART 4: PRODUCT ALLOCATION (DONUT)
-    # -------------------------------------------------------------------------
-    # Assuming M2M or FK to Product on Visit
+    # Chart 2: Top Products Allocation
     prod_data = (
-        visits_qs.values('product__name')
-        .annotate(volume=Sum('order_quantity'))
+        OrderItem.objects.filter(visit__in=visits_qs)
+        .values('product_name')
+        .annotate(volume=Sum('sale_quantity'))
         .order_by('-volume')[:5]
     )
-    prod_labels = [item['product__name'] or 'Uncategorized' for item in prod_data]
+    prod_labels = [item['product_name'] or 'Uncategorized' for item in prod_data]
     prod_values = [item['volume'] or 0 for item in prod_data]
 
-    # -------------------------------------------------------------------------
-    # 6. CHART 5: VISITS BY STATE
-    # -------------------------------------------------------------------------
-    state_data = (
-        visits_qs.values('state')
-        .annotate(visit_count=Count('id'))
-        .order_by('-visit_count')[:5]
-    )
-    state_labels = [item['state'] or 'Unknown' for item in state_data]
-    state_values = [item['visit_count'] for item in state_data]
+    # Pipeline Metrics
+    pipeline_qs = PipelineItem.objects.filter(visit__in=visits_qs)
+    total_pipeline = pipeline_qs.count() or 1
+    hot_count = pipeline_qs.filter(process_status__iexact='Hot').count()
+    warm_count = pipeline_qs.filter(process_status__iexact='Warm').count()
+    cold_count = pipeline_qs.filter(process_status__iexact='Cold').count()
 
-    # -------------------------------------------------------------------------
-    # 7. CHART 6: OBSERVED FIELD PROBLEMS (DONUT)
-    # -------------------------------------------------------------------------
-    problem_data = (
-        visits_qs.values('problem_observed__name')
-        .annotate(count=Count('id'))
-        .order_by('-count')[:5]
-    )
-    problem_labels = [item['problem_observed__name'] or 'General Check' for item in problem_data]
-    problem_values = [item['count'] for item in problem_data]
-
-    # -------------------------------------------------------------------------
-    # 8. TOP FARMS BY REVENUE (LEDGER TABLE)
-    # -------------------------------------------------------------------------
-    top_farms = (
-        visits_qs.values('farm__name')
-        .annotate(revenue=Sum('order_value'))
-        .order_by('-revenue')[:6]
-    )
-    top_farms_list = [
-        {'name': farm['farm__name'], 'revenue': f"{farm['revenue'] or 0:,.2f}"}
-        for farm in top_farms
-    ]
-
-    # -------------------------------------------------------------------------
-    # 9. PIPELINE TEMPERATURE & SECTOR RATIOS
-    # -------------------------------------------------------------------------
-    # Pipeline percentages calculation
-    total_pipeline_items = visits_qs.exclude(pipeline_status__isnull=True).count() or 1
-    hot_count = visits_qs.filter(pipeline_status__iexact='HOT').count()
-    warm_count = visits_qs.filter(pipeline_status__iexact='WARM').count()
-    cold_count = visits_qs.filter(pipeline_status__iexact='COLD').count()
-
-    pipeline_hot = round((hot_count / total_pipeline_items) * 100)
-    pipeline_warm = round((warm_count / total_pipeline_items) * 100)
-    pipeline_cold = round((cold_count / total_pipeline_items) * 100)
-
-    # Sector distribution percentages
-    sector_total = visits_qs.count() or 1
-    poultry_count = visits_qs.filter(sector__iexact='POULTRY').count()
-    aqua_count = visits_qs.filter(sector__iexact='AQUA').count()
-
-    sector_poultry_pct = round((poultry_count / sector_total) * 100)
-    sector_aqua_pct = round((aqua_count / sector_total) * 100)
-
-    # -------------------------------------------------------------------------
-    # 10. RECENT VISIT SUMMARY LOG (TABLE) & EXECUTIVES DROPDOWN
-    # -------------------------------------------------------------------------
-    recent_visits = visits_qs.select_related('executive', 'farm').order_by('-date')[:10]
-    executives_list = User.objects.filter(is_active=True).order_by('first_name')
-
-    # -------------------------------------------------------------------------
-    # CONTEXT COMPOSITION
-    # -------------------------------------------------------------------------
     context = {
-        # Active Filter States
         'selected_executive': selected_executive,
         'start_date': start_date,
         'end_date': end_date,
         'selected_sector': selected_sector,
-        'executives_list': executives_list,
+        'executives_list': User.objects.filter(is_active=True).order_by('first_name'),
 
-        # Top KPIs
         'total_visits': f"{total_visits:,}",
         'total_executives': total_executives,
         'total_farms': total_farms,
         'total_qty': f"{total_qty:,}",
         'total_revenue': f"{total_revenue:,.2f}",
         'avg_revenue': f"{avg_revenue:,.2f}",
-        'visits_growth': '12%',
-        'farms_expansion': '8%',
-        'qty_velocity': '15%',
-        'revenue_growth': '18%',
-        'avg_growth': '5%',
 
-        # Tables / Collections
-        'top_farms': top_farms_list,
-        'recent_visits': recent_visits,
+        'pipeline_hot': round((hot_count / total_pipeline) * 100),
+        'pipeline_warm': round((warm_count / total_pipeline) * 100),
+        'pipeline_cold': round((cold_count / total_pipeline) * 100),
 
-        # Pipeline & Sector Percentages
-        'pipeline_hot': pipeline_hot,
-        'pipeline_warm': pipeline_warm,
-        'pipeline_cold': pipeline_cold,
-        'sector_poultry_pct': sector_poultry_pct,
-        'sector_aqua_pct': sector_aqua_pct,
-
-        # Chart JSON Encodings (safe for template insertion)
         'month_labels_json': json.dumps(month_labels),
         'month_data_json': json.dumps(month_values),
-        'year_labels_json': json.dumps(year_labels),
-        'year_data_json': json.dumps(year_values),
-        'exec_labels_json': json.dumps(exec_labels),
-        'exec_data_json': json.dumps(exec_values),
         'prod_labels_json': json.dumps(prod_labels),
         'prod_data_json': json.dumps(prod_values),
-        'state_labels_json': json.dumps(state_labels),
-        'state_data_json': json.dumps(state_values),
-        'problem_labels_json': json.dumps(problem_labels),
-        'problem_data_json': json.dumps(problem_values),
     }
 
-    return render(request, 'analytics_dashboard.html', context)
+    return render(request, 'analytics.html', context)
+
+
+# ==============================================================================
+# 3. ANALYTICS REPORT VIEW (DETAILED PRINT/PDF VIEW)
+# ==============================================================================
+
+@login_required
+def analytics_report(request):
+    """Renders printable analytical reports and tabular summaries."""
+    visits = VisitLog.objects.all().select_related('executive').prefetch_related('orders', 'pipeline_items')
+    
+    context = {
+        'visits': visits,
+        'total_count': visits.count()
+    }
+    return render(request, 'analytics_report.html', context)
+
+
+# ==============================================================================
+# 4. GEOLOCATION & EXPORT ENDPOINTS
+# ==============================================================================
+
+@require_GET
+def get_location_details(request):
+    """Reverse geocodes coordinates into State, District, and Area via OSM."""
+    lat, lon = request.GET.get('lat'), request.GET.get('lon')
+    if not lat or not lon:
+        return JsonResponse({'error': 'Coordinates required'}, status=400)
+
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        response = requests.get(url, headers={'User-Agent': 'AgriNutritionCRM/1.0'}, timeout=5)
+        if response.status_code == 200:
+            data = response.json().get('address', {})
+            return JsonResponse({
+                'area': data.get('suburb') or data.get('village') or data.get('town') or '',
+                'district': data.get('state_district') or data.get('county') or '',
+                'state': data.get('state', '')
+            })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Geocoding service unavailable'}, status=502)
+
+
+@login_required
+def export_excel(request):
+    """Generates an `.xlsx` file containing all field visits and revenue."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Visit Reports"
+
+    ws.append(['ID', 'Executive', 'Date', 'Farm Name', 'Owner', 'Contact', 'Sector', 'Total Revenue'])
+
+    for log in VisitLog.objects.all().select_related('executive'):
+        ws.append([
+            log.id,
+            log.executive.get_full_name() or log.executive.username,
+            log.created_at.strftime('%Y-%m-%d %H:%M'),
+            log.farm_name,
+            log.owner_name,
+            log.contact_number,
+            log.business_type,
+            log.total_order_value
+        ])
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="Agrinutrition_Visit_Logs.xlsx"'
+    wb.save(response)
+    return response
