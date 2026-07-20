@@ -18,6 +18,11 @@ from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from django.shortcuts import render
+from django.db.models import Sum, Count, Avg
+from django.core.serializer.json import DjangoJSONEncoder
+# Import your actual models here (e.g., Visit, Executive, Farm, etc.)
+from .models import Visit, User, Farm
 
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
@@ -801,3 +806,98 @@ def get_location_details(request):
     except Exception as e:
         logger.error(f"Error in get_location_details: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        def analytics_dashboard(request):
+    # 1. Capture Filter Parameters from GET request
+    selected_executive = request.GET.get('executive', 'ALL')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    selected_sector = request.GET.get('sector', 'ALL')
+
+    # 2. Base QuerySet
+    visits = Visit.objects.all().select_related('executive', 'farm')
+
+    # 3. Apply Filters Dynamically
+    if selected_executive and selected_executive != 'ALL':
+        visits = visits.filter(executive_id=selected_executive)
+    if start_date:
+        visits = visits.filter(date__gte=start_date)
+    if end_date:
+        visits = visits.filter(date__lte=end_date)
+    if selected_sector and selected_sector != 'ALL':
+        visits = visits.filter(sector=selected_sector)
+
+    # 4. Calculate KPI Cards
+    total_visits = visits.count()
+    total_execs = visits.values('executive').distinct().count()
+    total_farms = visits.values('farm').distinct().count()
+    
+    qty_agg = visits.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+    revenue_agg = visits.aggregate(total_rev=Sum('order_value'))['total_rev'] or 0
+    avg_rev_agg = visits.aggregate(avg_rev=Avg('order_value'))['avg_rev'] or 0
+
+    # 5. Extract Aggregates for Chart Data
+    
+    # Month-Wise Revenue (Example aggregation)
+    # Adjust field names to match your DB schema
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    month_data = [12000, 19000, 15000, 25000, 22000, 30000, 28000, 35000, 40000, 42000, 48000, 50000] 
+    # Replace above mock lists with real ORM queries like:
+    # month_qs = visits.values('date__month').annotate(total=Sum('order_value')).order_by('date__month')
+
+    # State Visits
+    state_qs = visits.values('state').annotate(count=Count('id')).order_by('-count')[:5]
+    state_labels = [item['state'] for item in state_qs if item['state']] or ["No Data"]
+    state_data = [item['count'] for item in state_qs if item['state']] or [0]
+
+    # Executive Revenue
+    exec_qs = visits.values('executive__username').annotate(total=Sum('order_value')).order_by('-total')[:5]
+    exec_labels = [item['executive__username'] for item in exec_qs] or ["No Data"]
+    exec_data = [float(item['total'] or 0) for item in exec_qs] or [0]
+
+    # Product Allocation
+    prod_qs = visits.values('product_name').annotate(total=Sum('quantity')).order_by('-total')[:5]
+    prod_labels = [item['product_name'] for item in prod_qs] or ["No Data"]
+    prod_data = [item['total'] for item in prod_qs] or [0]
+
+    # Problems Observed
+    prob_qs = visits.values('problem_type').annotate(count=Count('id')).order_by('-count')[:5]
+    problem_labels = [item['problem_type'] for item in prob_qs] or ["None Recorded"]
+    problem_data = [item['count'] for item in prob_qs] or [0]
+
+    # 6. Build Context Dict with JSON-encoded data
+    context = {
+        # Selectors & Filters
+        'executives_list': User.objects.filter(is_active=True),
+        'selected_executive': selected_executive,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_sector': selected_sector,
+
+        # Top KPIs
+        'total_visits': total_visits,
+        'total_executives': total_execs,
+        'total_farms': total_farms,
+        'total_qty': f"{qty_agg:,}",
+        'total_revenue': f"{revenue_agg:,.2f}",
+        'avg_revenue': f"{avg_rev_agg:,.2f}",
+
+        # Recent Logs & Top Farms
+        'recent_visits': visits.order_by('-date')[:10],
+        'top_farms': visits.values('farm__name').annotate(revenue=Sum('order_value')).order_by('-revenue')[:5],
+
+        # JSON serialized chart data for JavaScript safety
+        'month_labels_json': json.dumps(month_labels),
+        'month_data_json': json.dumps(month_data),
+        'year_labels_json': json.dumps(["2024", "2025", "2026"]),
+        'year_data_json': json.dumps([150000, 320000, 450000]),
+        'exec_labels_json': json.dumps(exec_labels),
+        'exec_data_json': json.dumps(exec_data),
+        'state_labels_json': json.dumps(state_labels),
+        'state_data_json': json.dumps(state_data),
+        'prod_labels_json': json.dumps(prod_labels),
+        'prod_data_json': json.dumps(prod_data),
+        'problem_labels_json': json.dumps(problem_labels),
+        'problem_data_json': json.dumps(problem_data),
+    }
+
+    return render(request, 'analytics_dashboard.html', context)
