@@ -457,22 +457,26 @@
                 .catch(err => console.error("Filter cascade failed:", err));
             });
 
-            // Chart render logic - Clean slate configuration when database records are empty
-            const ctx = document.getElementById('districtChart').getContext('2d');
-            const labels = {{ chart_labels_js|safe|default:"[]" }};
-            const dataValues = {{ chart_counts_js|safe|default:"[]" }};
+            // Chart render logic with fallback guards
+            const canvasElem = document.getElementById('districtChart');
+            if (!canvasElem) return;
 
-            // 🧠 Evaluates backend parameters and forces values to be completely empty arrays if no tracking data exists
-            const finalizedLabels = labels.includes("No Data Available") ? [] : labels;
-            const finalizedData = labels.includes("No Data Available") ? [] : dataValues;
+            const ctx = canvasElem.getContext('2d');
+            
+            // Safe JSON parse handling
+            let rawLabels = {{ chart_labels_js|safe|default:"[]" }};
+            let rawData = {{ chart_counts_js|safe|default:"[]" }};
+
+            const finalizedLabels = (Array.isArray(rawLabels) && rawLabels.includes("No Data Available")) ? [] : rawLabels;
+            const finalizedData = (Array.isArray(rawLabels) && rawLabels.includes("No Data Available")) ? [] : rawData;
 
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: finalizedLabels, // 🧠 Stays completely empty if no data exists
+                    labels: finalizedLabels,
                     datasets: [{
                         label: 'Farms Registered per District',
-                        data: finalizedData,   // 🧠 Stays completely empty if no data exists
+                        data: finalizedData,
                         backgroundColor: '#38bdf8', 
                         borderWidth: 0,
                         borderRadius: 6

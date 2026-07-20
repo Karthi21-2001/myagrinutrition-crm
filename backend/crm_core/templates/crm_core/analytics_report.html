@@ -128,6 +128,49 @@
                 <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"0" }}</h3>
                 <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ avg_growth|default:"0%" }}</span>
             </div>
+
+            <!-- ADDED EXTRA STATISTICAL KPI CARDS -->
+            <!-- Total Visits Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-clipboard-check text-sky-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ total_visits|default:"0" }}</h2>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1">▲ {{ conversion_rate|default:"0" }}%</span>
+            </div>
+
+            <!-- Active Executives Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-users text-violet-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ active_executives|default:"0" }}</h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Live Tracking Active</span>
+            </div>
+
+            <!-- Farms Covered Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-tractor text-amber-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ total_farms|default:"0" }}</h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Field Accounts</span>
+            </div>
+
+            <!-- Total Orders Quantity Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-box text-orange-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ total_sales_volume|default:"0" }} <small class="text-xs font-medium text-slate-400">Units</small></h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Sales Volume</span>
+            </div>
+
+            <!-- Confirmed Revenue Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-coins text-emerald-400"></i></div>
+                <h2 class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|floatformat:2|default:"0.00" }}</h2>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1">Gross Conversion</span>
+            </div>
+
+            <!-- Average Order Value Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-chart-line text-cyan-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">₹{{ avg_order_value|floatformat:2|default:"0.00" }}</h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Average Deal Size</span>
+            </div>
         </div>
 
         <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
