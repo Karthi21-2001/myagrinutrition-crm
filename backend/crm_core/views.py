@@ -757,3 +757,47 @@ def clear_dashboard_data(request):
             messages.error(request, f"Failed to clear database logs: {str(e)}")
             return redirect('dashboard_home')
     return redirect('dashboard_home')
+
+
+# ==========================================
+# 📍 GEOCODING & LOCATION API ENDPOINT
+# ==========================================
+
+def get_location_details(request):
+    """
+    Reverse geocoding endpoint to fetch location details (state, district, area)
+    from latitude and longitude coordinates.
+    """
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+
+    if not lat or not lng:
+        return JsonResponse({'status': 'error', 'message': 'Latitude and longitude parameters are required.'}, status=400)
+
+    try:
+        headers = {'User-Agent': 'AgriCRM-App/1.0'}
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}"
+        
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            address = data.get('address', {})
+            
+            state = address.get('state', '')
+            district = address.get('state_district') or address.get('county') or address.get('district', '')
+            area = address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
+
+            return JsonResponse({
+                'status': 'success',
+                'state': state,
+                'district': district,
+                'area': area,
+                'full_address': data.get('display_name', '')
+            })
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Unable to fetch location from geocoding service.'}, status=502)
+
+    except Exception as e:
+        logger.error(f"Error in get_location_details: {str(e)}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
