@@ -271,27 +271,15 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    try:
-        all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
-            'farm', 'executive'
-        ).prefetch_related('visitedproductdetail_set').order_by('-visit_date')
-    except Exception:
-        all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
-            'farm', 'executive'
-        ).order_by('-visit_date')
+    # Prefetch using updated related_name 'visited_products'
+    all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
+        'farm', 'executive'
+    ).prefetch_related('visited_products').order_by('-visit_date')
 
     current_row = 2
     for v in all_visits:
         f = v.farm
-        
-        # Safe extraction of product details regardless of relation name
-        if hasattr(v, 'visitedproductdetail_set'):
-            products = list(v.visitedproductdetail_set.all())
-        elif hasattr(v, 'visited_products'):
-            products = list(v.visited_products.all())
-        else:
-            products = list(VisitedProductDetail.objects.filter(visit=v))
-
+        products = list(v.visited_products.all())
         product_loop_list = products if products else [None]
 
         for p in product_loop_list:
@@ -596,11 +584,10 @@ def get_dashboard_context(request):
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        # SAFE RECENT VISITS FETCH (Prevents prefetch_related invalid parameter error)
-        try:
-            recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
-        except Exception:
-            recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').order_by('-visit_date')[:10]
+        # RECENT VISITS (Uses updated 'visited_products' related_name)
+        recent_visits_queryset = FarmVisitReport.objects.filter(
+            visit_filters
+        ).select_related('farm').prefetch_related('visited_products').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
