@@ -36,19 +36,15 @@ urlpatterns = [
     # 📊 DASHBOARDS & LIVE ANALYTICS PIPELINES
     # ==========================================
     path('dashboard/', views.dashboard_home, name='dashboard_home'), 
+    path('dashboard/analytics/', views.dashboard_analytics, name='dashboard_analytics'),
+    path('dashboard/clear/', views.clear_dashboard_data, name='clear_dashboard_data'),
+    path('analytics/performance/', views.executive_analytics_view, name='executive_analytics_view'),
     
-    # NOTE: Uncomment these lines if/when you implement these functions in views.py
-    # path('dashboard/analytics/', views.dashboard_analytics, name='dashboard_analytics'),
-    # path('dashboard/clear/', views.clear_dashboard_data, name='clear_dashboard_data'),
-    # path('analytics/performance/', views.executive_analytics_view, name='executive_analytics_view'),
-    # path('analytics-report/', views.executive_analytics_view, name='analytics_report'), 
+    # 🎯 FIX FOR 500 ROUTING ERROR:
+    path('analytics-report/', views.executive_analytics_view, name='analytics_report'), 
 
     # ==========================================
     # 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES
     # ==========================================
     path('api/get-location-details/', views.get_location_details, name='reverse_geocode'),
-    
-    # NOTE: Uncomment these lines if/when you implement get_dependent_filters in views.py
-    # path('api/get-dependent-filters/', views.get_dependent_filters, name='get_dependent_filters'),
-    # path('crm/get-dependent-filters/', views.get_dependent_filters, name='get_dependent_filters_legacy'),
 ]
