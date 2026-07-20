@@ -370,7 +370,6 @@ def get_dashboard_context(request):
     segment_breakdown = []
     visit_frequency_exec = []
     
-    # Safe Initialization to Prevent UnboundLocalError
     month_wise_qs = VisitedProductDetail.objects.none()
     month_wise_labels, month_wise_data = [], []
     year_wise_qs = VisitedProductDetail.objects.none()
@@ -446,7 +445,7 @@ def get_dashboard_context(request):
             .order_by('month')
         )
 
-        combo_labels = [t['month'].strftime("%b %Y") for t in time_series_data]
+        combo_labels = [t['month'].strftime("%b %Y") for t in time_series_data if t.get('month')]
         combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
@@ -465,7 +464,7 @@ def get_dashboard_context(request):
             target=Sum('target_quantity'),
             potential=Sum('potential_quantity')
         )
-        if pipeline_spread_agg and pipeline_spread_agg.get('actual') is not None:
+        if pipeline_spread_agg:
             pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
 
         product_pricing_table = (
@@ -520,20 +519,23 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
-        # 6. Demographics, Issues & Visit Trends (FIXED Field Name)
-        bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-            chicks=Sum('farm__chicks_count'),
-            growers=Sum('farm__grower_count'),
-            layers=Sum('farm__layer_count'),
-            culling=Sum('farm__culling_bird_count')
-        )
-        if bird_population:
-            bird_counts = [
-                (bird_population.get('chicks') or 0),
-                (bird_population.get('growers') or 0),
-                (bird_population.get('layers') or 0),
-                (bird_population.get('culling') or 0)
-            ]
+        # 6. Demographics & Issues (Safely fallback if field names vary)
+        try:
+            bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
+                chicks=Sum('farm__chicks_count'),
+                growers=Sum('farm__grower_count'),
+                layers=Sum('farm__layer_count'),
+                culling=Sum('farm__culling_bird_count')
+            )
+            if bird_population:
+                bird_counts = [
+                    (bird_population.get('chicks') or 0),
+                    (bird_population.get('growers') or 0),
+                    (bird_population.get('layers') or 0),
+                    (bird_population.get('culling') or 0)
+                ]
+        except Exception as b_err:
+            logger.warning(f"Bird count aggregation skipped: {b_err}")
 
         reported_problems = (
             FarmVisitReport.objects.filter(visit_filters)
@@ -567,7 +569,7 @@ def get_dashboard_context(request):
             .filter(month__isnull=False)
             .order_by('month')
         )
-        month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs]
+        month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
         month_wise_data = [float(m['revenue'] or 0) for m in month_wise_qs]
 
         year_wise_qs = (
@@ -578,7 +580,7 @@ def get_dashboard_context(request):
             .filter(year__isnull=False)
             .order_by('year')
         )
-        year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs]
+        year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
         recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
@@ -657,15 +659,20 @@ def dashboard_home(request):
         return render(request, 'crm_core/dashboard.html', context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        messages.error(request, "Failed to load dashboard data.")
-        return render(request, 'crm_core/dashboard.html', {})
+        # Safe fallback template rendering if dashboard.html fails
+        try:
+            return render(request, 'dashboard.html', {})
+        except Exception:
+            return HttpResponse(
+                f"<div style='font-family:sans-serif; padding:40px; text-align:center;'>"
+                f"<h2>Dashboard Rendering Error</h2><p>{str(e)}</p>"
+                f"<p><a href='/crm/visit/'>Go to Visit Form</a></p></div>",
+                status=500
+            )
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    """
-    Returns dashboard analytics metrics as JSON for AJAX requests.
-    """
     try:
         context = get_dashboard_context(request)
         return JsonResponse({'status': 'success', 'data': context})
@@ -676,9 +683,6 @@ def dashboard_analytics(request):
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    """
-    Dedicated view for Executive Performance & Analytics Reports.
-    """
     context = get_dashboard_context(request)
     return render(request, 'crm_core/executive_analytics.html', context)
 
@@ -686,9 +690,6 @@ def executive_analytics_view(request):
 @login_required(login_url='/crm/login/')
 @user_passes_test(lambda u: u.is_superuser or u.is_staff)
 def clear_dashboard_data(request):
-    """
-    Admin-only utility endpoint to purge or reset visit records.
-    """
     if request.method == 'POST':
         try:
             with transaction.atomic():
@@ -702,13 +703,10 @@ def clear_dashboard_data(request):
 
 
 # ==========================================
-# 📍 REVERSE GEOCODING & DEPENDENT FILTERS API
+# 📍 REVERSE GEOCODING API
 # ==========================================
 
 def get_location_details(request):
-    """
-    Reverse geocoding endpoint to resolve Lat/Lng into State, District, Area.
-    """
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
 
