@@ -37,6 +37,7 @@ urlpatterns = [
     # ==========================================
     path('dashboard/', views.dashboard_home, name='dashboard_home'), 
     path('dashboard/analytics/', views.dashboard_analytics, name='dashboard_analytics'),
+    path('dashboard/clear/', views.clear_dashboard_data, name='clear_dashboard_data'),
     path('analytics/performance/', views.executive_analytics_view, name='executive_analytics_view'),
     path('analytics-report/', views.executive_analytics_view, name='analytics_report'), 
 
