@@ -1,4 +1,13 @@
-import csv
+import json
+
+context = {
+    # Send directly as Python lists (json_script handles serializing automatically):
+    'month_labels_json': ['Jan', 'Feb', 'Mar'],
+    'month_data_json': [1000, 2000, 1500],
+    # Or if you pre-serialize with json.dumps in Python:
+    'year_labels_json': json.dumps(['2024', '2025']),
+    'year_data_json': json.dumps([12000, 24000]),
+}--import csv
 import json
 import logging
 import openpyxl
@@ -709,13 +718,4 @@ def get_dashboard_context(request):
 
 
 @login_required(login_url='/crm/login/')
-def dashboard_home(request):
-    try:
-        context = get_dashboard_context(request)
-        return render(request, 'crm_core/dashboard.html', context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        return render(request, 'crm_core/analytics_report.html', {})
-
-
-@login_required(login_url='/crm/l
+d
