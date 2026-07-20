@@ -1,20 +1,19 @@
 import json
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Sum, Count, Avg, F
+from django.db.models import Sum
 from django.contrib.auth import get_user_model
 from django.db.models.functions import TruncMonth, TruncYear
 
-# Import your actual models here (Adjust model names if different)
 from .models import FieldVisit, Farm
 
 User = get_user_model()
 
-def analytics_dashboard(request):
+def executive_analytics_view(request):
     """
-    Main Analytics Dashboard View
+    Analytics View - Starts with 0 data unless real visits are recorded.
     """
-    # 1. Fetch Request Query Filters
+    # 1. Capture Filters
     selected_executive = request.GET.get('executive', 'ALL')
     start_date = request.GET.get('start_date', '')
     end_date = request.GET.get('end_date', '')
@@ -23,7 +22,7 @@ def analytics_dashboard(request):
     # 2. Base QuerySet
     visits = FieldVisit.objects.select_related('executive', 'farm').all()
 
-    # 3. Apply Filters
+    # 3. Apply Active Filters
     if selected_executive and selected_executive != 'ALL':
         visits = visits.filter(executive_id=selected_executive)
 
@@ -33,12 +32,9 @@ def analytics_dashboard(request):
     if start_date and end_date:
         visits = visits.filter(date__range=[start_date, end_date])
 
-    # =========================================================
-    # 4. KPI Calculations (FIXED REVENUE INFLATION BUG HERE)
-    # =========================================================
+    # 4. Aggregations & KPIs (Zero Defaults)
     total_visits = visits.count()
     
-    # Sum order_value directly. Do NOT multiply with quantity if order_value already holds the total.
     revenue_agg = visits.aggregate(total_rev=Sum('order_value'))
     total_revenue = revenue_agg['total_rev'] or 0
 
@@ -50,10 +46,7 @@ def analytics_dashboard(request):
     total_executives = User.objects.filter(is_active=True).count()
     total_farms = visits.values('farm').distinct().count()
 
-    # =========================================================
-    # 5. Chart Data Aggregations (JSON formatting for Chart.js)
-    # =========================================================
-    # Month-wise Revenue
+    # 5. Month-wise Trend Data
     month_data = (
         visits.annotate(month=TruncMonth('date'))
         .values('month')
@@ -63,7 +56,7 @@ def analytics_dashboard(request):
     month_labels = [item['month'].strftime('%b %Y') for item in month_data if item['month']]
     month_values = [float(item['total'] or 0) for item in month_data]
 
-    # Year-wise Revenue
+    # 6. Year-wise Trend Data
     year_data = (
         visits.annotate(year=TruncYear('date'))
         .values('year')
@@ -73,7 +66,7 @@ def analytics_dashboard(request):
     year_labels = [item['year'].strftime('%Y') for item in year_data if item['year']]
     year_values = [float(item['total'] or 0) for item in year_data]
 
-    # Executive Breakdown
+    # 7. Executive Breakdown
     exec_data = (
         visits.values('executive__first_name', 'executive__username')
         .annotate(total=Sum('order_value'))
@@ -85,15 +78,15 @@ def analytics_dashboard(request):
     ]
     exec_values = [float(item['total'] or 0) for item in exec_data]
 
-    # Sector Percentage Calculations
+    # 8. Business Sector Calculations
     poultry_count = visits.filter(sector='POULTRY').count()
     aqua_count = visits.filter(sector='AQUA').count()
-    sector_total = poultry_count + aqua_count or 1
+    sector_total = poultry_count + aqua_count
     
-    sector_poultry_pct = round((poultry_count / sector_total) * 100, 1)
-    sector_aqua_pct = round((aqua_count / sector_total) * 100, 1)
+    sector_poultry_pct = round((poultry_count / sector_total) * 100, 1) if sector_total > 0 else 0
+    sector_aqua_pct = round((aqua_count / sector_total) * 100, 1) if sector_total > 0 else 0
 
-    # Top Farms List
+    # 9. Top Farms List
     top_farms_qs = (
         visits.values('farm__name')
         .annotate(revenue=Sum('order_value'))
@@ -104,20 +97,19 @@ def analytics_dashboard(request):
         for farm in top_farms_qs
     ]
 
-    # Recent Visits Log
+    # 10. Table List
     recent_visits = visits.order_by('-date')[:10]
     executives_list = User.objects.all()
 
-    # Context Assembly
+    # Context Payload
     context = {
-        # Filter States
         'selected_executive': selected_executive,
         'start_date': start_date,
         'end_date': end_date,
         'selected_sector': selected_sector,
         'executives_list': executives_list,
 
-        # Top KPIs
+        # Metrics (Start cleanly at 0)
         'total_visits': total_visits,
         'total_executives': total_executives,
         'total_farms': total_farms,
@@ -125,25 +117,32 @@ def analytics_dashboard(request):
         'total_revenue': f"{total_revenue:,.2f}",
         'avg_revenue': f"{avg_revenue:,.2f}",
 
-        # Sector Ratios
+        # Growth Percentage Badges
+        'visits_growth': '0%',
+        'farms_expansion': '0%',
+        'qty_velocity': '0%',
+        'revenue_growth': '0%',
+        'avg_growth': '0%',
+
+        # Sectors
         'sector_poultry_pct': sector_poultry_pct,
         'sector_aqua_pct': sector_aqua_pct,
 
-        # Chart JSON Strings (Safe to render in template JavaScript)
+        # Dynamic JSON arrays for Charts (Empty [] if no logs exist)
         'month_labels_json': json.dumps(month_labels),
         'month_data_json': json.dumps(month_values),
         'year_labels_json': json.dumps(year_labels),
         'year_data_json': json.dumps(year_values),
         'exec_labels_json': json.dumps(exec_labels),
         'exec_data_json': json.dumps(exec_values),
-        'prod_labels_json': json.dumps(["Feed Supplement", "Disinfectants", "Probiotics", "Enzymes"]),
-        'prod_data_json': json.dumps([40, 25, 20, 15]),
-        'state_labels_json': json.dumps(["AP", "TS", "KA", "TN"]),
-        'state_data_json': json.dumps([120, 85, 45, 30]),
-        'problem_labels_json': json.dumps(["Water Quality", "Low Feed Intake", "Growth Issues", "Others"]),
-        'problem_data_json': json.dumps([35, 30, 20, 15]),
+        'prod_labels_json': json.dumps([]),
+        'prod_data_json': json.dumps([]),
+        'state_labels_json': json.dumps([]),
+        'state_data_json': json.dumps([]),
+        'problem_labels_json': json.dumps([]),
+        'problem_data_json': json.dumps([]),
 
-        # Data Tables
+        # Empty Tables
         'top_farms': top_farms,
         'recent_visits': recent_visits,
     }
@@ -153,11 +152,11 @@ def analytics_dashboard(request):
 
 def get_dependent_filters(request):
     """
-    API View to handle dynamic AJAX requests for dependent dropdowns
+    API endpoint for dynamic AJAX dropdown filters
     """
     executive_id = request.GET.get('executive_id')
     sector = request.GET.get('sector')
-
+    
     farms_qs = Farm.objects.all()
 
     if executive_id and executive_id != 'ALL':
@@ -167,15 +166,14 @@ def get_dependent_filters(request):
         farms_qs = farms_qs.filter(sector=sector)
 
     farms_data = list(farms_qs.values('id', 'name'))
-
     return JsonResponse({'status': 'success', 'farms': farms_data}, safe=False)
 
 
-def export_excel(request):
+def export_visits_to_excel(request):
     """
-    Placeholder for Excel Export functionality
+    Export Engine
     """
-    response = HttpResponse(content_type='application/ms-excel')
+    response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="analytics_matrix.csv"'
     response.write("Date,Executive,Farm,Sector,Order Value\n")
     return response
