@@ -271,7 +271,6 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
-    # Optimized DB Query using prefetch_related
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
     ).prefetch_related('visitedproductdetail_set').order_by('-visit_date')
@@ -648,6 +647,20 @@ def executive_analytics_view(request):
         )
 
 
+@login_required(login_url='/crm/login/')
+def clear_dashboard_data(request):
+    if not request.user.is_superuser:
+        messages.error(request, "Permission denied.")
+        return redirect('dashboard_home')
+
+    # Delete related logs
+    VisitedProductDetail.objects.all().delete()
+    FarmVisitReport.objects.all().delete()
+
+    messages.success(request, "All dashboard metrics and visit logs have been reset.")
+    return redirect('dashboard_home')
+
+
 # ==========================================
 # 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES
 # ==========================================
@@ -719,44 +732,43 @@ def get_location_details(request):
 
 def get_dependent_filters(request):
     """
-    Utility endpoint to return dependent filters (districts, executives, sub-segments)
-    filtered by state or primary business type for AJAX dropdowns.
+    Returns dependent dropdown filter values (districts, executives) based on state,
+    country, or sector selections made in the analytics dashboard.
     """
-    state = request.GET.get('state', '').strip()
-    business_type = request.GET.get('business_type', '').strip()
+    sel_state = request.GET.get('state', '').strip()
+    sel_country = request.GET.get('country', '').strip()
+    sel_business_type = request.GET.get('business_type', '').strip()
 
-    farms = Farm.objects.all()
+    farm_qs = Farm.objects.all()
 
-    if state and state not in ['All', 'All States']:
-        farms = farms.filter(state__iexact=state)
+    if sel_state and sel_state not in ['All', 'All States']:
+        farm_qs = farm_qs.filter(state__iexact=sel_state)
 
-    if business_type and business_type not in ['All', 'All Sectors']:
-        farms = farms.filter(business_type__iexact=business_type)
+    if sel_business_type and sel_business_type not in ['All', 'All Sectors']:
+        farm_qs = farm_qs.filter(business_type__iexact=sel_business_type)
 
     districts = list(
-        farms.values_list('district', flat=True)
+        farm_qs.values_list('district', flat=True)
         .distinct()
         .exclude(district__isnull=True)
-        .exclude(district='')
+        .exclude(district__exact='')
+        .order_by('district')
     )
 
     executives = list(
-        farms.values_list('executive__username', flat=True)
+        User.objects.filter(
+            is_active=True,
+            is_staff=False,
+            is_superuser=False,
+            farm__in=farm_qs
+        )
+        .values_list('username', flat=True)
         .distinct()
-        .exclude(executive__username__isnull=True)
-        .exclude(executive__username='')
-    )
-
-    sub_segments = list(
-        farms.values_list('sub_segment', flat=True)
-        .distinct()
-        .exclude(sub_segment__isnull=True)
-        .exclude(sub_segment='')
+        .order_by('username')
     )
 
     return JsonResponse({
         'status': 'success',
-        'districts': sorted(districts),
-        'executives': sorted(executives),
-        'sub_segments': sorted(sub_segments)
+        'districts': districts,
+        'executives': executives,
     })
