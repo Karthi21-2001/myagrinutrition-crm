@@ -369,9 +369,9 @@ def get_dashboard_context(request):
     segment_breakdown = []
     visit_frequency_exec = []
     
-    month_wise_qs = VisitedProductDetail.objects.none()
+    month_wise_qs = []
     month_wise_labels, month_wise_data = [], []
-    year_wise_qs = VisitedProductDetail.objects.none()
+    year_wise_qs = []
     year_wise_labels, year_wise_data = [], []
     recent_visits_queryset = FarmVisitReport.objects.none()
 
@@ -405,11 +405,20 @@ def get_dashboard_context(request):
             product_filters &= Q(visit__executive__username=sel_executive)
 
         if sel_month and sel_month not in ['All', 'All Months']:
-            visit_filters &= Q(visit_date__month=sel_month)
-            product_filters &= Q(visit__visit_date__month=sel_month)
+            try:
+                m_val = int(sel_month)
+                visit_filters &= Q(visit_date__month=m_val)
+                product_filters &= Q(visit__visit_date__month=m_val)
+            except ValueError:
+                pass
+
         if sel_year and sel_year != 'All':
-            visit_filters &= Q(visit_date__year=sel_year)
-            product_filters &= Q(visit__visit_date__year=sel_year)
+            try:
+                y_val = int(sel_year)
+                visit_filters &= Q(visit_date__year=y_val)
+                product_filters &= Q(visit__visit_date__year=y_val)
+            except ValueError:
+                pass
 
         # 1. KPI Aggregations
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
@@ -560,7 +569,7 @@ def get_dashboard_context(request):
         )
 
         # 7. Month-Wise & Year-Wise Financial Trends
-        month_wise_qs = (
+        month_wise_qs = list(
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
@@ -571,7 +580,7 @@ def get_dashboard_context(request):
         month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
         month_wise_data = [float(m['revenue'] or 0) for m in month_wise_qs]
 
-        year_wise_qs = (
+        year_wise_qs = list(
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(year=TruncYear('visit__visit_date'))
             .values('year')
@@ -661,15 +670,21 @@ def dashboard_home(request):
         return render(request, 'crm_core/dashboard.html', context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
+        return render(request, 'crm_core/analytics_report.html', {})
+
+
+@login_required(login_url='/crm/login/')
+def executive_analytics_view(request):
+    context = get_dashboard_context(request)
+    # Renders analytics_report.html with robust error fallbacks
+    try:
+        return render(request, 'crm_core/analytics_report.html', context)
+    except Exception:
         try:
-            return render(request, 'dashboard.html', {})
-        except Exception:
-            return HttpResponse(
-                f"<div style='font-family:sans-serif; padding:40px; text-align:center;'>"
-                f"<h2>Dashboard Rendering Error</h2><p>{str(e)}</p>"
-                f"<p><a href='/crm/visit-form/'>Go to Visit Form</a></p></div>",
-                status=500
-            )
+            return render(request, 'analytics_report.html', context)
+        except Exception as e:
+            logger.error(f"Failed to find analytics template: {str(e)}")
+            return render(request, 'crm_core/dashboard.html', context)
 
 
 @login_required(login_url='/crm/login/')
@@ -680,12 +695,6 @@ def dashboard_analytics(request):
     except Exception as e:
         logger.error(f"Error in dashboard_analytics: {str(e)}", exc_info=True)
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-@login_required(login_url='/crm/login/')
-def executive_analytics_view(request):
-    context = get_dashboard_context(request)
-    return render(request, 'crm_core/executive_analytics.html', context)
 
 
 @login_required(login_url='/crm/login/')
