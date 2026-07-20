@@ -344,10 +344,12 @@ def export_visits_to_excel(request):
 # ==========================================
 
 def get_dashboard_context(request):
-    total_rev = 0
+    total_rev = 0.0
     vol_sold = 0
     v_count = 0
     total_farms_count = 0
+    paid_orders_count = 0
+    avg_order_value = 0.0
     conversion_rate = 0.0
 
     combo_labels, combo_revenue, combo_volume = [], [], []
@@ -366,8 +368,8 @@ def get_dashboard_context(request):
     problems_list = []
     segment_breakdown = []
     visit_frequency_exec = []
-    year_wise_trends = []
-    month_wise_cycle = []
+    month_wise_labels, month_wise_data = [], []
+    year_wise_labels, year_wise_data = [], []
     recent_visits_queryset = FarmVisitReport.objects.none()
 
     state_list = []
@@ -406,27 +408,52 @@ def get_dashboard_context(request):
             visit_filters &= Q(visit_date__year=sel_year)
             product_filters &= Q(visit__visit_date__year=sel_year)
 
-        total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(total=Sum('revenue_generated'))['total'] or 0
-        vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
+        # -------------------------------------------------------------
+        # 1. KPI Aggregations (Revenue, Quantities & Avg Order Value)
+        # -------------------------------------------------------------
+        total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
+            total=Sum('revenue_generated')
+        )['total'] or 0.0
+
+        vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(
+            total_qty=Sum('sale_quantity')
+        )['total_qty'] or 0
+
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
+
+        # Count distinct orders/line items that resulted in actual sales
+        paid_orders_count = VisitedProductDetail.objects.filter(
+            product_filters, 
+            sale_quantity__gt=0
+        ).count()
+
+        # Calculate Average Order Value
+        avg_order_value = (total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
 
         closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
         total_leads = VisitedProductDetail.objects.filter(product_filters).count()
         conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
 
+        # -------------------------------------------------------------
+        # 2. Combined Time Series Analytics
+        # -------------------------------------------------------------
         time_series_data = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
             .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
+            .filter(month__isnull=False)
             .order_by('month')
         )
 
-        combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
+        combo_labels = [t['month'].strftime("%b %Y") for t in time_series_data]
         combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
+        # -------------------------------------------------------------
+        # 3. Product Performance & Pricing
+        # -------------------------------------------------------------
         product_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
@@ -451,6 +478,9 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
+        # -------------------------------------------------------------
+        # 4. Executive & Funnel Performance
+        # -------------------------------------------------------------
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
@@ -473,6 +503,9 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
+        # -------------------------------------------------------------
+        # 5. Geographic & Telemetry Audits
+        # -------------------------------------------------------------
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
@@ -494,6 +527,9 @@ def get_dashboard_context(request):
             .order_by('-visit_date')[:15]
         )
 
+        # -------------------------------------------------------------
+        # 6. Demographics, Issues & Visit Trends
+        # -------------------------------------------------------------
         bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
             chicks=Sum('chicks_count'),
             growers=Sum('grower_count'),
@@ -531,21 +567,30 @@ def get_dashboard_context(request):
             .order_by('-visit_count')
         )
 
-        year_wise_trends = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .annotate(year=TruncYear('visit__visit_date'))
-            .values('year')
-            .annotate(revenue=Sum('revenue_generated'))
-            .order_by('year')
-        )
-
-        month_wise_cycle = (
+        # -------------------------------------------------------------
+        # 7. Month-Wise & Year-Wise Financial Trends (Chart Axes Fix)
+        # -------------------------------------------------------------
+        month_wise_qs = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
             .annotate(revenue=Sum('revenue_generated'))
+            .filter(month__isnull=False)
             .order_by('month')
         )
+        month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs]
+        month_wise_data = [float(m['revenue'] or 0) for m in month_wise_qs]
+
+        year_wise_qs = (
+            VisitedProductDetail.objects.filter(product_filters)
+            .annotate(year=TruncYear('visit__visit_date'))
+            .values('year')
+            .annotate(revenue=Sum('revenue_generated'))
+            .filter(year__isnull=False)
+            .order_by('year')
+        )
+        year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs]
+        year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
         recent_visits_queryset = FarmVisitReport.objects.filter(visit_filters).select_related('farm').prefetch_related('visitedproductdetail_set').order_by('-visit_date')[:10]
 
@@ -561,6 +606,8 @@ def get_dashboard_context(request):
         'total_visits': v_count,
         'total_farms': total_farms_count,
         'total_sales_volume': vol_sold,
+        'paid_orders_count': paid_orders_count,
+        'avg_order_value': avg_order_value,
         'conversion_rate': conversion_rate,
 
         'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
@@ -589,8 +636,15 @@ def get_dashboard_context(request):
         'segment_breakdown': segment_breakdown,
 
         'visit_frequency_exec': visit_frequency_exec,
-        'year_wise_trends': year_wise_trends,
-        'month_wise_cycle': month_wise_cycle,
+        
+        # Financial Ledgers & Chart Series JSON
+        'month_wise_cycle': month_wise_qs,
+        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
+        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
+        
+        'year_wise_trends': year_wise_qs,
+        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
+        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
 
         'recent_visits': recent_visits_queryset,
 
@@ -698,77 +752,19 @@ def get_location_details(request):
 
     try:
         backup_url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
-        backup_response = requests.get(backup_url, timeout=4)
-
-        if backup_response.status_code == 200:
-            b_data = backup_response.json()
-
-            state = b_data.get('principalSubdivision', 'Unknown State')
-            area = b_data.get('locality', '').strip()
-
-            district = 'Unknown District'
-            for admin_layer in b_data.get('informative', []):
-                if admin_layer.get('order') == 4 or 'district' in admin_layer.get('description', '').lower():
-                    district = admin_layer.get('name', district)
-                    break
-
-            if not area and b_data.get('lookupSource'):
-                area = b_data.get('lookupSource')
+        response = requests.get(backup_url, timeout=4)
+        if response.status_code == 200:
+            data = response.json()
+            state = data.get('principalSubdivision', 'Tamil Nadu')
+            district = data.get('locality', '').replace('District', '').strip()
+            area = data.get('city') or data.get('locality') or ''
 
             return JsonResponse({
                 'state': state,
-                'district': district.replace('District', '').strip(),
-                'area': area if area else f"Zone ({lat[:7]}, {lon[:7]})"
+                'district': district,
+                'area': area
             })
     except Exception as e:
-        logger.warning(f"BigDataCloud reverse-geocode failed: {e}")
+        logger.error(f"Backup Geocode lookup failed: {e}")
 
-    return JsonResponse({
-        'state': 'Live GPS Active',
-        'district': f"Dist: {lat[:7]}N",
-        'area': f"Loc: {lon[:7]}E"
-    })
-
-
-def get_dependent_filters(request):
-    """
-    Returns dependent dropdown filter values (districts, executives) based on state,
-    country, or sector selections made in the analytics dashboard.
-    """
-    sel_state = request.GET.get('state', '').strip()
-    sel_country = request.GET.get('country', '').strip()
-    sel_business_type = request.GET.get('business_type', '').strip()
-
-    farm_qs = Farm.objects.all()
-
-    if sel_state and sel_state not in ['All', 'All States']:
-        farm_qs = farm_qs.filter(state__iexact=sel_state)
-
-    if sel_business_type and sel_business_type not in ['All', 'All Sectors']:
-        farm_qs = farm_qs.filter(business_type__iexact=sel_business_type)
-
-    districts = list(
-        farm_qs.values_list('district', flat=True)
-        .distinct()
-        .exclude(district__isnull=True)
-        .exclude(district__exact='')
-        .order_by('district')
-    )
-
-    executives = list(
-        User.objects.filter(
-            is_active=True,
-            is_staff=False,
-            is_superuser=False,
-            farm__in=farm_qs
-        )
-        .values_list('username', flat=True)
-        .distinct()
-        .order_by('username')
-    )
-
-    return JsonResponse({
-        'status': 'success',
-        'districts': districts,
-        'executives': executives,
-    })
+    return JsonResponse({'status': 'error', 'message': 'Reverse geocoding unresolvable'}, status=500)
