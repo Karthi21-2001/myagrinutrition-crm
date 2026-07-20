@@ -1,8 +1,10 @@
 import csv
 import json
-import requests
-import openpyxl
+import logging
 import traceback
+import openpyxl
+import requests
+
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -19,8 +21,9 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import Farm, FarmVisitReport, VisitedProductDetail
-from .forms import ExecutiveSignUpForm 
+from .forms import ExecutiveSignUpForm
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 # ==========================================
@@ -79,7 +82,7 @@ def save_farm_visit(request):
         owner_name = request.POST.get('owner_name')
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
-        sub_segment = request.POST.get('sub_business_type_select', '').strip() 
+        sub_segment = request.POST.get('sub_business_type_select', '').strip()
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
@@ -87,7 +90,7 @@ def save_farm_visit(request):
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
-        
+
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
         latitude = float(lat) if lat else None
@@ -100,9 +103,9 @@ def save_farm_visit(request):
                 farm_instance, created = Farm.objects.get_or_create(
                     farm_name=farm_name,
                     owner_name=owner_name,
+                    contact_number=contact_number,
                     defaults={
                         'executive': current_user,
-                        'contact_number': contact_number,
                         'business_type': business_type,
                         'sub_segment': sub_segment,
                         'state': state,
@@ -112,12 +115,12 @@ def save_farm_visit(request):
                         'longitude': longitude,
                     }
                 )
-                
+
                 if not created:
                     if business_type:
                         farm_instance.business_type = business_type
                     if sub_segment:
-                        farm_instance.sub_segment = sub_segment 
+                        farm_instance.sub_segment = sub_segment
                     farm_instance.state = state
                     farm_instance.district = district
                     farm_instance.area = area
@@ -129,6 +132,7 @@ def save_farm_visit(request):
                     farm_problem=farm_problem
                 )
 
+                # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
@@ -138,7 +142,7 @@ def save_farm_visit(request):
                     prod_name = order_products[i].strip()
                     if not prod_name:
                         continue
-                        
+
                     s_qty = int(sale_quantities[i]) if (i < len(sale_quantities) and sale_quantities[i]) else 0
                     unit = unit_types[i] if i < len(unit_types) else 'KG'
                     price = float(primary_prices[i]) if (i < len(primary_prices) and primary_prices[i]) else 0.00
@@ -156,6 +160,7 @@ def save_farm_visit(request):
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
 
+                # Process Pipeline Products
                 pipeline_products = request.POST.getlist('pipeline_discussed_product[]')
                 p_quantities = request.POST.getlist('pipeline_potential_quantity[]')
                 t_quantities = request.POST.getlist('pipeline_target_quantity[]')
@@ -165,7 +170,7 @@ def save_farm_visit(request):
 
                 for i in range(len(pipeline_products)):
                     pipe_prod_name = pipeline_products[i].strip()
-                    if not pipe_prod_name:  
+                    if not pipe_prod_name:
                         continue
 
                     p_qty = int(p_quantities[i]) if (i < len(p_quantities) and p_quantities[i]) else 0
@@ -190,10 +195,11 @@ def save_farm_visit(request):
             messages.success(request, "Agri-Field visit logging record processed successfully!")
             if request.user.is_staff or request.user.is_superuser:
                 return redirect('dashboard_home')
-            
+
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
         except Exception as e:
+            logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
             messages.error(request, f"Database transaction block failed: {str(e)}")
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
@@ -264,45 +270,46 @@ def export_visits_to_excel(request):
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws_data.row_dimensions[1].height = 28
 
+    # Optimized DB Query using prefetch_related
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
-    ).order_by('-visit_date')
-    
+    ).prefetch_related('visitedproductdetail_set').order_by('-visit_date')
+
     current_row = 2
     for v in all_visits:
-        f = v.farm if v else None
-        products = VisitedProductDetail.objects.filter(visit=v)
-        product_loop_list = products if products.exists() else [None]
-        
+        f = v.farm
+        products = list(v.visitedproductdetail_set.all())
+        product_loop_list = products if products else [None]
+
         for p in product_loop_list:
-            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
-            ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
+            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v.visit_date else "")
+            ws_data.cell(row=current_row, column=2, value=v.executive.username if v.executive else "")
             ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
             ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
             ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
             ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-            ws_data.cell(row=current_row, column=7, value=f.sub_segment if f and f.sub_segment else "") 
+            ws_data.cell(row=current_row, column=7, value=f.sub_segment if (f and f.sub_segment) else "") 
             ws_data.cell(row=current_row, column=8, value=f.state if f else "")
             ws_data.cell(row=current_row, column=9, value=f.district if f else "")
             ws_data.cell(row=current_row, column=10, value=f.area if f else "")
-            
-            ws_data.cell(row=current_row, column=11, value=v.farm_problem if v and v.farm_problem else "None reported")
+
+            ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
             ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
             ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
             ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
             ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
-            
+
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
             ws_data.cell(row=current_row, column=18, value=float(p.primary_price) if p else 0.0)
             ws_data.cell(row=current_row, column=19, value=float(p.revenue_generated) if p else 0.0)
-            
+
             ws_data.cell(row=current_row, column=20, value=p.potential_quantity if p else 0)
             ws_data.cell(row=current_row, column=21, value=p.target_quantity if p else 0)
             ws_data.cell(row=current_row, column=22, value=p.unit_type if p else "N/A")
             ws_data.cell(row=current_row, column=23, value=p.process_status if p else "N/A")
             ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%" if p else "0%")
-            
+
             gps_cell = ws_data.cell(row=current_row, column=25)
             if f and f.latitude and f.longitude:
                 gps_cell.value = "View on Map"
@@ -315,9 +322,9 @@ def export_visits_to_excel(request):
             for c_idx in range(1, 26):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
-                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]:  
+                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]: 
                     cell_item.alignment = Alignment(horizontal="center")
-                    
+
             current_row += 1
 
     if ws_data.max_row > 1:
@@ -342,7 +349,7 @@ def get_dashboard_context(request):
     v_count = 0
     total_farms_count = 0
     conversion_rate = 0.0
-    
+
     combo_labels, combo_revenue, combo_volume = [], [], []
     top_prod_labels, top_prod_revenue = [], []
     pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
@@ -362,7 +369,7 @@ def get_dashboard_context(request):
     year_wise_trends = []
     month_wise_cycle = []
     recent_visits_queryset = FarmVisitReport.objects.none()
-    
+
     state_list = []
     district_list = []
     executive_list = []
@@ -391,7 +398,7 @@ def get_dashboard_context(request):
             farm_filters &= Q(executive__username=sel_executive)
             visit_filters &= Q(executive__username=sel_executive)
             product_filters &= Q(visit__executive__username=sel_executive)
-            
+
         if sel_month and sel_month not in ['All', 'All Months']:
             visit_filters &= Q(visit_date__month=sel_month)
             product_filters &= Q(visit__visit_date__month=sel_month)
@@ -403,7 +410,7 @@ def get_dashboard_context(request):
         vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(total_qty=Sum('sale_quantity'))['total_qty'] or 0
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
-        
+
         closed_deals = VisitedProductDetail.objects.filter(product_filters, process_status='Hot').count()
         total_leads = VisitedProductDetail.objects.filter(product_filters).count()
         conversion_rate = round((closed_deals / total_leads * 100), 1) if total_leads else 0.0
@@ -415,7 +422,7 @@ def get_dashboard_context(request):
             .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
             .order_by('month')
         )
-        
+
         combo_labels = [t['month'].strftime("%b %Y") if (t.get('month') and hasattr(t['month'], 'strftime')) else 'Unknown' for t in time_series_data]
         combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
@@ -436,7 +443,7 @@ def get_dashboard_context(request):
         )
         if pipeline_spread_agg and pipeline_spread_agg.get('actual') is not None:
             pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
-            
+
         product_pricing_table = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
@@ -500,7 +507,7 @@ def get_dashboard_context(request):
                 (bird_population.get('layers') or 0),
                 (bird_population.get('culling') or 0)
             ]
-            
+
         reported_problems = (
             FarmVisitReport.objects.filter(visit_filters)
             .values('farm_problem')
@@ -523,7 +530,7 @@ def get_dashboard_context(request):
             .annotate(visit_count=Count('id'))
             .order_by('-visit_count')
         )
-        
+
         year_wise_trends = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(year=TruncYear('visit__visit_date'))
@@ -531,7 +538,7 @@ def get_dashboard_context(request):
             .annotate(revenue=Sum('revenue_generated'))
             .order_by('year')
         )
-        
+
         month_wise_cycle = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -546,8 +553,8 @@ def get_dashboard_context(request):
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
         executive_list = User.objects.filter(is_active=True, is_staff=False, is_superuser=False).values_list('username', flat=True).distinct()
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Error computing get_dashboard_context: {str(e)}", exc_info=True)
 
     return {
         'total_revenue': total_rev,
@@ -555,7 +562,7 @@ def get_dashboard_context(request):
         'total_farms': total_farms_count,
         'total_sales_volume': vol_sold,
         'conversion_rate': conversion_rate,
-        
+
         'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
         'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
         'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
@@ -563,35 +570,35 @@ def get_dashboard_context(request):
         'top_prod_revenue_js': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
-        
+
         'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
         'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
         'funnel_stages': funnel_stages,
         'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
-        
+
         'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
         'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
         'geo_district_performance': geo_district_performance,
-        
+
         'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
         'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
         'reported_problems': reported_problems,
         'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
         'segment_breakdown': segment_breakdown,
-        
+
         'visit_frequency_exec': visit_frequency_exec,
         'year_wise_trends': year_wise_trends,
         'month_wise_cycle': month_wise_cycle,
 
         'recent_visits': recent_visits_queryset,
-        
+
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
         'country_list': ['India'],
-        
+
         'selected_state': sel_state,
         'selected_country': sel_country,
         'selected_district': sel_district,
@@ -647,50 +654,50 @@ def executive_analytics_view(request):
 def get_location_details(request):
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
-    
+
     if not lat or not lon:
         return JsonResponse({'status': 'error', 'message': 'Missing coordinates'}, status=400)
-        
+
     try:
         headers = {
             'User-Agent': 'AgriNutritionCRM_Production_Engine/2.0 (operations@myagrinutrition.com)'
         }
         api_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}&zoom=18&addressdetails=1"
-        
+
         response = requests.get(api_url, headers=headers, timeout=4)
         if response.status_code == 200:
             data = response.json()
             address = data.get('address', {})
-            
+
             district = address.get('district') or address.get('county') or address.get('subdistrict') or address.get('city_district') or address.get('state_district')
             area = address.get('suburb') or address.get('village') or address.get('town') or address.get('neighbourhood') or address.get('city') or address.get('road')
             state = address.get('state')
-            
+
             if district and area and state:
                 return JsonResponse({
                     'state': state.strip(),
                     'district': district.replace('District', '').strip(),
                     'area': area.strip()
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Nominatim lookup failed: {e}")
 
     try:
         backup_url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
         backup_response = requests.get(backup_url, timeout=4)
-        
+
         if backup_response.status_code == 200:
             b_data = backup_response.json()
-            
+
             state = b_data.get('principalSubdivision', 'Unknown State')
             area = b_data.get('locality', '').strip()
-            
+
             district = 'Unknown District'
             for admin_layer in b_data.get('informative', []):
                 if admin_layer.get('order') == 4 or 'district' in admin_layer.get('description', '').lower():
                     district = admin_layer.get('name', district)
                     break
-            
+
             if not area and b_data.get('lookupSource'):
                 area = b_data.get('lookupSource')
 
@@ -699,8 +706,8 @@ def get_location_details(request):
                 'district': district.replace('District', '').strip(),
                 'area': area if area else f"Zone ({lat[:7]}, {lon[:7]})"
             })
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"BigDataCloud reverse-geocode failed: {e}")
 
     return JsonResponse({
         'state': 'Live GPS Active',
@@ -710,8 +717,22 @@ def get_location_details(request):
 
 
 def get_dependent_filters(request):
-    state_query = request.GET.get('state', '')
-    if state_query:
-        districts = list(Farm.objects.filter(state=state_query).values_list('district', flat=True).distinct().exclude(district=''))
-        return JsonResponse({'districts': districts})
-    return JsonResponse({'sub_segments': ['Layer', 'Broiler', 'Shrimp', 'Fish']})
+    """
+    Utility endpoint for dynamic drop-down filter dependencies (AJAX).
+    Returns relevant districts filtered by selected state.
+    """
+    state_query = request.GET.get('state', '').strip()
+    if state_query and state_query not in ['All', 'All States']:
+        districts = list(
+            Farm.objects.filter(state__iexact=state_query)
+            .values_list('district', flat=True)
+            .distinct()
+            .exclude(district='')
+        )
+    else:
+        districts = list(
+            Farm.objects.values_list('district', flat=True)
+            .distinct()
+            .exclude(district='')
+        )
+    return JsonResponse({'districts': sorted(districts)})
