@@ -1,4 +1,3 @@
-# crm_core/urls.py
 from django.urls import path
 from django.views.generic import TemplateView
 from . import views
@@ -13,10 +12,11 @@ urlpatterns = [
     path('logout/', views.logout_user, name='logout_user'),
     
     # --- Permanent Password Recovery Admin Router ---
-    # Intercepts the workflow to render a static admin notice screen instead of executing a mail-out reset loop
-    path('password-reset/', 
-         TemplateView.as_view(template_name='crm_core/password_reset.html'), 
-         name='password_reset'),
+    path(
+        'password-reset/', 
+        TemplateView.as_view(template_name='crm_core/password_reset.html'), 
+        name='password_reset'
+    ),
          
     # ==========================================
     # 🌱 CORE AGRI-FORM LAYOUT INTERFACES
@@ -29,8 +29,7 @@ urlpatterns = [
     # ==========================================
     # 📥 EXCEL EXPORT ENGINE ROUTES
     # ==========================================
-    # Securely bound to views.export_visits_to_excel
-    path('export-excel/', views.export_visits_to_excel, name='export_visits_to_excel'),
+    path('export-excel/', views.export_visits_to_excel, name='export_excel'),
     path('export-visits/', views.export_visits_to_excel, name='export_visits_alt'),
     
     # ==========================================
@@ -38,13 +37,14 @@ urlpatterns = [
     # ==========================================
     path('dashboard/', views.dashboard_home, name='dashboard_home'), 
     path('dashboard/analytics/', views.dashboard_analytics, name='dashboard_analytics'),
+    path('dashboard/clear/', views.clear_dashboard_data, name='clear_dashboard_data'),
     path('analytics/performance/', views.executive_analytics_view, name='executive_analytics_view'),
+    
+    # --- Analytics Report Routing ---
     path('analytics-report/', views.executive_analytics_view, name='analytics_report'), 
 
     # ==========================================
     # 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES
     # ==========================================
     path('api/get-location-details/', views.get_location_details, name='reverse_geocode'),
-    path('api/get-dependent-filters/', views.get_dependent_filters, name='get_dependent_filters'),
-    path('crm/get-dependent-filters/', views.get_dependent_filters, name='get_dependent_filters_legacy'),
 ]

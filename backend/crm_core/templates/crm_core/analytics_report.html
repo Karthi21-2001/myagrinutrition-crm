@@ -1,515 +1,515 @@
-{% extends 'crm_core/base.html' %}
 {% load static %}
-
-{% block content %}
-<!-- Custom Dashboard Styling Overrides safely contained within the block -->
-<style>
-    .dashboard-body { background-color: #0f172a; color: #cbd5e1; font-family: 'Segoe UI', system-ui, sans-serif; }
-    .dashboard-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
-    .filter-select { background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 10px 14px; border-radius: 8px; width: 100%; cursor: pointer; font-size: 0.875rem; transition: border-color 0.15s ease; }
-    .filter-select:focus { border-color: #38bdf8; outline: none; }
-    .filter-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.75px; text-transform: uppercase; margin-bottom: 6px; display: block; }
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My AgriNutrition - Analytics & Visit Report</title>
     
-    /* High-Density Performance Cards */
-    .kpi-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; transition: transform 0.2s ease, border-color 0.2s ease; }
-    .kpi-card:hover { transform: translateY(-2px); border-color: #475569; }
-    
-    /* Custom scrollbar configurations for dashboard matrices */
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
-</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- Tailwinds CSS v4 Engine CDN dependency inject for custom container -->
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
-<div class="dashboard-body p-4 md:p-8 rounded-xl">
-
-    <!-- TOP NAVIGATION & MANAGEMENT ACTION PANEL HEADER -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-white tracking-wide uppercase">🌱 Advanced Analyst Center</h1>
-            <p class="text-xs text-slate-400">My AgriNutrition Comprehensive Performance & Field Telemetry Intelligence Suite</p>
-        </div>
-        <div class="flex items-center gap-3 w-full md:w-auto">
-            <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg border border-slate-600 transition duration-150 flex items-center gap-2">
-                🖨️ Print Report
-            </button>
-            
-            <a href="?export=excel" id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-emerald-500 transition duration-150 flex items-center gap-2 shadow-sm">
-                📥 Export Integrated Logs
-            </a>
-            <a href="../" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold px-5 py-2.5 rounded-lg border border-slate-600 transition duration-150">
-                ⬅ Back to Summary
-            </a>
-        </div>
-    </div>
-
-    <!-- CORE HIGH-LEVEL DYNAMIC KPI STRIP -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div class="kpi-card border-l-4 border-l-sky-500">
-            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Total visits (KPI Count)</span>
-            <h3 class="text-2xl font-bold text-white tracking-tight">{{ total_visits|default:"0" }}</h3>
-        </div>
-        <div class="kpi-card border-l-4 border-l-emerald-500">
-            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Aggregated Revenue (INR)</span>
-            <h3 class="text-2xl font-bold text-emerald-400 tracking-tight">₹{{ total_revenue|default:"0.00"|floatformat:2 }}</h3>
-        </div>
-        <div class="kpi-card border-l-4 border-l-amber-500">
-            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Total Sales Volume</span>
-            <h3 class="text-2xl font-bold text-amber-400 tracking-tight">{{ total_sales_volume|default:"0" }} Units</h3>
-        </div>
-        <div class="kpi-card border-l-4 border-l-rose-500">
-            <span class="text-xs font-bold text-slate-400 tracking-wider uppercase block mb-1">Conversion Success Rate</span>
-            <h3 class="text-2xl font-bold text-rose-400 tracking-tight">{{ conversion_rate|default:"0" }}%</h3>
-        </div>
-    </div>
-
-    <!-- 🎛️ DYNAMIC FILTER ENGINE AND TIMELINE GRID PANEL -->
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8 bg-[#1e293b] p-5 rounded-xl border border-[#334155]">
-        <div>
-            <label class="filter-label">🗺 State</label>
-            <select id="stateSelect" class="filter-select">
-                <option value="All">All States</option>
-                {% for s in states %}
-                    <option value="{{ s }}" {% if selected_state == s %}selected{% endif %}>{{ s }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="filter-label">🌏 Country</label>
-            <select id="countrySelect" class="filter-select">
-                <option value="All">All Countries</option>
-                {% for c in countries %}
-                    <option value="{{ c }}" {% if selected_country == c %}selected{% endif %}>{{ c }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="filter-label">📍 District</label>
-            <select id="districtSelect" class="filter-select">
-                <option value="All">All Districts</option>
-                {% for d in districts %}
-                    <option value="{{ d }}" {% if selected_district == d %}selected{% endif %}>{{ d }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="filter-label">👤 Executive</label>
-            <select id="executiveSelect" class="filter-select">
-                <option value="All">All Executives</option>
-                {% for e in executives %}
-                    <option value="{{ e }}" {% if selected_executive == e %}selected{% endif %}>{{ e }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label class="filter-label">⚓ Sector Segment</label>
-            <select id="businessTypeSelect" class="filter-select border-emerald-700/60 font-semibold text-emerald-400 focus:border-emerald-500">
-                <option value="All" {% if selected_business_type == 'All' or not selected_business_type %}selected{% endif %}>All Sectors</option>
-                <option value="Poultry">🐓 Poultry</option>
-                <option value="Aqua">🐟 Aqua</option>
-            </select>
-        </div>
-        <div>
-            <label class="filter-label">📅 Start Date</label>
-            <input type="date" id="startDateInput" class="filter-select text-slate-400 focus:text-white" />
-        </div>
-        <div>
-            <label class="filter-label">📅 End Date</label>
-            <input type="date" id="endDateInput" class="filter-select text-slate-400 focus:text-white" />
-        </div>
-        <div>
-            <label class="filter-label">📅 Quick Month</label>
-            <select id="monthSelect" class="filter-select">
-                <option value="All">All Months</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-            </select>
-        </div>
-    </div>
-
-    <!-- SECTION 1: SALES & REVENUE INSIGHTS -->
-    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">1. Sales & Revenue Analysis</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-        <div class="dashboard-card lg:col-span-7">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">📈 Revenue Trends & Quantities Sold Over Time</h3>
-            <div class="relative w-full h-[320px]">
-                <canvas id="comboChart"></canvas>
-            </div>
-        </div>
-        <div class="dashboard-card lg:col-span-5">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🎯 Top-Selling & Highest-Revenue Products</h3>
-            <div class="relative w-full h-[320px] flex items-center justify-center">
-                <canvas id="productDonutChart"></canvas>
-            </div>
-        </div>
-        <div class="dashboard-card lg:col-span-6">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">📊 Actual Sales vs Targets vs Total Market Potential</h3>
-            <div class="relative w-full h-[280px]">
-                <canvas id="clusteredBarChart"></canvas>
-            </div>
-        </div>
-        <div class="dashboard-card lg:col-span-6">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🏷️ Average Unit Prices Catalog Table</h3>
-            <div class="w-full max-h-[280px] overflow-y-auto custom-scrollbar border border-slate-700 rounded-lg">
-                <table class="w-full text-left text-sm text-slate-300">
-                    <thead class="bg-slate-800 text-xs text-slate-400 uppercase sticky top-0 border-b border-slate-700">
-                        <tr>
-                            <th class="p-3">Product Name</th>
-                            <th class="p-3 text-right">Average Price (INR)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-700">
-                        {% for row in product_pricing_table|default:'' %}
-                        <tr class="hover:bg-slate-800/40">
-                            <td class="p-3 font-semibold text-slate-200">{{ row.product_name }}</td>
-                            <td class="p-3 text-right text-emerald-400 font-bold">₹{{ row.avg_unit_price|default:"0"|floatformat:2 }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="2" class="p-4 text-center text-slate-500 italic">No pricing data logged.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- SECTION 2: OPERATIONS & PERFORMANCE TRACKING -->
-    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">2. Operations & Performance Tracking</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-        <div class="dashboard-card lg:col-span-7">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🏆 Executive Sales Performance Leaderboard</h3>
-            <div class="relative w-full h-[300px]">
-                <canvas id="leaderboardChart"></canvas>
-            </div>
-        </div>
-        <div class="dashboard-card lg:col-span-5">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">⏳ Sales Pipeline Funnel Conversion Stages</h3>
-            <div class="relative w-full h-[300px]">
-                <canvas id="pipelineFunnelChart"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- SECTION 3: GEOGRAPHICAL PERFORMANCE & AUDITING MATRIX -->
-    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">3. Geographical Distribution & Logs</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-        <div class="dashboard-card lg:col-span-5">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🗺️ Zone-wise Metrics Breakdown (District Map Mock)</h3>
-            <div class="relative w-full h-[300px]">
-                <canvas id="geoDistrictChart"></canvas>
-            </div>
-        </div>
-        <div class="dashboard-card lg:col-span-7">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🛡️ Management Telemetry Live Audit Trail</h3>
-            <div class="w-full max-h-[300px] overflow-y-auto custom-scrollbar border border-slate-700 rounded-lg">
-                <table class="w-full text-left text-sm text-slate-300">
-                    <thead class="bg-slate-800 text-xs text-slate-400 uppercase sticky top-0 border-b border-slate-700">
-                        <tr>
-                            <th class="p-3">Timestamp</th>
-                            <th class="p-3">Executive</th>
-                            <th class="p-3">Farm Name</th>
-                            <th class="p-3">Area / Suburb</th>
-                            <th class="p-3 text-center">Live GPS Navigation</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-700">
-                        {% for audit in telemetry_audit_log|default:'' %}
-                        <tr class="hover:bg-slate-800/40 text-xs">
-                            <td class="p-3 text-slate-400">{{ audit.visit_date|default:"" }}</td>
-                            <td class="p-3 font-bold text-slate-200">
-                                {% if audit.executive__username %}{{ audit.executive__username }}{% else %}{{ audit.executive.username }}{% endif %}
-                            </td>
-                            <td class="p-3">
-                                {% if audit.farm__farm_name %}{{ audit.farm__farm_name }}{% else %}{{ audit.farm.farm_name }}{% endif %}
-                            </td>
-                            <td class="p-3">
-                                <span class="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs">
-                                    {% if audit.farm__area %}{{ audit.farm__area }}{% else %}{{ audit.farm.area }}{% endif %}
-                                </span>
-                            </td>
-                            <td class="p-3 text-center">
-                                <span class="text-slate-500 italic text-xs">Available</span>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="p-4 text-center text-slate-500 italic">No tracking records available.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- SECTION 4: FARM HEALTH & HEALTH DIAGNOSTICS ARCHITECTURE -->
-    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">4. Farm Profile & Health Analytics</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">🐓 Avian Demographics Demarcation</h3>
-            <div class="relative w-full h-[260px] flex items-center justify-center">
-                <canvas id="avianDemographicsChart"></canvas>
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">⚠️ Top Farm Diagnostics / Problems Observed</h3>
-            <div class="max-h-[260px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 border border-slate-700 rounded-lg bg-slate-900/40 p-2">
-                {% for item in reported_problems|default:'' %}
-                <div class="flex justify-between items-center py-2.5 px-2 text-sm">
-                    <span class="text-slate-300 font-medium flex items-center gap-2">❌ {{ item.farm_problem }}</span>
-                    <span class="bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold px-2.5 py-0.5 rounded-full text-xs">{{ item.frequency }} Reported</span>
-                </div>
-                {% empty %}
-                <div class="text-center p-4 text-slate-500 italic text-sm">No diagnostic notes tracked.</div>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-4">⚓ Market Segment & Sub-Segment Tractions</h3>
-            <div class="w-full max-h-[260px] overflow-y-auto custom-scrollbar border border-slate-700 rounded-lg">
-                <table class="w-full text-left text-xs text-slate-300">
-                    <thead class="bg-slate-800 text-slate-400 uppercase sticky top-0 border-b border-slate-700">
-                        <tr>
-                            <th class="p-2.5">Segment</th>
-                            <th class="p-2.5">Sub-Segment</th>
-                            <th class="p-2.5 text-center">Farms</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-700">
-                        {% for segment in segment_breakdown|default:'' %}
-                        <tr class="hover:bg-slate-800/40">
-                            <td class="p-2.5 font-bold text-slate-200">{{ segment.business_type }}</td>
-                            <td class="p-2.5 text-slate-400">{{ segment.sub_segment|default:"General" }}</td>
-                            <td class="p-2.5 text-center font-bold text-sky-400">{{ segment.total_farms }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="p-4 text-center text-slate-500 italic">No segmentation maps recorded.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- SECTION 5: LEGACY / HISTORICAL REVENUE TREND CHANNELS -->
-    <h2 class="text-lg font-bold text-slate-300 mb-4 tracking-wide uppercase border-b border-slate-700 pb-2">5. Legacy Management Overlays</h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-3 border-b border-slate-700 pb-2">📊 Field Visit Frequency per Executive</h3>
-            <div class="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 text-sm">
-                {% for item in visit_frequency_exec|default:'' %}
-                <div class="flex justify-between items-center py-2">
-                    <span class="text-slate-300">👤 {% if item.executive__username %}{{ item.executive__username }}{% else %}{{ item.executive.username }}{% endif %}</span>
-                    <span class="bg-sky-500/20 text-sky-400 border border-sky-500/30 font-semibold px-2 py-0.5 rounded text-xs">{{ item.visit_count }} Visits</span>
-                </div>
-                {% empty %}
-                <div class="text-center p-4 text-slate-500 italic">No structural logs found.</div>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-3 border-b border-slate-700 pb-2">📅 Year-wise Revenue Trends</h3>
-            <div class="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 text-sm">
-                {% for item in year_wise_trends|default:'' %}
-                <div class="flex justify-between items-center py-2">
-                    <span class="text-slate-300">🗓️ {{ item.year }}</span>
-                    <span class="font-bold text-emerald-400">₹{{ item.revenue|default:"0"|floatformat:2 }}</span>
-                </div>
-                {% empty %}
-                <div class="text-center p-4 text-slate-500 italic">No trend profiles found.</div>
-                {% endfor %}
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <h3 class="text-sm font-semibold text-slate-200 mb-3 border-b border-slate-700 pb-2">🌙 Month-wise Revenue Cycle</h3>
-            <div class="max-h-[240px] overflow-y-auto custom-scrollbar divide-y divide-slate-700 text-sm">
-                {% for item in month_wise_cycle|default:'' %}
-                <div class="flex justify-between items-center py-2">
-                    <span class="text-slate-300">📈 {{ item.month }}</span>
-                    <span class="font-bold text-amber-400">₹{{ item.revenue|default:"0"|floatformat:2 }}</span>
-                </div>
-                {% empty %}
-                <div class="text-center p-4 text-slate-500 italic">No seasonal items calculated.</div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-</div>
-
-<!-- ⚡ REAL-TIME INTERACTIVE SCRIPT ENGINE -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    let charts = {};
-
-    document.addEventListener("DOMContentLoaded", function () {
-        const safeParse = (contextKey, defaultVal = []) => {
-            try { 
-                let jsonStr = contextKey.replace(/&quot;/g, '"');
-                return JSON.parse(jsonStr); 
-            } catch(e) { return defaultVal; }
-        };
-
-        const comboLabels = safeParse('{{ combo_labels_js|safe }}');
-        const comboRevenue = safeParse('{{ combo_revenue_js|safe }}');
-        const comboVolume = safeParse('{{ combo_volume_js|safe }}');
-        const topProdLabels = safeParse('{{ top_prod_labels_js|safe }}');
-        const topProdRevenue = safeParse('{{ top_prod_revenue_js|safe }}');
-        const execLabels = safeParse('{{ exec_labels_js|safe }}');
-        const execRevenue = safeParse('{{ exec_revenue_js|safe }}');
-        const funnelStagesRaw = safeParse('{{ funnel_stages_js|safe }}');
-        const mapLabels = safeParse('{{ map_labels_js|safe }}');
-        const mapRevenue = safeParse('{{ map_revenue_js|safe }}');
-        const birdLabels = safeParse('{{ bird_labels_js|safe }}');
-        const birdCounts = safeParse('{{ bird_counts_js|safe }}');
-
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.borderColor = '#334155';
-
-        charts.combo = new Chart(document.getElementById('comboChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: comboLabels,
-                datasets: [
-                    { label: 'Volume Sold', data: comboVolume, backgroundColor: '#38bdf8', yAxisID: 'yVol', order: 2, borderRadius: 4 },
-                    { label: 'Revenue (₹)', data: comboRevenue, borderColor: '#34d399', backgroundColor: 'transparent', type: 'line', yAxisID: 'yRev', order: 1, tension: 0.2 }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                scales: {
-                    yVol: { position: 'left', beginAtZero: true },
-                    yRev: { position: 'right', beginAtZero: true, grid: { display: false } }
-                }
-            }
-        });
-
-        charts.donut = new Chart(document.getElementById('productDonutChart').getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: topProdLabels,
-                datasets: [{ data: topProdRevenue, backgroundColor: ['#a78bfa', '#f472b6', '#34d399', '#fbbf24', '#22d3ee'] }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-        });
-
-        charts.clustered = new Chart(document.getElementById('clusteredBarChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: execLabels,
-                datasets: [
-                    { label: 'Actual Sales', data: execRevenue, backgroundColor: '#fbbf24', borderRadius: 4 },
-                    { label: 'Target Metric', data: execRevenue.map(v => v * 1.15), backgroundColor: '#475569', borderRadius: 4 }
-                ]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        charts.leaderboard = new Chart(document.getElementById('leaderboardChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: execLabels,
-                datasets: [{ label: 'Sales Generated', data: execRevenue, backgroundColor: '#60a5fa', borderRadius: 4 }]
-            },
-            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
-        });
-
-        charts.funnel = new Chart(document.getElementById('pipelineFunnelChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: Object.keys(funnelStagesRaw).length ? Object.keys(funnelStagesRaw) : ['Leads', 'Quotes', 'Closed'],
-                datasets: [{ label: 'Stages', data: Object.values(funnelStagesRaw).length ? Object.values(funnelStagesRaw) : [100, 60, 30], backgroundColor: '#f472b6', borderRadius: 4 }]
-            },
-            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-        });
-
-        charts.geo = new Chart(document.getElementById('geoDistrictChart').getContext('2d'), {
-            type: 'pie',
-            data: {
-                labels: mapLabels,
-                datasets: [{ data: mapRevenue, backgroundColor: ['#38bdf8', '#fbbf24', '#f87171', '#34d399'] }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        charts.demographics = new Chart(document.getElementById('avianDemographicsChart').getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: birdLabels,
-                datasets: [{ data: birdCounts, backgroundColor: ['#22d3ee', '#818cf8', '#fb7185'] }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        const targets = ['stateSelect', 'countrySelect', 'districtSelect', 'executiveSelect', 'businessTypeSelect', 'startDateInput', 'endDateInput', 'monthSelect'];
-        targets.forEach(id => {
-            document.getElementById(id).addEventListener('change', fetchFilteredCanvasMetrics);
-        });
-    });
-
-    function fetchFilteredCanvasMetrics() {
-        const getVal = (id) => document.getElementById(id).value;
-        const queryParams = new URLSearchParams({
-            state: getVal('stateSelect'), country: getVal('countrySelect'), district: getVal('districtSelect'),
-            executive: getVal('executiveSelect'), business_type: getVal('businessTypeSelect'),
-            start_date: getVal('startDateInput'), end_date: getVal('endDateInput'), month: getVal('monthSelect')
-        });
-
-        const exportButton = document.getElementById('exportCsvBtn');
-        if (exportButton) {
-            exportButton.setAttribute('href', `?export=excel&${queryParams.toString()}`);
+    <style>
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #131c2e;
+            --bg-input: #0b0f19;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --primary: #06b6d4;
+            --primary-hover: #0891b2;
+            --success: #10b981;
+            --border: #1e293b;
+            --border-focus: #38bdf8;
         }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: var(--bg-main); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 100px; }
+        
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="min-h-full flex flex-col antialiased custom-scrollbar pb-12">
 
-        fetch(`${window.location.pathname}?${queryParams.toString()}`, {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.combo_labels) {
-                charts.combo.data.labels = data.combo_labels;
-                charts.combo.data.datasets[0].data = data.combo_volume;
-                charts.combo.data.datasets[1].data = data.combo_revenue;
-                charts.combo.update();
-            }
-            if (data.top_prod_labels) {
-                charts.donut.data.labels = data.top_prod_labels;
-                charts.donut.data.datasets[0].data = data.top_prod_revenue;
-                charts.donut.update();
-            }
-            if (data.exec_labels) {
-                charts.leaderboard.data.labels = data.exec_labels;
-                charts.leaderboard.data.datasets[0].data = data.exec_revenue;
-                charts.leaderboard.update();
+    <!-- 📊 TOP WORKSPACE HEADER BAR -->
+    <header class="border-b border-slate-800 bg-[#131c2e]/60 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-xl font-black tracking-tight text-white uppercase flex items-center gap-2">
+                    <span class="text-cyan-400"><i class="fa-solid fa-chart-pie"></i></span>
+                    My AgriNutrition Analytics
+                </h1>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
+            </div>
+            
+            <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
+                <!-- 🎯 EXECUTIVE DROPDOWN SELECTOR -->
+                <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
+                    <option value="ALL" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>👥 All Executives</option>
+                    {% for exec in executives_list %}
+                        <option value="{{ exec.id }}" {% if selected_executive == exec.id|stringformat:"s" %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
+                    {% endfor %}
+                </select>
 
-                charts.clustered.data.labels = data.exec_labels;
-                charts.clustered.data.datasets[0].data = data.exec_revenue;
-                charts.clustered.data.datasets[1].data = data.exec_revenue.map(v => v * 1.15);
-                charts.clustered.update();
-            }
-            if (data.map_labels) {
-                charts.geo.data.labels = data.map_labels;
-                charts.geo.data.datasets[0].data = data.map_revenue;
-                charts.geo.update();
-            }
-        })
-        .catch(error => console.error("Error updates:", error));
-    }
-</script>
-{% endblock %}
+                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                    <input type="date" name="start_date" value="{{ start_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                </div>
+                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                    <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                </div>
+                <select name="sector" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
+                    <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
+                    <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
+                    <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
+                </select>
+                
+                <!-- 📥 EXPORT LINK UPDATED HERE -->
+                <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
+                    <i class="fa-solid fa-file-excel"></i> Export Matrix
+                </a>
+            </form>
+        </div>
+    </header>
+
+    <!-- 🗺️ CORE ANALYTICS MAIN CONTAINER -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 space-y-6 mt-4">
+
+        <!-- HEADER SUBTITLE / TELEMETRY BANNER -->
+        <div class="flex justify-between items-center border-b border-slate-800/80 pb-3">
+            <h2 class="text-sm font-bold text-slate-300 tracking-wide uppercase flex items-center gap-2">
+                <i class="fa-solid fa-tower-cell text-emerald-400"></i>
+                Live Management Performance & Pipeline Telemetry
+            </h2>
+            <span class="text-[10px] text-slate-400 bg-slate-800/50 px-2.5 py-1 rounded-md border border-slate-700/50 font-mono">
+                System Status: <span class="text-emerald-400 font-bold">ONLINE</span>
+            </span>
+        </div>
+
+        <!-- ================= STATISTICAL KPI CARD DECK ================= -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-sky-400"></i></div>
+                <h3 id="kpiVisits" class="text-2xl font-black text-white mt-2">{{ total_visits|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ visits_growth|default:"0%" }}</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-user-tie text-violet-400"></i></div>
+                <h3 id="kpiExecs" class="text-2xl font-black text-white mt-2">{{ total_executives|default:"0" }}</h3>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Live Tracking Active</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-wheat-api text-amber-400"></i></div>
+                <h3 id="kpiFarms" class="text-2xl font-black text-white mt-2">{{ total_farms|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ farms_expansion|default:"0%" }} expansion</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-boxes-stacked text-orange-400"></i></div>
+                <h3 id="kpiQty" class="text-2xl font-black text-white mt-2">{{ total_qty|default:"0" }} <span class="text-xs font-medium text-slate-400">Units</span></h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ qty_velocity|default:"0%" }} velocity</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-indian-rupee-sign text-emerald-400"></i></div>
+                <h3 id="kpiRevenue" class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ revenue_growth|default:"0%" }} Growth</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
+                <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ avg_growth|default:"0%" }}</span>
+            </div>
+
+            <!-- ADDED EXTRA STATISTICAL KPI CARDS -->
+            <!-- Total Visits Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-clipboard-check text-sky-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ total_visits|default:"0" }}</h2>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1">▲ {{ conversion_rate|default:"0" }}%</span>
+            </div>
+
+            <!-- Active Executives Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-users text-violet-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ active_executives|default:"0" }}</h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Live Tracking Active</span>
+            </div>
+
+            <!-- Farms Covered Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-tractor text-amber-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ total_farms|default:"0" }}</h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Field Accounts</span>
+            </div>
+
+            <!-- Total Orders Quantity Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-box text-orange-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">{{ total_sales_volume|default:"0" }} <small class="text-xs font-medium text-slate-400">Units</small></h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Sales Volume</span>
+            </div>
+
+            <!-- Confirmed Revenue Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-coins text-emerald-400"></i></div>
+                <h2 class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|floatformat:2|default:"0.00" }}</h2>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1">Gross Conversion</span>
+            </div>
+
+            <!-- Average Order Value Card -->
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-chart-line text-cyan-400"></i></div>
+                <h2 class="text-2xl font-black text-white mt-2">₹{{ avg_order_value|floatformat:2|default:"0.00" }}</h2>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Average Deal Size</span>
+            </div>
+        </div>
+
+        <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Month-wise Running Trend -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Month-Wise Revenue Review</h3>
+                            <p class="text-[10px] text-slate-400">Fiscal performance scaling across active financial months</p>
+                        </div>
+                        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20 rounded-md">Monthly Ledger</span>
+                    </div>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="monthWiseTrendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Year-wise Running Trend -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Year-Wise Revenue Review</h3>
+                            <p class="text-[10px] text-slate-400">Historical macro conversion comparison parameters</p>
+                        </div>
+                        <span class="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 border border-cyan-500/20 rounded-md">Yearly Ledger</span>
+                    </div>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="yearWiseTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Executive Performance Chart -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Revenue By Executive</h3>
+                    <p class="text-[10px] text-slate-400">Performance breakdown across primary product orders</p>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4"><canvas id="execRevBarChart"></canvas></div>
+            </div>
+
+            <!-- Product Volume Breakdown -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Product Allocation (Order Volume)</h3>
+                    <p class="text-[10px] text-slate-400">Distribution ratio of standard units booked in fields</p>
+                </div>
+                <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="prodSalesDonut"></canvas></div>
+            </div>
+
+            <!-- Top Farm Yields -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Top Farms by Booking Revenue</h3>
+                    <p class="text-[10px] text-slate-400">Highest converting farm accounts this period</p>
+                </div>
+                <div id="farmLedgerContainer" class="overflow-y-auto flex-1 custom-scrollbar text-xs divide-y divide-slate-800/60 mt-4 pr-1">
+                    <div class="flex justify-between py-2 font-bold text-slate-500 uppercase tracking-wide text-[10px]">
+                        <span>Farm Identity</span>
+                        <span>Revenue</span>
+                    </div>
+                    {% for farm in top_farms %}
+                        <div class="flex justify-between py-2.5 items-center">
+                            <span class="font-medium text-slate-200">{{ farm.name }}</span>
+                            <span class="font-bold text-emerald-400">₹{{ farm.revenue }}</span>
+                        </div>
+                    {% empty %}
+                        <p class="text-slate-500 text-center py-4">No farm data recorded.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <!-- Visits By State Layout Block -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div class="mb-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Visits by State</h3>
+                    <p class="text-[10px] text-slate-400">Geographic footprints across core territories</p>
+                </div>
+                <div class="relative flex-1 w-full min-h-0">
+                    <canvas id="stateVisitsChart" style="position: relative; height:100%; width:100%"></canvas>
+                </div>
+            </div>
+
+            <!-- Diagnostic Problems Observations Matrix -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Field Problems Observed</h3>
+                    <p class="text-[10px] text-slate-400">Aggregated insights from symptoms logs</p>
+                </div>
+                <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="problemsDonut"></canvas></div>
+            </div>
+
+            <!-- Funnel Status Conversion Matrix -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Pipeline Temperature</h3>
+                    <p class="text-[10px] text-slate-400">Conversion states of open discussed products</p>
+                </div>
+                <div class="flex-1 flex flex-col justify-center space-y-3 font-semibold text-xs mt-2 px-1">
+                    <div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>💥 Hot Deals Pipeline</span><span>{{ pipeline_hot|default:"0" }}%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-rose-500 h-full rounded-full" style="width: {{ pipeline_hot|default:0 }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>🔥 Warm Leads Engagement</span><span>{{ pipeline_warm|default:"0" }}%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-amber-500 h-full rounded-full" style="width: {{ pipeline_warm|default:0 }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>❄️ Cold Accounts Analysis</span><span>{{ pipeline_cold|default:"0" }}%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-slate-500 h-full rounded-full" style="width: {{ pipeline_cold|default:0 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Sector Distribution -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Business Sector Distribution</h3>
+                    <p class="text-[10px] text-slate-400">Volume alignment between business verticals</p>
+                </div>
+                <div class="flex-1 grid grid-cols-2 gap-3 font-bold text-xs p-1 mt-4">
+                    <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                        <div class="flex justify-between items-center text-amber-400 text-lg">
+                            <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Poultry</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-2xl font-black text-white">{{ sector_poultry_pct|default:"0" }}%</span>
+                            <p class="text-[9px] font-medium text-amber-500/70 mt-0.5">Broiler/Layer Matrix</p>
+                        </div>
+                    </div>
+                    <div class="bg-sky-500/5 border border-sky-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                        <div class="flex justify-between items-center text-sky-400 text-lg">
+                            <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Aqua</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-2xl font-black text-white">{{ sector_aqua_pct|default:"0" }}%</span>
+                            <p class="text-[9px] font-medium text-sky-500/70 mt-0.5">Shrimp Tracking</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= LIVE LOG ENTRIES AUDIT MATRIX LEDGER ================= -->
+        <div class="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-xl">
+            <div class="p-4 border-b border-slate-800 bg-slate-900/20 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Recent Visit Summary Log</h3>
+                    <p class="text-[10px] text-slate-400">Real-time incoming stream from frontline field reports</p>
+                </div>
+                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 animate-pulse">Live Sync Active</span>
+            </div>
+            
+            <div class="overflow-x-auto custom-scrollbar text-xs">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-[var(--bg-main)] font-bold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
+                        <tr>
+                            <th class="p-3.5 pl-5">Date Logged</th>
+                            <th class="p-3.5">Executive Name</th>
+                            <th class="p-3.5">Farm Identification</th>
+                            <th class="p-3.5">Geographic Hierarchy</th>
+                            <th class="p-3.5 text-right pr-5">Order Revenue Value</th>
+                            <th class="p-3.5 text-center">GPS Routing</th>
+                        </tr>
+                    </thead>
+                    <tbody id="visitLogTableBody" class="divide-y divide-slate-800/40 font-medium text-slate-300">
+                        {% for visit in recent_visits %}
+                            <tr class="hover:bg-slate-800/10 transition duration-150">
+                                <td class="p-3.5 pl-5 font-semibold text-slate-500">{{ visit.date|date:"d-M-Y" }}</td>
+                                <td class="p-3.5 text-slate-200 font-bold">{{ visit.executive.get_full_name|default:visit.executive.username }}</td>
+                                <td class="p-3.5 flex flex-col">
+                                    <span class="font-bold text-slate-300">{{ visit.farm.name }}</span>
+                                    <span class="text-[10px] text-slate-500">Owner: {{ visit.farm.owner_name }}</span>
+                                </td>
+                                <td class="p-3.5 text-slate-400">{{ visit.location }}</td>
+                                <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">₹{{ visit.order_value }}</td>
+                                <td class="p-3.5 text-center">
+                                    {% if visit.gps_link %}
+                                        <a href="{{ visit.gps_link }}" target="_blank" class="text-slate-500 hover:text-cyan-400 text-sm"><i class="fa-solid fa-location-dot"></i></a>
+                                    {% else %}
+                                        <span class="text-slate-600"><i class="fa-solid fa-location-dot"></i></span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-slate-500">No recent visit logs found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- CHART.JS INTEGRATION -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
+            Chart.defaults.font.family = "'Inter', sans-serif";
+
+            const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
+
+            // Month Trend Chart
+            const ctxMonth = document.getElementById('monthWiseTrendChart').getContext('2d');
+            const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
+            gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+            gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+            new Chart(ctxMonth, {
+                type: 'line',
+                data: { 
+                    labels: {{ month_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        label: 'Monthly Net', 
+                        data: {{ month_data_json|safe|default:"[]" }}, 
+                        borderColor: '#10b981', 
+                        backgroundColor: gradMonth, 
+                        borderWidth: 2.5, 
+                        tension: 0.38, 
+                        fill: true, 
+                        pointBackgroundColor: '#10b981', 
+                        pointHoverRadius: 6 
+                    }] 
+                },
+                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            });
+
+            // Year Trend Chart
+            const ctxYear = document.getElementById('yearWiseTrendChart').getContext('2d');
+            const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
+            gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+            gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+            new Chart(ctxYear, {
+                type: 'line',
+                data: { 
+                    labels: {{ year_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        label: 'Yearly Aggregate', 
+                        data: {{ year_data_json|safe|default:"[]" }}, 
+                        borderColor: '#06b6d4', 
+                        backgroundColor: gradYear, 
+                        borderWidth: 2.5, 
+                        tension: 0.38, 
+                        fill: true, 
+                        pointBackgroundColor: '#06b6d4', 
+                        pointHoverRadius: 6 
+                    }] 
+                },
+                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            });
+
+            // Exec Bar Chart
+            new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels: {{ exec_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ exec_data_json|safe|default:"[]" }}, 
+                        backgroundColor: '#38bdf8', 
+                        borderRadius: 4, 
+                        barThickness: 10 
+                    }] 
+                },
+                options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
+            });
+
+            // State Visits Chart
+            new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels: {{ state_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ state_data_json|safe|default:"[]" }}, 
+                        backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#10b981'], 
+                        borderRadius: 4, 
+                        barThickness: 12 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    indexAxis: 'y', 
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                        y: { grid: { display: false }, ticks: { color: '#f1f5f9', font: { weight: 'bold' } } }
+                    } 
+                }
+            });
+
+            // Product Sales Donut
+            new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
+                type: 'doughnut',
+                data: { 
+                    labels: {{ prod_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ prod_data_json|safe|default:"[]" }}, 
+                        backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#475569'], 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
+            });
+
+            // Problems Donut
+            new Chart(document.getElementById('problemsDonut').getContext('2d'), {
+                type: 'doughnut',
+                data: { 
+                    labels: {{ problem_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ problem_data_json|safe|default:"[]" }}, 
+                        backgroundColor: ['#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#475569'], 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
+            });
+        });
+    </script>
+</body>
+</html>
