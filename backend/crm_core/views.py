@@ -629,7 +629,7 @@ def get_dashboard_context(request):
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        # 8. Tables
+        # 8. Tables & Lists
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
         ).select_related('farm', 'executive').prefetch_related('visited_products').order_by('-visit_date')[:10]
@@ -710,94 +710,17 @@ def get_dashboard_context(request):
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    try:
-        context = get_dashboard_context(request)
-        return render(request, 'crm_core/dashboard.html', context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        return render(request, 'crm_core/analytics_report.html', {})
-
-
-@login_required(login_url='/crm/login/')
-def executive_analytics_view(request):
+    """
+    Main Analytics Dashboard Controller.
+    Always computes and provides the context variables required by analytics UI templates.
+    """
     context = get_dashboard_context(request)
-    try:
-        return render(request, 'crm_core/analytics_report.html', context)
-    except Exception:
-        try:
-            return render(request, 'analytics_report.html', context)
-        except Exception as e:
-            logger.error(f"Failed to find analytics template: {str(e)}")
-            return render(request, 'crm_core/dashboard.html', context)
+    return render(request, 'crm_core/analytics_report.html', context)
 
 
 @login_required(login_url='/crm/login/')
-def dashboard_analytics(request):
-    try:
-        context = get_dashboard_context(request)
-        return JsonResponse({'status': 'success', 'data': context})
-    except Exception as e:
-        logger.error(f"Error in dashboard_analytics: {str(e)}", exc_info=True)
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
-
-
-@login_required(login_url='/crm/login/')
-@user_passes_test(lambda u: u.is_superuser or u.is_staff)
-def clear_dashboard_data(request):
-    if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                VisitedProductDetail.objects.all().delete()
-                FarmVisitReport.objects.all().delete()
-                Farm.objects.all().delete()
-            messages.success(request, "Dashboard data successfully cleared.")
-            return redirect('dashboard_home')
-        except Exception as e:
-            logger.error(f"Error clearing data: {str(e)}", exc_info=True)
-            messages.error(request, f"Failed to clear database logs: {str(e)}")
-            return redirect('dashboard_home')
-    return redirect('dashboard_home')
-
-
-# ==========================================
-# 📍 GEOCODING & LOCATION API ENDPOINT
-# ==========================================
-
-def get_location_details(request):
+def analytics_report_view(request):
     """
-    Reverse geocoding endpoint to fetch location details (state, district, area)
-    from latitude and longitude coordinates.
+    Direct route mapped controller for /crm/analytics-report/
     """
-    lat = request.GET.get('lat')
-    lng = request.GET.get('lng')
-
-    if not lat or not lng:
-        return JsonResponse({'status': 'error', 'message': 'Latitude and longitude parameters are required.'}, status=400)
-
-    try:
-        headers = {'User-Agent': 'AgriCRM-App/1.0'}
-        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lng}"
-        
-        response = requests.get(url, headers=headers, timeout=5)
-        
-        if response.status_code == 200:
-            data = response.json()
-            address = data.get('address', {})
-            
-            state = address.get('state', '')
-            district = address.get('state_district') or address.get('county') or address.get('district', '')
-            area = address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
-
-            return JsonResponse({
-                'status': 'success',
-                'state': state,
-                'district': district,
-                'area': area,
-                'full_address': data.get('display_name', '')
-            })
-        else:
-            return JsonResponse({'status': 'error', 'message': 'Unable to fetch location from geocoding service.'}, status=502)
-
-    except Exception as e:
-        logger.error(f"Error in get_location_details: {str(e)}", exc_info=True)
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return dashboard_home(request)
