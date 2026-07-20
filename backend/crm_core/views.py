@@ -17,7 +17,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib import messages
 from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.views.decorators.csrf import csrf_exempt
 
 from .models import Farm, FarmVisitReport, VisitedProductDetail
@@ -295,7 +295,6 @@ def export_visits_to_excel(request):
 
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
             
-            # Pull directly from Farm model instance
             ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
@@ -658,8 +657,48 @@ def dashboard_home(request):
         return render(request, 'crm_core/dashboard.html', {})
 
 
+@login_required(login_url='/crm/login/')
+def dashboard_analytics(request):
+    """
+    Returns dashboard analytics metrics as JSON for AJAX requests.
+    """
+    try:
+        context = get_dashboard_context(request)
+        return JsonResponse({'status': 'success', 'data': context})
+    except Exception as e:
+        logger.error(f"Error in dashboard_analytics: {str(e)}", exc_info=True)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required(login_url='/crm/login/')
+def executive_analytics_view(request):
+    """
+    Dedicated view for Executive Performance & Analytics Reports.
+    """
+    context = get_dashboard_context(request)
+    return render(request, 'crm_core/executive_analytics.html', context)
+
+
+@login_required(login_url='/crm/login/')
+@user_passes_test(lambda u: u.is_superuser or u.is_staff)
+def clear_dashboard_data(request):
+    """
+    Admin-only utility endpoint to purge or reset visit records.
+    """
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                VisitedProductDetail.objects.all().delete()
+                FarmVisitReport.objects.all().delete()
+            messages.success(request, "All visit logs and associated product details have been cleared.")
+        except Exception as e:
+            logger.error(f"Error clearing dashboard data: {str(e)}", exc_info=True)
+            messages.error(request, f"Failed to clear data: {str(e)}")
+    return redirect('dashboard_home')
+
+
 # ==========================================
-# 📍 REVERSE GEOCODING API
+# 📍 REVERSE GEOCODING & DEPENDENT FILTERS API
 # ==========================================
 
 def get_location_details(request):
@@ -688,3 +727,17 @@ def get_location_details(request):
     except Exception as e:
         logger.error(f"Geocoding failed: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def get_dependent_filters(request):
+    """
+    Returns dynamically filtered districts or executives based on selected state.
+    """
+    state = request.GET.get('state', '').strip()
+    
+    districts = Farm.objects.filter(state__iexact=state).values_list('district', flat=True).distinct() if state else []
+    
+    return JsonResponse({
+        'status': 'success',
+        'districts': list(districts)
+    })
