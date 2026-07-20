@@ -1,410 +1,471 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agrinutrition Analytics Dashboard</title>
-    <!-- Tailwind CSS CDN -->
+    <title>My AgriNutrition - Analytics & Visit Report</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        :root {
+            --bg-main: #0b0f19;
+            --bg-card: #131c2e;
+            --bg-input: #0b0f19;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --primary: #06b6d4;
+            --primary-hover: #0891b2;
+            --success: #10b981;
+            --border: #1e293b;
+            --border-focus: #38bdf8;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: var(--bg-main); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 100px; }
+        
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
+            cursor: pointer;
+        }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 lg:p-8">
+<body class="min-h-full flex flex-col antialiased custom-scrollbar pb-12">
 
-    <div class="max-w-7xl mx-auto space-y-6">
-
-        <!-- ==================================================================== -->
-        <!-- HEADER & FILTER TOOLBAR                                              -->
-        <!-- ==================================================================== -->
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-800/80 p-5 rounded-2xl border border-slate-700/60 shadow-lg backdrop-blur">
+    <!-- 📊 TOP WORKSPACE HEADER BAR -->
+    <header class="border-b border-slate-800 bg-[#131c2e]/60 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">Executive Analytics Dashboard</h1>
-                <p class="text-sm text-slate-400 mt-1">Real-time performance metrics, sales velocity, and regional field operations.</p>
+                <h1 class="text-xl font-black tracking-tight text-white uppercase flex items-center gap-2">
+                    <span class="text-cyan-400"><i class="fa-solid fa-chart-pie"></i></span>
+                    My AgriNutrition Analytics
+                </h1>
+                <p class="text-xs text-slate-400 font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
             </div>
+            
+            <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
+                <!-- 🎯 EXECUTIVE DROPDOWN SELECTOR -->
+                <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
+                    <option value="ALL" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>👥 All Executives</option>
+                    {% for exec in executives_list %}
+                        <option value="{{ exec.id }}" {% if selected_executive == exec.id|stringformat:"s" %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
+                    {% endfor %}
+                </select>
 
-            <!-- Global Filters Form -->
-            <form method="GET" class="flex flex-wrap items-center gap-3">
-                <!-- Executive Filter -->
-                <div>
-                    <select name="executive" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="ALL" {% if selected_executive == 'ALL' %}selected{% endif %}>All Executives</option>
-                        {% for exec in executives_list %}
-                            <option value="{{ exec.id }}" {% if selected_executive|add:"" == exec.id|add:"" %}selected{% endif %}>
-                                {{ exec.get_full_name|default:exec.username }}
-                            </option>
-                        {% endfor %}
-                    </select>
+                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                    <input type="date" name="start_date" value="{{ start_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
-
-                <!-- Date Range Filters -->
-                <div class="flex items-center gap-2">
-                    <input type="date" name="start_date" value="{{ start_date }}" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                    <span class="text-slate-500 text-xs">to</span>
-                    <input type="date" name="end_date" value="{{ end_date }}" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                    <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
-
-                <!-- Sector Filter -->
-                <div>
-                    <select name="sector" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="ALL" {% if selected_sector == 'ALL' %}selected{% endif %}>All Sectors</option>
-                        <option value="Poultry" {% if selected_sector == 'Poultry' %}selected{% endif %}>Poultry</option>
-                        <option value="Aqua" {% if selected_sector == 'Aqua' %}selected{% endif %}>Aqua</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-4 py-2.5 rounded-lg transition-colors">
-                    Filter
-                </button>
-                <a href="?" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 py-2.5 rounded-lg transition-colors">
-                    Reset
+                <select name="sector" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
+                    <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
+                    <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
+                    <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
+                </select>
+                
+                <!-- 📥 EXPORT LINK UPDATED HERE -->
+                <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
+                    <i class="fa-solid fa-file-excel"></i> Export Matrix
                 </a>
             </form>
         </div>
+    </header>
 
-        <!-- ==================================================================== -->
-        <!-- KPI METRICS GRID                                                     -->
-        <!-- ==================================================================== -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-            
-            <!-- Visits -->
-            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
-                <p class="text-xs font-medium text-slate-400">Total Visits</p>
-                <h3 class="text-xl font-bold text-white mt-1">{{ total_visits }}</h3>
-                <span class="text-xs text-emerald-400 mt-1 inline-block">↑ {{ visits_growth }} vs last period</span>
-            </div>
+    <!-- 🗺️ CORE ANALYTICS MAIN CONTAINER -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 space-y-6 mt-4">
 
-            <!-- Active Executives -->
-            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
-                <p class="text-xs font-medium text-slate-400">Executives Active</p>
-                <h3 class="text-xl font-bold text-white mt-1">{{ total_executives }}</h3>
-                <span class="text-xs text-slate-500 mt-1 inline-block">Field staff</span>
-            </div>
-
-            <!-- Farms Reached -->
-            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
-                <p class="text-xs font-medium text-slate-400">Unique Farms</p>
-                <h3 class="text-xl font-bold text-white mt-1">{{ total_farms }}</h3>
-                <span class="text-xs text-emerald-400 mt-1 inline-block">↑ {{ farms_expansion }} coverage</span>
-            </div>
-
-            <!-- Total Quantity -->
-            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
-                <p class="text-xs font-medium text-slate-400">Order Quantity</p>
-                <h3 class="text-xl font-bold text-white mt-1">{{ total_qty }}</h3>
-                <span class="text-xs text-emerald-400 mt-1 inline-block">↑ {{ qty_velocity }} volume</span>
-            </div>
-
-            <!-- Revenue -->
-            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
-                <p class="text-xs font-medium text-slate-400">Total Revenue</p>
-                <h3 class="text-xl font-bold text-emerald-400 mt-1">₹{{ total_revenue }}</h3>
-                <span class="text-xs text-emerald-400 mt-1 inline-block">↑ {{ revenue_growth }} gross</span>
-            </div>
-
-            <!-- Avg Ticket -->
-            <div class="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50">
-                <p class="text-xs font-medium text-slate-400">Avg Ticket / Visit</p>
-                <h3 class="text-xl font-bold text-blue-400 mt-1">₹{{ avg_revenue }}</h3>
-                <span class="text-xs text-blue-400 mt-1 inline-block">↑ {{ avg_growth }} avg</span>
-            </div>
-
+        <!-- HEADER SUBTITLE / TELEMETRY BANNER -->
+        <div class="flex justify-between items-center border-b border-slate-800/80 pb-3">
+            <h2 class="text-sm font-bold text-slate-300 tracking-wide uppercase flex items-center gap-2">
+                <i class="fa-solid fa-tower-cell text-emerald-400"></i>
+                Live Management Performance & Pipeline Telemetry
+            </h2>
+            <span class="text-[10px] text-slate-400 bg-slate-800/50 px-2.5 py-1 rounded-md border border-slate-700/50 font-mono">
+                System Status: <span class="text-emerald-400 font-bold">ONLINE</span>
+            </span>
         </div>
 
-        <!-- ==================================================================== -->
-        <!-- CHARTS SECTION - ROW 1                                               -->
-        <!-- ==================================================================== -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            <!-- Chart 1: Monthly Revenue Trend -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50">
-                <h2 class="text-base font-semibold text-white mb-4">Monthly Revenue Velocity</h2>
-                <div class="relative h-64">
-                    <canvas id="monthlyChart"></canvas>
-                </div>
+        <!-- ================= STATISTICAL KPI CARD DECK ================= -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-sky-400"></i></div>
+                <h3 id="kpiVisits" class="text-2xl font-black text-white mt-2">{{ total_visits|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ visits_growth|default:"0%" }}</span>
             </div>
-
-            <!-- Chart 2: Yearly Revenue Trend -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50">
-                <h2 class="text-base font-semibold text-white mb-4">Yearly Growth Comparative</h2>
-                <div class="relative h-64">
-                    <canvas id="yearlyChart"></canvas>
-                </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-user-tie text-violet-400"></i></div>
+                <h3 id="kpiExecs" class="text-2xl font-black text-white mt-2">{{ total_executives|default:"0" }}</h3>
+                <span class="text-[9px] text-slate-500 font-bold mt-1">Live Tracking Active</span>
             </div>
-
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Farms Covered</span><i class="fa-solid fa-wheat-api text-amber-400"></i></div>
+                <h3 id="kpiFarms" class="text-2xl font-black text-white mt-2">{{ total_farms|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ farms_expansion|default:"0%" }} expansion</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-boxes-stacked text-orange-400"></i></div>
+                <h3 id="kpiQty" class="text-2xl font-black text-white mt-2">{{ total_qty|default:"0" }} <span class="text-xs font-medium text-slate-400">Units</span></h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ qty_velocity|default:"0%" }} velocity</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-indian-rupee-sign text-emerald-400"></i></div>
+                <h3 id="kpiRevenue" class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ revenue_growth|default:"0%" }} Growth</span>
+            </div>
+            <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
+                <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
+                <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"0" }}</h3>
+                <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ avg_growth|default:"0%" }}</span>
+            </div>
         </div>
 
-        <!-- ==================================================================== -->
-        <!-- CHARTS SECTION - ROW 2                                               -->
-        <!-- ==================================================================== -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <!-- Chart 3: Top Executives -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50">
-                <h2 class="text-base font-semibold text-white mb-4">Top 10 Executive Performance</h2>
-                <div class="relative h-64">
-                    <canvas id="execChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Chart 4: Product Allocation -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50">
-                <h2 class="text-base font-semibold text-white mb-4">Top Products Volume</h2>
-                <div class="relative h-64">
-                    <canvas id="productChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Chart 5: Visits by State -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50">
-                <h2 class="text-base font-semibold text-white mb-4">Regional Visit Density</h2>
-                <div class="relative h-64">
-                    <canvas id="stateChart"></canvas>
-                </div>
-            </div>
-
-        </div>
-
-        <!-- ==================================================================== -->
-        <!-- CHARTS & SUMMARY GAUGES - ROW 3                                       -->
-        <!-- ==================================================================== -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <!-- Chart 6: Observed Problems -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50">
-                <h2 class="text-base font-semibold text-white mb-4">Observed Field Issues</h2>
-                <div class="relative h-64">
-                    <canvas id="problemChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Pipeline Temperature Metric Progress Bars -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50 flex flex-col justify-between">
+        <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Month-wise Running Trend -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
                 <div>
-                    <h2 class="text-base font-semibold text-white mb-2">Pipeline Deal Temperature</h2>
-                    <p class="text-xs text-slate-400 mb-6">Distribution ratio of lead progression states.</p>
-
-                    <div class="space-y-4">
+                    <div class="flex justify-between items-start">
                         <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-rose-400 font-medium">🔥 Hot Leads</span>
-                                <span class="text-slate-300 font-bold">{{ pipeline_hot }}%</span>
-                            </div>
-                            <div class="w-full bg-slate-700 rounded-full h-2">
-                                <div class="bg-rose-500 h-2 rounded-full" style="width: {{ pipeline_hot }}%"></div>
-                            </div>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Month-Wise Revenue Review</h3>
+                            <p class="text-[10px] text-slate-400">Fiscal performance scaling across active financial months</p>
                         </div>
-
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-amber-400 font-medium">⚡ Warm Leads</span>
-                                <span class="text-slate-300 font-bold">{{ pipeline_warm }}%</span>
-                            </div>
-                            <div class="w-full bg-slate-700 rounded-full h-2">
-                                <div class="bg-amber-500 h-2 rounded-full" style="width: {{ pipeline_warm }}%"></div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-blue-400 font-medium">❄️ Cold Leads</span>
-                                <span class="text-slate-300 font-bold">{{ pipeline_cold }}%</span>
-                            </div>
-                            <div class="w-full bg-slate-700 rounded-full h-2">
-                                <div class="bg-blue-500 h-2 rounded-full" style="width: {{ pipeline_cold }}%"></div>
-                            </div>
-                        </div>
+                        <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 border border-emerald-500/20 rounded-md">Monthly Ledger</span>
                     </div>
                 </div>
-
-                <!-- Sector Breakdown -->
-                <div class="mt-6 pt-4 border-t border-slate-700/50">
-                    <h3 class="text-xs font-semibold text-slate-300 mb-2">Sector Mix</h3>
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="text-amber-300">🐓 Poultry: <strong>{{ sector_poultry_pct }}%</strong></span>
-                        <span class="text-cyan-300">🐟 Aqua: <strong>{{ sector_aqua_pct }}%</strong></span>
-                    </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="monthWiseTrendChart"></canvas>
                 </div>
             </div>
 
-            <!-- Top Farms Revenue Ledger -->
-            <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50 overflow-hidden">
-                <h2 class="text-base font-semibold text-white mb-4">Top Client Accounts</h2>
-                <div class="space-y-3 overflow-y-auto max-h-56 pr-1">
-                    {% for farm in top_farms %}
-                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 border border-slate-700/30">
-                        <span class="text-xs font-medium text-slate-200 truncate max-w-[160px]">{{ farm.name }}</span>
-                        <span class="text-xs font-bold text-emerald-400">₹{{ farm.revenue }}</span>
+            <!-- Year-wise Running Trend -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Year-Wise Revenue Review</h3>
+                            <p class="text-[10px] text-slate-400">Historical macro conversion comparison parameters</p>
+                        </div>
+                        <span class="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 border border-cyan-500/20 rounded-md">Yearly Ledger</span>
                     </div>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4">
+                    <canvas id="yearWiseTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Executive Performance Chart -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Revenue By Executive</h3>
+                    <p class="text-[10px] text-slate-400">Performance breakdown across primary product orders</p>
+                </div>
+                <div class="relative flex-1 min-h-0 mt-4"><canvas id="execRevBarChart"></canvas></div>
+            </div>
+
+            <!-- Product Volume Breakdown -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Product Allocation (Order Volume)</h3>
+                    <p class="text-[10px] text-slate-400">Distribution ratio of standard units booked in fields</p>
+                </div>
+                <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="prodSalesDonut"></canvas></div>
+            </div>
+
+            <!-- Top Farm Yields -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Top Farms by Booking Revenue</h3>
+                    <p class="text-[10px] text-slate-400">Highest converting farm accounts this period</p>
+                </div>
+                <div id="farmLedgerContainer" class="overflow-y-auto flex-1 custom-scrollbar text-xs divide-y divide-slate-800/60 mt-4 pr-1">
+                    <div class="flex justify-between py-2 font-bold text-slate-500 uppercase tracking-wide text-[10px]">
+                        <span>Farm Identity</span>
+                        <span>Revenue</span>
+                    </div>
+                    {% for farm in top_farms %}
+                        <div class="flex justify-between py-2.5 items-center">
+                            <span class="font-medium text-slate-200">{{ farm.name }}</span>
+                            <span class="font-bold text-emerald-400">₹{{ farm.revenue }}</span>
+                        </div>
                     {% empty %}
-                    <p class="text-xs text-slate-500">No account ledger data available.</p>
+                        <p class="text-slate-500 text-center py-4">No farm data recorded.</p>
                     {% endfor %}
                 </div>
             </div>
-
         </div>
 
-        <!-- ==================================================================== -->
-        <!-- RECENT VISITS LOG TABLE                                              -->
-        <!-- ==================================================================== -->
-        <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700/50 overflow-hidden">
-            <h2 class="text-base font-semibold text-white mb-4">Recent Field Activity Log</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-slate-300">
-                    <thead class="bg-slate-900/80 text-slate-400 uppercase font-semibold border-b border-slate-700">
+        <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <!-- Visits By State Layout Block -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div class="mb-2">
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Visits by State</h3>
+                    <p class="text-[10px] text-slate-400">Geographic footprints across core territories</p>
+                </div>
+                <div class="relative flex-1 w-full min-h-0">
+                    <canvas id="stateVisitsChart" style="position: relative; height:100%; width:100%"></canvas>
+                </div>
+            </div>
+
+            <!-- Diagnostic Problems Observations Matrix -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Field Problems Observed</h3>
+                    <p class="text-[10px] text-slate-400">Aggregated insights from symptoms logs</p>
+                </div>
+                <div class="relative flex-1 min-h-0 flex justify-center mt-2"><canvas id="problemsDonut"></canvas></div>
+            </div>
+
+            <!-- Funnel Status Conversion Matrix -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Pipeline Temperature</h3>
+                    <p class="text-[10px] text-slate-400">Conversion states of open discussed products</p>
+                </div>
+                <div class="flex-1 flex flex-col justify-center space-y-3 font-semibold text-xs mt-2 px-1">
+                    <div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>💥 Hot Deals Pipeline</span><span>{{ pipeline_hot|default:"0" }}%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-rose-500 h-full rounded-full" style="width: {{ pipeline_hot|default:0 }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>🔥 Warm Leads Engagement</span><span>{{ pipeline_warm|default:"0" }}%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-amber-500 h-full rounded-full" style="width: {{ pipeline_warm|default:0 }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>❄️ Cold Accounts Analysis</span><span>{{ pipeline_cold|default:"0" }}%</span></div>
+                        <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
+                            <div class="bg-slate-500 h-full rounded-full" style="width: {{ pipeline_cold|default:0 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Sector Distribution -->
+            <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-0.5">Business Sector Distribution</h3>
+                    <p class="text-[10px] text-slate-400">Volume alignment between business verticals</p>
+                </div>
+                <div class="flex-1 grid grid-cols-2 gap-3 font-bold text-xs p-1 mt-4">
+                    <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                        <div class="flex justify-between items-center text-amber-400 text-lg">
+                            <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Poultry</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-2xl font-black text-white">{{ sector_poultry_pct|default:"0" }}%</span>
+                            <p class="text-[9px] font-medium text-amber-500/70 mt-0.5">Broiler/Layer Matrix</p>
+                        </div>
+                    </div>
+                    <div class="bg-sky-500/5 border border-sky-500/20 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                        <div class="flex justify-between items-center text-sky-400 text-lg">
+                            <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Aqua</span>
+                        </div>
+                        <div class="mt-2">
+                            <span class="text-2xl font-black text-white">{{ sector_aqua_pct|default:"0" }}%</span>
+                            <p class="text-[9px] font-medium text-sky-500/70 mt-0.5">Shrimp Tracking</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= LIVE LOG ENTRIES AUDIT MATRIX LEDGER ================= -->
+        <div class="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-xl">
+            <div class="p-4 border-b border-slate-800 bg-slate-900/20 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-wider">Recent Visit Summary Log</h3>
+                    <p class="text-[10px] text-slate-400">Real-time incoming stream from frontline field reports</p>
+                </div>
+                <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 animate-pulse">Live Sync Active</span>
+            </div>
+            
+            <div class="overflow-x-auto custom-scrollbar text-xs">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-[var(--bg-main)] font-bold text-slate-400 uppercase tracking-wider text-[10px] border-b border-slate-800">
                         <tr>
-                            <th class="p-3">Date</th>
-                            <th class="p-3">Executive</th>
-                            <th class="p-3">Farm Name</th>
-                            <th class="p-3">State</th>
-                            <th class="p-3 text-right">Order Value</th>
+                            <th class="p-3.5 pl-5">Date Logged</th>
+                            <th class="p-3.5">Executive Name</th>
+                            <th class="p-3.5">Farm Identification</th>
+                            <th class="p-3.5">Geographic Hierarchy</th>
+                            <th class="p-3.5 text-right pr-5">Order Revenue Value</th>
+                            <th class="p-3.5 text-center">GPS Routing</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-700/50">
+                    <tbody id="visitLogTableBody" class="divide-y divide-slate-800/40 font-medium text-slate-300">
                         {% for visit in recent_visits %}
-                        <tr class="hover:bg-slate-700/30 transition-colors">
-                            <td class="p-3 whitespace-nowrap">{{ visit.date|date:"M d, Y" }}</td>
-                            <td class="p-3 font-medium text-white">{{ visit.executive.get_full_name|default:visit.executive.username }}</td>
-                            <td class="p-3 text-slate-300">{{ visit.farm.name }}</td>
-                            <td class="p-3">{{ visit.state|default:"N/A" }}</td>
-                            <td class="p-3 text-right font-semibold text-emerald-400">₹{{ visit.order_value|default:"0.00" }}</td>
-                        </tr>
+                            <tr class="hover:bg-slate-800/10 transition duration-150">
+                                <td class="p-3.5 pl-5 font-semibold text-slate-500">{{ visit.date|date:"d-M-Y" }}</td>
+                                <td class="p-3.5 text-slate-200 font-bold">{{ visit.executive.get_full_name|default:visit.executive.username }}</td>
+                                <td class="p-3.5 flex flex-col">
+                                    <span class="font-bold text-slate-300">{{ visit.farm.name }}</span>
+                                    <span class="text-[10px] text-slate-500">Owner: {{ visit.farm.owner_name }}</span>
+                                </td>
+                                <td class="p-3.5 text-slate-400">{{ visit.location }}</td>
+                                <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">₹{{ visit.order_value }}</td>
+                                <td class="p-3.5 text-center">
+                                    {% if visit.gps_link %}
+                                        <a href="{{ visit.gps_link }}" target="_blank" class="text-slate-500 hover:text-cyan-400 text-sm"><i class="fa-solid fa-location-dot"></i></a>
+                                    {% else %}
+                                        <span class="text-slate-600"><i class="fa-solid fa-location-dot"></i></span>
+                                    {% endif %}
+                                </td>
+                            </tr>
                         {% empty %}
-                        <tr>
-                            <td colspan="5" class="p-4 text-center text-slate-500">No visit records matching active filter parameters.</td>
-                        </tr>
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-slate-500">No recent visit logs found.</td>
+                            </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
-    </div>
+    </main>
 
-    <!-- ==================================================================== -->
-    <!-- CHART.JS INTEGRATION SCRIPTS                                         -->
-    <!-- ==================================================================== -->
+    <!-- CHART.JS INTEGRATION -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Global Chart Defaults for Dark Theme
-        Chart.defaults.color = '#94a3b8';
-        Chart.defaults.font.family = 'Inter';
+        document.addEventListener("DOMContentLoaded", () => {
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
+            Chart.defaults.font.family = "'Inter', sans-serif";
 
-        const chartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: { grid: { color: 'rgba(51, 65, 85, 0.3)' } },
-                y: { grid: { color: 'rgba(51, 65, 85, 0.3)' } }
-            }
-        };
+            const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
-        // 1. Monthly Revenue Chart (Line)
-        new Chart(document.getElementById('monthlyChart'), {
-            type: 'line',
-            data: {
-                labels: {{ month_labels_json|safe }},
-                datasets: [{
-                    data: {{ month_data_json|safe }},
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                    fill: true,
-                    tension: 0.35,
-                    borderWidth: 2
-                }]
-            },
-            options: chartOptions
-        });
+            // Month Trend Chart
+            const ctxMonth = document.getElementById('monthWiseTrendChart').getContext('2d');
+            const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
+            gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+            gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
 
-        // 2. Yearly Revenue Chart (Bar)
-        new Chart(document.getElementById('yearlyChart'), {
-            type: 'bar',
-            data: {
-                labels: {{ year_labels_json|safe }},
-                datasets: [{
-                    data: {{ year_data_json|safe }},
-                    backgroundColor: '#10b981',
-                    borderRadius: 6
-                }]
-            },
-            options: chartOptions
-        });
+            new Chart(ctxMonth, {
+                type: 'line',
+                data: { 
+                    labels: {{ month_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        label: 'Monthly Net', 
+                        data: {{ month_data_json|safe|default:"[]" }}, 
+                        borderColor: '#10b981', 
+                        backgroundColor: gradMonth, 
+                        borderWidth: 2.5, 
+                        tension: 0.38, 
+                        fill: true, 
+                        pointBackgroundColor: '#10b981', 
+                        pointHoverRadius: 6 
+                    }] 
+                },
+                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            });
 
-        // 3. Top Executives Chart (Horizontal Bar)
-        new Chart(document.getElementById('execChart'), {
-            type: 'bar',
-            data: {
-                labels: {{ exec_labels_json|safe }},
-                datasets: [{
-                    data: {{ exec_data_json|safe }},
-                    backgroundColor: '#6366f1',
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                ...chartOptions,
-                indexAxis: 'y'
-            }
-        });
+            // Year Trend Chart
+            const ctxYear = document.getElementById('yearWiseTrendChart').getContext('2d');
+            const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
+            gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+            gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
-        // 4. Product Allocation Chart (Donut)
-        new Chart(document.getElementById('productChart'), {
-            type: 'doughnut',
-            data: {
-                labels: {{ prod_labels_json|safe }},
-                datasets: [{
-                    data: {{ prod_data_json|safe }},
-                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } }
+            new Chart(ctxYear, {
+                type: 'line',
+                data: { 
+                    labels: {{ year_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        label: 'Yearly Aggregate', 
+                        data: {{ year_data_json|safe|default:"[]" }}, 
+                        borderColor: '#06b6d4', 
+                        backgroundColor: gradYear, 
+                        borderWidth: 2.5, 
+                        tension: 0.38, 
+                        fill: true, 
+                        pointBackgroundColor: '#06b6d4', 
+                        pointHoverRadius: 6 
+                    }] 
+                },
+                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            });
+
+            // Exec Bar Chart
+            new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels: {{ exec_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ exec_data_json|safe|default:"[]" }}, 
+                        backgroundColor: '#38bdf8', 
+                        borderRadius: 4, 
+                        barThickness: 10 
+                    }] 
+                },
+                options: { ...baseOptions, indexAxis: 'y', scales: { x: { ticks: { display: false }, grid: { display: false } } } }
+            });
+
+            // State Visits Chart
+            new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
+                type: 'bar',
+                data: { 
+                    labels: {{ state_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ state_data_json|safe|default:"[]" }}, 
+                        backgroundColor: ['#3b82f6', '#f97316', '#a855f7', '#10b981'], 
+                        borderRadius: 4, 
+                        barThickness: 12 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    indexAxis: 'y', 
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                        y: { grid: { display: false }, ticks: { color: '#f1f5f9', font: { weight: 'bold' } } }
+                    } 
                 }
-            }
-        });
+            });
 
-        // 5. Visits by State Chart (Bar)
-        new Chart(document.getElementById('stateChart'), {
-            type: 'bar',
-            data: {
-                labels: {{ state_labels_json|safe }},
-                datasets: [{
-                    data: {{ state_data_json|safe }},
-                    backgroundColor: '#0284c7',
-                    borderRadius: 6
-                }]
-            },
-            options: chartOptions
-        });
+            // Product Sales Donut
+            new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
+                type: 'doughnut',
+                data: { 
+                    labels: {{ prod_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ prod_data_json|safe|default:"[]" }}, 
+                        backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#475569'], 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
+            });
 
-        // 6. Field Problems Chart (Doughnut)
-        new Chart(document.getElementById('problemChart'), {
-            type: 'doughnut',
-            data: {
-                labels: {{ problem_labels_json|safe }},
-                datasets: [{
-                    data: {{ problem_data_json|safe }},
-                    backgroundColor: ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#64748b'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } }
-                }
-            }
+            // Problems Donut
+            new Chart(document.getElementById('problemsDonut').getContext('2d'), {
+                type: 'doughnut',
+                data: { 
+                    labels: {{ problem_labels_json|safe|default:"[]" }}, 
+                    datasets: [{ 
+                        data: {{ problem_data_json|safe|default:"[]" }}, 
+                        backgroundColor: ['#f43f5e', '#f59e0b', '#10b981', '#06b6d4', '#475569'], 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { ...baseOptions, cutout: '75%', plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 8, padding: 10, font: { size: 9 }, color: '#94a3b8' } } } }
+            });
         });
     </script>
 </body>
