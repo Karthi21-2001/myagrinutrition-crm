@@ -710,36 +710,28 @@ def get_dashboard_context(request):
         'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
         'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
-        'funnel_stages': funnel_stages,
-        'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
+        'funnel_list': funnel_list,
 
+        'geo_district_performance': geo_district_performance,
         'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
         'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
-        'geo_district_performance': geo_district_performance,
 
-        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
-        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
-        'reported_problems': reported_problems,
-        'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
+        'bird_counts_js': json.dumps(bird_counts, cls=DjangoJSONEncoder),
+        'bird_labels_js': json.dumps(bird_labels, cls=DjangoJSONEncoder),
+        'problems_list': problems_list,
         'segment_breakdown': segment_breakdown,
-
         'visit_frequency_exec': visit_frequency_exec,
-        
-        'month_wise_cycle': month_wise_qs,
-        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-        
-        'year_wise_trends': year_wise_qs,
-        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
+
+        'month_wise_labels_js': json.dumps(list(month_wise_labels), cls=DjangoJSONEncoder),
+        'month_wise_data_js': json.dumps(list(month_wise_data), cls=DjangoJSONEncoder),
+        'year_wise_labels_js': json.dumps(list(year_wise_labels), cls=DjangoJSONEncoder),
+        'year_wise_data_js': json.dumps(list(year_wise_data), cls=DjangoJSONEncoder),
 
         'recent_visits': recent_visits_queryset,
-
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
-        'country_list': ['India'],
 
         'selected_state': sel_state,
         'selected_country': sel_country,
@@ -747,69 +739,42 @@ def get_dashboard_context(request):
         'selected_executive': sel_executive,
         'selected_month': sel_month,
         'selected_year': sel_year,
+        'start_date': start_date_str,
+        'end_date': end_date_str,
     }
 
 
 # ==========================================
-# 🎯 SAFE CONTROLLER VIEWS (WITH FALLBACKS)
+# 🖥️ DASHBOARD ROUTING ENDPOINTS
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Render Main Dashboard with template safe fallback"""
-    templates = ['crm_core/dashboard.html', 'dashboard.html', 'crm_core/dashboard_home.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load dashboard: {str(e)}")
-        return render_safe(request, templates, {})
+    """Primary Executive & Admin Analytics Dashboard view."""
+    context = get_dashboard_context(request)
+    return render_safe(request, ['crm_core/dashboard.html', 'dashboard.html'], context)
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    """Render Analytics Report dashboard with template safe fallback"""
-    templates = ['crm_core/analytics_report.html', 'analytics_report.html', 'crm_core/analytics.html', 'analytics.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load analytics report: {str(e)}")
-        return render_safe(request, templates, {})
+    """Secondary Analytics endpoint for charts or detailed reporting views."""
+    context = get_dashboard_context(request)
+    return render_safe(request, ['crm_core/analytics.html', 'analytics.html'], context)
 
 
 @login_required(login_url='/crm/login/')
-def executive_analytics_view(request):
-    """Render Executive Analytics dashboard with template safe fallback"""
-    templates = ['crm_core/executive_analytics.html', 'executive_analytics.html', 'crm_core/analytics_report.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load executive analytics: {str(e)}")
-        return render_safe(request, templates, {})
-
-
-# ==========================================
-# 🛰️ GEOLOCATION & UTILITIES
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-def get_location_details(request):
-    lat = request.GET.get('lat')
-    lng = request.GET.get('lng')
-    return JsonResponse({'status': 'success', 'lat': lat, 'lng': lng})
-
-
-# ==========================================
-# 🛠️ DASHBOARD MAINTENANCE & ACTION VIEWS
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-def clear_dashboard_data(request):
-    """Placeholder view to handle dashboard data clear requests safely."""
-    messages.info(request, "Clear dashboard functionality is currently disabled.")
-    return redirect('dashboard_home')
+def api_dashboard_metrics(request):
+    """JSON API endpoint returning calculated metrics dynamically for asynchronous frontend updates."""
+    context = get_dashboard_context(request)
+    api_payload = {
+        'total_revenue': context['total_revenue'],
+        'total_visits': context['total_visits'],
+        'active_executives': context['active_executives'],
+        'total_farms': context['total_farms'],
+        'total_sales_volume': context['total_sales_volume'],
+        'paid_orders_count': context['paid_orders_count'],
+        'avg_order_value': context['avg_order_value'],
+        'conversion_rate': context['conversion_rate'],
+        'pipeline_spread': context['pipeline_spread'],
+    }
+    return JsonResponse(api_payload)
