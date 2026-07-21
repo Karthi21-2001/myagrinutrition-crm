@@ -518,7 +518,7 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
-        # 4. Executive Performance (Safely handling conditional aggregations)
+        # 4. Executive Performance
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
@@ -547,7 +547,7 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
-        # 5. Maps & Telemetry (Safely avoiding key alias duplication)
+        # 5. Maps & Telemetry
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
@@ -714,11 +714,12 @@ def get_dashboard_context(request):
 def dashboard_home(request):
     try:
         context = get_dashboard_context(request)
-        return render(request, 'crm_core/dashboard_home.html', context)
+        # Pointing to crm_core/dashboard.html to eliminate TemplateDoesNotExist error
+        return render(request, 'crm_core/dashboard.html', context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
         messages.error(request, f"Unable to load dashboard: {str(e)}")
-        return render(request, 'crm_core/dashboard_home.html', {})
+        return render(request, 'crm_core/dashboard.html', {})
 
 
 @login_required(login_url='/crm/login/')
