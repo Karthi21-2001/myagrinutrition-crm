@@ -1,25 +1,24 @@
+import csv
 import json
 import logging
 import openpyxl
+import requests
+import traceback
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import (
-    Avg, Count, F, Q, Sum, Case, When, IntegerField, FloatField, ExpressionWrapper
-)
-from django.db.models.functions import TruncMonth, TruncYear, Coalesce
+from django.db.models import Avg, Count, DecimalField, F, Q, Sum
+from django.db.models.functions import TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.template import TemplateDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-# Local Application Imports
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
 
@@ -27,21 +26,8 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-# Helper function to render templates safely across folder structures
-def render_safe(request, template_names, context=None):
-    if isinstance(template_names, str):
-        template_names = [template_names]
-
-    for t in template_names:
-        try:
-            return render(request, t, context)
-        except TemplateDoesNotExist:
-            continue
-    raise TemplateDoesNotExist(f"None of these templates exist: {template_names}")
-
-
 # ==========================================
-# EXECUTIVE AUTHENTICATION CONTROLLERS
+# 🔐 EXECUTIVE AUTHENTICATION CONTROLLERS
 # ==========================================
 
 def register_user(request):
@@ -55,7 +41,7 @@ def register_user(request):
             return redirect('render_visit_form')
     else:
         form = ExecutiveSignUpForm()
-    return render_safe(request, ['crm_core/register.html', 'register.html'], {'form': form})
+    return render(request, 'crm_core/register.html', {'form': form})
 
 
 def login_user(request):
@@ -72,7 +58,7 @@ def login_user(request):
                 return redirect('render_visit_form')
     else:
         form = AuthenticationForm()
-    return render_safe(request, ['crm_core/login.html', 'login.html'], {'form': form})
+    return render(request, 'crm_core/login.html', {'form': form})
 
 
 def logout_user(request):
@@ -81,12 +67,12 @@ def logout_user(request):
 
 
 # ==========================================
-# AGRI-CORE MANAGEMENT FUNCTIONALITY
+# 🌱 AGRI-CORE MANAGEMENT FUNCTIONALITY
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def render_visit_form(request):
-    return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'])
+    return render(request, 'crm_core/farm_visit_form.html')
 
 
 @login_required(login_url='/crm/login/')
@@ -210,18 +196,18 @@ def save_farm_visit(request):
             if request.user.is_staff or request.user.is_superuser:
                 return redirect('dashboard_home')
 
-            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
+            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
             messages.error(request, f"Database transaction block failed: {str(e)}")
-            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
+            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
     return redirect('render_visit_form')
 
 
 # ==========================================
-# EXCEL EXPORT ENGINE
+# 📥 EXCEL EXPORT ENGINE
 # ==========================================
 
 @csrf_exempt
@@ -270,8 +256,8 @@ def export_visits_to_excel(request):
     )
 
     headers = [
-        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number',
-        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb',
+        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
+        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
         'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
         'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
         'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
@@ -286,32 +272,32 @@ def export_visits_to_excel(request):
 
     all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
         'farm', 'executive'
-    ).prefetch_related('visited_products').order_by('-visit_date')
+    ).order_by('-visit_date')
 
     current_row = 2
     for v in all_visits:
-        f = v.farm
-        products = list(v.visited_products.all())
-        product_loop_list = products if products else [None]
+        f = v.farm if v else None
+        products = VisitedProductDetail.objects.filter(visit=v)
+        product_loop_list = products if products.exists() else [None]
 
         for p in product_loop_list:
-            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v.visit_date else "")
-            ws_data.cell(row=current_row, column=2, value=v.executive.username if v.executive else "")
+            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
+            ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
             ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
             ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
             ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
             ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-            ws_data.cell(row=current_row, column=7, value=f.sub_segment if (f and f.sub_segment) else "")
+            ws_data.cell(row=current_row, column=7, value=f.sub_segment if (f and f.sub_segment) else "") 
             ws_data.cell(row=current_row, column=8, value=f.state if f else "")
             ws_data.cell(row=current_row, column=9, value=f.district if f else "")
             ws_data.cell(row=current_row, column=10, value=f.area if f else "")
 
-            ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
-
-            ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=11, value=v.farm_problem if (v and v.farm_problem) else "None reported")
+            
+            ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
+            ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
+            ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
+            ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
 
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
@@ -336,7 +322,7 @@ def export_visits_to_excel(request):
             for c_idx in range(1, 26):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
-                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]:
+                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]: 
                     cell_item.alignment = Alignment(horizontal="center")
 
             current_row += 1
@@ -354,7 +340,7 @@ def export_visits_to_excel(request):
 
 
 # ==========================================
-# DASHBOARDS & ADVANCED ANALYTICS PIPELINES
+# 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
 # ==========================================
 
 def get_dashboard_context(request):
@@ -386,7 +372,7 @@ def get_dashboard_context(request):
     problems_list = []
     segment_breakdown = []
     visit_frequency_exec = []
-
+    
     month_wise_qs = []
     month_wise_labels, month_wise_data = [], []
     year_wise_qs = []
@@ -403,9 +389,6 @@ def get_dashboard_context(request):
     sel_executive = request.GET.get('executive', '').strip()
     sel_month = request.GET.get('month', '').strip()
     sel_year = request.GET.get('year', '').strip()
-
-    start_date_str = request.GET.get('start_date', '').strip()
-    end_date_str = request.GET.get('end_date', '').strip()
 
     try:
         farm_filters = Q()
@@ -443,40 +426,21 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        if start_date_str:
-            try:
-                visit_filters &= Q(visit_date__gte=start_date_str)
-                product_filters &= Q(visit__visit_date__gte=start_date_str)
-            except ValueError:
-                pass
-
-        if end_date_str:
-            try:
-                visit_filters &= Q(visit_date__lte=end_date_str)
-                product_filters &= Q(visit__visit_date__lte=end_date_str)
-            except ValueError:
-                pass
-
         # 1. Primary Metrics Aggregations
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
         active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
-        computed_rev = ExpressionWrapper(
-            Coalesce(F('sale_quantity'), 0) * Coalesce(F('primary_price'), 0.0, output_field=FloatField()),
-            output_field=FloatField()
-        )
-
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            total=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField())
+            total=Sum('revenue_generated')
         )['total'] or 0.0
 
         vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            total_qty=Coalesce(Sum('sale_quantity'), 0)
+            total_qty=Sum('sale_quantity')
         )['total_qty'] or 0
 
         paid_orders_count = VisitedProductDetail.objects.filter(
-            product_filters,
+            product_filters, 
             sale_quantity__gt=0
         ).count()
 
@@ -505,35 +469,29 @@ def get_dashboard_context(request):
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
-            .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
-                volume=Coalesce(Sum('sale_quantity'), 0)
-            )
+            .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
             .filter(month__isnull=False)
             .order_by('month')
         )
 
         combo_labels = [t['month'].strftime("%b %Y") for t in time_series_data if t.get('month')]
-        combo_revenue = [float(t.get('revenue') or 0.0) for t in time_series_data]
+        combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
         # 3. Product Performance & Pricing Table
         product_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
-            .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
-                qty_sold=Coalesce(Sum('sale_quantity'), 0)
-            )
+            .annotate(revenue=Sum('revenue_generated'), qty_sold=Sum('sale_quantity'))
             .order_by('-revenue')
         )
         top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
-        top_prod_revenue = [float(p['revenue'] or 0.0) for p in product_performance]
+        top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
 
         pipeline_spread_agg = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            actual=Coalesce(Sum('sale_quantity'), 0),
-            target=Coalesce(Sum('target_quantity'), 0),
-            potential=Coalesce(Sum('potential_quantity'), 0)
+            actual=Sum('sale_quantity'),
+            target=Sum('target_quantity'),
+            potential=Sum('potential_quantity')
         )
         if pipeline_spread_agg:
             pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
@@ -541,7 +499,7 @@ def get_dashboard_context(request):
         product_pricing_table = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
-            .annotate(avg_unit_price=Coalesce(Avg('primary_price'), 0.0))
+            .annotate(avg_unit_price=Avg('primary_price'))
             .order_by('product_name')
         )
 
@@ -550,21 +508,15 @@ def get_dashboard_context(request):
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
             .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
+                revenue=Sum('revenue_generated'),
                 total_items=Count('id'),
-                hot_items=Sum(
-                    Case(
-                        When(process_status__iexact='Hot', then=1),
-                        default=0,
-                        output_field=IntegerField()
-                    )
-                )
+                hot_items=Count('id', filter=Q(process_status__iexact='Hot'))
             )
             .order_by('-revenue')
         )
         exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
-        exec_revenue = [float(e['revenue'] or 0.0) for e in executive_performance]
-        exec_conv_pct = [round(((e['hot_items'] or 0) / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
+        exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
+        exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
 
         funnel_stages = (
             VisitedProductDetail.objects.filter(product_filters)
@@ -580,12 +532,14 @@ def get_dashboard_context(request):
             .values('visit__farm__state', 'visit__farm__district')
             .annotate(
                 farm_count=Count('visit__farm', distinct=True),
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField())
+                revenue=Sum('revenue_generated'),
+                state=F('visit__farm__state'),
+                district=F('visit__farm__district')
             )
             .order_by('-revenue')
         )
-        map_labels = [d['visit__farm__district'] if d.get('visit__farm__district') else 'Unknown' for d in geo_district_performance[:10]]
-        map_revenue = [float(d['revenue'] or 0.0) for d in geo_district_performance[:10]]
+        map_labels = [d['district'] if d.get('district') else 'Unknown' for d in geo_district_performance[:10]]
+        map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
 
         telemetry_audit_log = (
             FarmVisitReport.objects.filter(visit_filters)
@@ -597,10 +551,10 @@ def get_dashboard_context(request):
         # 6. Demographics
         try:
             bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-                chicks=Coalesce(Sum('farm__chicks_count'), 0),
-                growers=Coalesce(Sum('farm__grower_count'), 0),
-                layers=Coalesce(Sum('farm__layer_count'), 0),
-                culling=Coalesce(Sum('farm__culling_bird_count'), 0)
+                chicks=Sum('chicks_count'),
+                growers=Sum('grower_count'),
+                layers=Sum('layer_count'),
+                culling=Sum('culling_bird')
             )
             if bird_population:
                 bird_counts = [
@@ -640,39 +594,28 @@ def get_dashboard_context(request):
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
-            .annotate(revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()))
+            .annotate(revenue=Sum('revenue_generated'))
             .filter(month__isnull=False)
             .order_by('month')
         )
         month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
-        month_wise_data = [float(m['revenue'] or 0.0) for m in month_wise_qs]
+        month_wise_data = [float(m['revenue'] or 0) for m in month_wise_qs]
 
         year_wise_qs = list(
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(year=TruncYear('visit__visit_date'))
             .values('year')
-            .annotate(revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()))
+            .annotate(revenue=Sum('revenue_generated'))
             .filter(year__isnull=False)
             .order_by('year')
         )
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
-        year_wise_data = [float(y['revenue'] or 0.0) for y in year_wise_qs]
+        year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        # 8. Table Display Mapping
+        # 8. Tables
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
-        ).select_related('farm', 'executive').prefetch_related('visited_products').annotate(
-            total_calculated_revenue=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        Coalesce(F('visited_products__sale_quantity'), 0) * Coalesce(F('visited_products__primary_price'), 0.0, output_field=FloatField()),
-                        output_field=FloatField()
-                    )
-                ),
-                0.0,
-                output_field=FloatField()
-            )
-        ).order_by('-visit_date')[:10]
+        ).select_related('farm', 'executive').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
@@ -697,25 +640,22 @@ def get_dashboard_context(request):
         'poultry_pct': poultry_pct,
         'aqua_pct': aqua_pct,
 
-        # Chart JSON Mapping - Exactly matching template keys
-        'time_series_labels_json': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
-        'time_series_revenue_json': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
-        'time_series_volume_json': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
-
-        'top_product_labels_json': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
-        'top_product_revenue_json': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
-
+        'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
+        'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
+        'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
+        'top_prod_labels_js': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
+        'top_prod_revenue_js': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
 
-        'executive_labels_json': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
-        'executive_revenue_json': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
+        'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
+        'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
         'funnel_stages': funnel_stages,
         'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
 
-        'district_labels_json': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
-        'district_revenue_json': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
+        'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
+        'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
         'geo_district_performance': geo_district_performance,
 
@@ -728,12 +668,12 @@ def get_dashboard_context(request):
         'visit_frequency_exec': visit_frequency_exec,
 
         'month_wise_cycle': month_wise_qs,
-        'month_labels_json': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-        'month_data_json': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
+        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
+        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
 
         'year_wise_trends': year_wise_qs,
-        'year_labels_json': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-        'year_data_json': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
+        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
+        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
 
         'recent_visits': recent_visits_queryset,
 
@@ -751,66 +691,19 @@ def get_dashboard_context(request):
     }
 
 
-# ==========================================
-# SAFE CONTROLLER VIEWS (WITH FALLBACKS)
-# ==========================================
-
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Render Main Dashboard with template safe fallback"""
-    templates = ['crm_core/dashboard.html', 'dashboard.html', 'crm_core/dashboard_home.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load dashboard: {str(e)}")
-        return render_safe(request, templates, {})
+    context = get_dashboard_context(request)
+    return render(request, 'crm_core/dashboard.html', context)
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    """Render Analytics Report dashboard with template safe fallback"""
-    templates = ['crm_core/analytics_report.html', 'analytics_report.html', 'crm_core/analytics.html', 'analytics.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load analytics report: {str(e)}")
-        return render_safe(request, templates, {})
+    context = get_dashboard_context(request)
+    return render(request, 'crm_core/analytics_report.html', context)
 
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    """Render Executive Analytics dashboard with template safe fallback"""
-    templates = ['crm_core/executive_analytics.html', 'executive_analytics.html', 'crm_core/analytics_report.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load executive analytics: {str(e)}")
-        return render_safe(request, templates, {})
-
-
-# ==========================================
-# GEOLOCATION & UTILITIES
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-def get_location_details(request):
-    lat = request.GET.get('lat')
-    lng = request.GET.get('lng')
-    return JsonResponse({'status': 'success', 'lat': lat, 'lng': lng})
-
-
-# ==========================================
-# DASHBOARD MAINTENANCE & ACTION VIEWS
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-def clear_dashboard_data(request):
-    """Placeholder view to handle dashboard data clear requests safely."""
-    messages.info(request, "Clear dashboard functionality is currently disabled.")
-    return redirect('dashboard_home')
+    context = get_dashboard_context(request)
+    return render(request, 'crm_core/analytics_report.html', context)
