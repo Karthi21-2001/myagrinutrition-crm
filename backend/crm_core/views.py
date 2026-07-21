@@ -681,7 +681,12 @@ def get_dashboard_context(request):
 
     except Exception as e:
         logger.error(f"Error computing get_dashboard_context: {str(e)}", exc_info=True)
-return {
+        
+   def get_dashboard_context(request):
+    # ... logic here ...
+    selected_year = sel_year
+
+    return {  # <--- Indented inside the function
         'total_revenue': total_rev,
         'total_visits': v_count,
         'active_executives': active_executives,
@@ -697,26 +702,22 @@ return {
         'poultry_pct': poultry_pct,
         'aqua_pct': aqua_pct,
 
-        # --- FIX: Match template key names for Combo / Time Series ---
         'time_series_labels_json': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
         'time_series_revenue_json': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
         'time_series_volume_json': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
         
-        # --- FIX: Match template key names for Top Products ---
         'top_product_labels_json': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
         'top_product_revenue_json': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
         
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
 
-        # --- FIX: Match template key names for Executive Performance ---
         'executive_labels_json': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
         'executive_revenue_json': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
         'funnel_stages': funnel_stages,
         'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
 
-        # --- FIX: Match template key names for Map / District ---
         'district_labels_json': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
         'district_revenue_json': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
@@ -730,12 +731,10 @@ return {
 
         'visit_frequency_exec': visit_frequency_exec,
 
-        # --- FIX: Match template key names for Monthly Trend Chart ---
         'month_wise_cycle': month_wise_qs,
         'month_labels_json': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
         'month_data_json': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
 
-        # --- FIX: Match template key names for Yearly Trend Chart ---
         'year_wise_trends': year_wise_qs,
         'year_labels_json': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
         'year_data_json': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
@@ -754,7 +753,6 @@ return {
         'selected_month': sel_month,
         'selected_year': sel_year,
     }
-
 
 # ==========================================
 # SAFE CONTROLLER VIEWS (WITH FALLBACKS)
