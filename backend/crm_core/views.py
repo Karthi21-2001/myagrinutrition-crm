@@ -169,7 +169,7 @@ def save_farm_visit(request):
                         sale_quantity=s_qty,
                         unit_type=unit,
                         primary_price=price,
-                        revenue_generated=price,
+                        revenue_generated=price * s_qty
                         process_status='Hot' if s_qty > 0 else 'Warm',
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
