@@ -74,7 +74,7 @@
                     <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
                 </select>
                 
-                <!-- 📥 EXPORT LINK UPDATED HERE -->
+                <!-- 📥 EXPORT LINK -->
                 <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
                     <i class="fa-solid fa-file-excel"></i> Export Matrix
                 </a>
@@ -312,17 +312,53 @@
                     <tbody id="visitLogTableBody" class="divide-y divide-slate-800/40 font-medium text-slate-300">
                         {% for visit in recent_visits %}
                             <tr class="hover:bg-slate-800/10 transition duration-150">
-                                <td class="p-3.5 pl-5 font-semibold text-slate-500">{{ visit.date|date:"d-M-Y" }}</td>
-                                <td class="p-3.5 text-slate-200 font-bold">{{ visit.executive.get_full_name|default:visit.executive.username }}</td>
-                                <td class="p-3.5 flex flex-col">
-                                    <span class="font-bold text-slate-300">{{ visit.farm.name }}</span>
-                                    <span class="text-[10px] text-slate-500">Owner: {{ visit.farm.owner_name }}</span>
+                                <!-- Date Logged (with Fallback) -->
+                                <td class="p-3.5 pl-5 font-semibold text-slate-500">
+                                    {{ visit.visit_date|default:visit.created_at|date:"d-M-Y" }}
                                 </td>
-                                <td class="p-3.5 text-slate-400">{{ visit.location }}</td>
-                                <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">₹{{ visit.order_value }}</td>
+
+                                <!-- Executive Name -->
+                                <td class="p-3.5 text-slate-200 font-bold">
+                                    {{ visit.executive.get_full_name|default:visit.executive.username }}
+                                </td>
+
+                                <!-- Farm Identification -->
+                                <td class="p-3.5 flex flex-col">
+                                    <span class="font-bold text-slate-300">
+                                        {{ visit.farm.name|default:"Unnamed Farm" }}
+                                    </span>
+                                    <span class="text-[10px] text-slate-500">
+                                        Owner: {{ visit.farm_owner|default:"N/A" }}
+                                    </span>
+                                </td>
+
+                                <!-- Geographic Hierarchy -->
+                                <td class="p-3.5 text-slate-400">
+                                    {% if visit.district or visit.state %}
+                                        {{ visit.district }}{% if visit.district and visit.state %}, {% endif %}{{ visit.state }}
+                                    {% else %}
+                                        Unassigned Region
+                                    {% endif %}
+                                </td>
+
+                                <!-- Order Revenue Value -->
+                                <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">
+                                    ₹{{ visit.calculated_total|default:"0.00" }}
+                                </td>
+
+                                <!-- GPS Routing -->
                                 <td class="p-3.5 text-center">
-                                    {% if visit.gps_link %}
-                                        <a href="{{ visit.gps_link }}" target="_blank" class="text-slate-500 hover:text-cyan-400 text-sm"><i class="fa-solid fa-location-dot"></i></a>
+                                    {% if visit.latitude and visit.longitude %}
+                                        <a href="https://maps.google.com/?q={{ visit.latitude }},{{ visit.longitude }}" 
+                                           target="_blank" 
+                                           class="text-slate-500 hover:text-cyan-400 text-sm transition"
+                                           title="View on Maps ({{ visit.latitude }}, {{ visit.longitude }})">
+                                            <i class="fa-solid fa-location-dot"></i>
+                                        </a>
+                                    {% elif visit.latitude %}
+                                        <span class="text-slate-400 text-xs font-mono" title="Latitude">
+                                            📍 {{ visit.latitude }}
+                                        </span>
                                     {% else %}
                                         <span class="text-slate-600"><i class="fa-solid fa-location-dot"></i></span>
                                     {% endif %}
@@ -330,7 +366,9 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="6" class="p-6 text-center text-slate-500">No recent visit logs found.</td>
+                                <td colspan="6" class="p-6 text-center text-slate-500">
+                                    No recent visit logs found.
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
