@@ -19,6 +19,15 @@ from django.template import TemplateDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from django.shortcuts import render, redirect, get_object_or_400
+from django.contrib import messages
+from django.db.models import Sum, Count, F, Avg
+from django.db.models.functions import TruncMonth, TruncYear
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+
+# Import your models (adjust model names if yours differ)
+from .models import VisitLog, PipelineItem, OrderItem, Executive, Farm
 
 # Local Application Imports
 from .forms import ExecutiveSignUpForm
@@ -813,3 +822,331 @@ def clear_dashboard_data(request):
     """Placeholder view to handle dashboard data clear requests safely."""
     messages.info(request, "Clear dashboard functionality is currently disabled.")
     return redirect('dashboard_home')
+
+# =====================================================================
+# 1. FORM SUBMISSION VIEW: Captures data from Field Visiting Log Form
+# =====================================================================
+@login_required
+def submit_visit_log(request):
+    """
+    Handles POST requests from the 'MY AGRINUTRITION FIELD VISITING LOG' page.
+    Saves Farm Profile, GPS Metrics, Diagnostics, Pipelines, and Orders.
+    """
+    if request.method == 'POST':
+        try:
+            # A. General Farm Profile & GPS Metrics
+            farm_name = request.POST.get('farm_name', '').strip()
+            owner_name = request.POST.get('owner_name', '').strip()
+            contact_number = request.POST.get('contact_number', '').strip()
+            
+            district = request.POST.get('district', '').strip()
+            area = request.POST.get('area', '').strip()
+            state = request.POST.get('state', '').strip()
+            latitude = request.POST.get('latitude', None)
+            longitude = request.POST.get('longitude', None)
+
+            # B. Diagnostic Metrics
+            sector = request.POST.get('sector', '').strip()            # e.g. POULTRY / AQUA
+            sub_sector = request.POST.get('sub_sector', '').strip()    # e.g. Broiler / Layer / Shrimp
+            problem_observed = request.POST.get('problem_observed', '').strip()
+
+            # C. Shed Inventory Counts
+            chicks_count = int(request.POST.get('chicks_count', 0) or 0)
+            grower_count = int(request.POST.get('grower_count', 0) or 0)
+            layer_count = int(request.POST.get('layer_count', 0) or 0)
+            culling_count = int(request.POST.get('culling_count', 0) or 0)
+
+            # --- Create or Retrieve Farm Record ---
+            farm_obj, _ = Farm.objects.get_or_create(
+                name=farm_name if farm_name else "Unassigned Farm",
+                defaults={'owner_name': owner_name, 'contact': contact_number}
+            )
+
+            # --- Create Main Visit Log Record ---
+            visit = VisitLog.objects.create(
+                executive=request.user,
+                farm=farm_obj,
+                farm_owner=owner_name,
+                contact=contact_number,
+                district=district,
+                area=area,
+                state=state,
+                latitude=latitude if latitude else None,
+                longitude=longitude if longitude else None,
+                sector=sector,
+                sub_sector=sub_sector,
+                problem_observed=problem_observed,
+                chicks_count=chicks_count,
+                grower_count=grower_count,
+                layer_count=layer_count,
+                culling_count=culling_count
+            )
+
+            # D. Dynamic Pipeline Items Table
+            pipe_products = request.POST.getlist('pipe_product_name[]')
+            pipe_pot_qtys = request.POST.getlist('pipe_potential_qty[]')
+            pipe_target_qtys = request.POST.getlist('pipe_target_qty[]')
+            pipe_units = request.POST.getlist('pipe_units[]')
+            pipe_stages = request.POST.getlist('pipe_stage[]')        # Hot / Warm / Cold
+            pipe_convs = request.POST.getlist('pipe_conversion[]')
+
+            for prod, pot_qty, tgt_qty, unit, stage, conv in zip(
+                pipe_products, pipe_pot_qtys, pipe_target_qtys, pipe_units, pipe_stages, pipe_convs
+            ):
+                if prod.strip():
+                    PipelineItem.objects.create(
+                        visit=visit,
+                        product_name=prod.strip(),
+                        potential_qty=float(pot_qty or 0),
+                        target_qty=float(tgt_qty or 0),
+                        unit=unit,
+                        stage=stage,
+                        conversion_percentage=float(conv or 0)
+                    )
+
+            # E. Dynamic Confirmed Orders Table
+            order_products = request.POST.getlist('order_product_name[]')
+            order_qtys = request.POST.getlist('order_quantity[]')
+            order_units = request.POST.getlist('order_units[]')
+            order_rates = request.POST.getlist('order_rate[]')
+
+            for prod, qty, unit, rate in zip(order_products, order_qtys, order_units, order_rates):
+                num_qty = float(qty or 0)
+                num_rate = float(rate or 0)
+                if prod.strip() and num_qty > 0:
+                    OrderItem.objects.create(
+                        visit=visit,
+                        product_name=prod.strip(),
+                        quantity=num_qty,
+                        unit=unit,
+                        rate=num_rate,
+                        total_amount=num_qty * num_rate
+                    )
+
+            messages.success(request, f"Visit entry for '{farm_obj.name}' saved successfully!")
+            return redirect('analytics_dashboard')
+
+        except Exception as e:
+            messages.error(request, f"Error saving visit log: {str(e)}")
+            return redirect('submit_visit_log')
+
+    # GET Request: Display form
+    return render(request, 'field_log_form.html')
+
+
+# =====================================================================
+# 2. DASHBOARD VIEW: Processes & Aggregates Data for Chart.js
+# =====================================================================
+def analytics_dashboard(request):
+    """
+    Queries submitted VisitLogs, OrderItems, and PipelineItems,
+    aggregates metrics, and passes serialized JSON data for live charts.
+    """
+    # --- Form Filters (Executive, Date Range, Sector) ---
+    selected_exec = request.GET.get('executive', 'ALL')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    selected_sector = request.GET.get('sector', 'ALL')
+
+    # Base Querysets
+    visits_qs = VisitLog.objects.all().select_related('executive', 'farm')
+    orders_qs = OrderItem.objects.all().select_related('visit')
+    pipeline_qs = PipelineItem.objects.all().select_related('visit')
+
+    # Apply Filters
+    if selected_exec != 'ALL' and selected_exec.isdigit():
+        visits_qs = visits_qs.filter(executive_id=int(selected_exec))
+        orders_qs = orders_qs.filter(visit__executive_id=int(selected_exec))
+        pipeline_qs = pipeline_qs.filter(visit__executive_id=int(selected_exec))
+
+    if start_date:
+        visits_qs = visits_qs.filter(visit_date__gte=start_date)
+        orders_qs = orders_qs.filter(visit__visit_date__gte=start_date)
+        pipeline_qs = pipeline_qs.filter(visit__visit_date__gte=start_date)
+
+    if end_date:
+        visits_qs = visits_qs.filter(visit_date__lte=end_date)
+        orders_qs = orders_qs.filter(visit__visit_date__lte=end_date)
+        pipeline_qs = pipeline_qs.filter(visit__visit_date__lte=end_date)
+
+    if selected_sector != 'ALL':
+        visits_qs = visits_qs.filter(sector__iexact=selected_sector)
+        orders_qs = orders_qs.filter(visit__sector__iexact=selected_sector)
+        pipeline_qs = pipeline_qs.filter(visit__sector__iexact=selected_sector)
+
+    # -----------------------------------------------------------------
+    # 📊 KPI DECK CALCULATIONS
+    # -----------------------------------------------------------------
+    total_visits = visits_qs.count()
+    total_executives = visits_qs.values('executive').distinct().count()
+    total_farms = visits_qs.values('farm').distinct().count()
+    
+    total_qty = orders_qs.aggregate(sum_qty=Sum('quantity'))['sum_qty'] or 0
+    total_revenue_val = orders_qs.aggregate(sum_rev=Sum('total_amount'))['sum_rev'] or 0.0
+    
+    avg_revenue_val = (total_revenue_val / total_visits) if total_visits > 0 else 0.0
+
+    # Format Currency Values
+    total_revenue_str = f"{total_revenue_val:,.2f}"
+    avg_revenue_str = f"{avg_revenue_val:,.2f}"
+
+    # -----------------------------------------------------------------
+    # 📈 CHART 1: MONTH-WISE REVENUE REVIEW
+    # -----------------------------------------------------------------
+    monthly_data = (
+        orders_qs.annotate(month=TruncMonth('created_at'))
+        .values('month')
+        .annotate(total=Sum('total_amount'))
+        .order_by('month')
+    )
+    month_labels = [d['month'].strftime('%b %Y') for d in monthly_data if d['month']]
+    month_values = [float(d['total']) for d in monthly_data if d['month']]
+
+    # -----------------------------------------------------------------
+    # 📈 CHART 2: YEAR-WISE REVENUE REVIEW
+    # -----------------------------------------------------------------
+    yearly_data = (
+        orders_qs.annotate(year=TruncYear('created_at'))
+        .values('year')
+        .annotate(total=Sum('total_amount'))
+        .order_by('year')
+    )
+    year_labels = [str(d['year'].year) for d in yearly_data if d['year']]
+    year_values = [float(d['total']) for d in yearly_data if d['year']]
+
+    # -----------------------------------------------------------------
+    # 📊 CHART 3: REVENUE BY EXECUTIVE
+    # -----------------------------------------------------------------
+    exec_data = (
+        orders_qs.values('visit__executive__first_name', 'visit__executive__username')
+        .annotate(total=Sum('total_amount'))
+        .order_by('-total')
+    )
+    exec_labels = [
+        d['visit__executive__first_name'] or d['visit__executive__username'] or "Unknown"
+        for d in exec_data
+    ]
+    exec_values = [float(d['total']) for d in exec_data]
+
+    # -----------------------------------------------------------------
+    # 🍩 CHART 4: PRODUCT ALLOCATION (ORDER VOLUME)
+    # -----------------------------------------------------------------
+    prod_data = (
+        orders_qs.values('product_name')
+        .annotate(total_vol=Sum('quantity'))
+        .order_by('-total_vol')[:6]
+    )
+    prod_labels = [d['product_name'] for d in prod_data]
+    prod_values = [float(d['total_vol']) for d in prod_data]
+
+    # -----------------------------------------------------------------
+    # 🗺️ CHART 5: VISITS BY STATE
+    # -----------------------------------------------------------------
+    state_data = (
+        visits_qs.values('state')
+        .annotate(total_visits=Count('id'))
+        .order_by('-total_visits')[:6]
+    )
+    state_labels = [d['state'] if d['state'] else "Unassigned" for d in state_data]
+    state_values = [d['total_visits'] for d in state_data]
+
+    # -----------------------------------------------------------------
+    # 🔬 CHART 6: FIELD PROBLEMS OBSERVED
+    # -----------------------------------------------------------------
+    prob_data = (
+        visits_qs.exclude(problem_observed='')
+        .values('problem_observed')
+        .annotate(prob_count=Count('id'))
+        .order_by('-prob_count')[:5]
+    )
+    prob_labels = [d['problem_observed'] for d in prob_data]
+    prob_values = [d['prob_count'] for d in prob_data]
+
+    # -----------------------------------------------------------------
+    # 🌡️ PIPELINE TEMPERATURE % METRICS
+    # -----------------------------------------------------------------
+    total_pipe_items = pipeline_qs.count() or 1
+    hot_count = pipeline_qs.filter(stage__iexact='Hot').count()
+    warm_count = pipeline_qs.filter(stage__iexact='Warm').count()
+    cold_count = pipeline_qs.filter(stage__iexact='Cold').count()
+
+    pipeline_hot = round((hot_count / total_pipe_items) * 100)
+    pipeline_warm = round((warm_count / total_pipe_items) * 100)
+    pipeline_cold = round((cold_count / total_pipe_items) * 100)
+
+    # -----------------------------------------------------------------
+    # 🐓/🐟 SECTOR DISTRIBUTION % METRICS
+    # -----------------------------------------------------------------
+    total_sector_visits = visits_qs.count() or 1
+    poultry_count = visits_qs.filter(sector__iexact='POULTRY').count()
+    aqua_count = visits_qs.filter(sector__iexact='AQUA').count()
+
+    sector_poultry_pct = round((poultry_count / total_sector_visits) * 100)
+    sector_aqua_pct = round((aqua_count / total_sector_visits) * 100)
+
+    # -----------------------------------------------------------------
+    # 🏆 TOP FARMS BY BOOKING REVENUE & RECENT VISITS LEDGER
+    # -----------------------------------------------------------------
+    top_farms = (
+        orders_qs.values('visit__farm__name')
+        .annotate(revenue=Sum('total_amount'))
+        .order_by('-revenue')[:5]
+    )
+    top_farms_list = [
+        {'name': item['visit__farm__name'] or 'Unnamed Farm', 'revenue': f"{item['revenue']:,.2f}"}
+        for item in top_farms
+    ]
+
+    recent_visits = visits_qs.order_by('-created_at')[:10]
+
+    # -----------------------------------------------------------------
+    # 📦 CONTEXT DICTIONARY
+    # -----------------------------------------------------------------
+    context = {
+        # Dropdown options
+        'executives_list': Executive.objects.all(),
+        'selected_executive': selected_exec,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_sector': selected_sector,
+
+        # Top KPIs
+        'total_visits': total_visits,
+        'total_executives': total_executives,
+        'total_farms': total_farms,
+        'total_qty': f"{total_qty:,.0f}",
+        'total_revenue': total_revenue_str,
+        'avg_revenue': avg_revenue_str,
+
+        # Serialized JSON string arrays for JavaScript Chart rendering
+        'month_labels_json': json.dumps(month_labels),
+        'month_data_json': json.dumps(month_values),
+        
+        'year_labels_json': json.dumps(year_labels),
+        'year_data_json': json.dumps(year_values),
+        
+        'exec_labels_json': json.dumps(exec_labels),
+        'exec_data_json': json.dumps(exec_values),
+        
+        'prod_labels_json': json.dumps(prod_labels),
+        'prod_data_json': json.dumps(prod_values),
+        
+        'state_labels_json': json.dumps(state_labels),
+        'state_data_json': json.dumps(state_values),
+        
+        'problem_labels_json': json.dumps(prob_labels),
+        'problem_data_json': json.dumps(prob_values),
+
+        # Pipeline & Sector Percentages
+        'pipeline_hot': pipeline_hot,
+        'pipeline_warm': pipeline_warm,
+        'pipeline_cold': pipeline_cold,
+        'sector_poultry_pct': sector_poultry_pct,
+        'sector_aqua_pct': sector_aqua_pct,
+
+        # Table Ledgers
+        'top_farms': top_farms_list,
+        'recent_visits': recent_visits,
+    }
+
+    return render(request, 'dashboard.html', context)
