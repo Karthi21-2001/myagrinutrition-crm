@@ -710,11 +710,15 @@ def get_dashboard_context(request):
     }
 
 
+# ==========================================
+# 🎯 FIXED RENDER CONTROLLERS
+# ==========================================
+
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
+    """Render Main Dashboard safely"""
     try:
         context = get_dashboard_context(request)
-        # Pointing to crm_core/dashboard.html to eliminate TemplateDoesNotExist error
         return render(request, 'crm_core/dashboard.html', context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
@@ -724,17 +728,19 @@ def dashboard_home(request):
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
+    """Render Analytics Report dashboard safely"""
     try:
         context = get_dashboard_context(request)
-        return render(request, 'crm_core/analytics.html', context)
+        return render(request, 'crm_core/analytics_report.html', context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load analytics: {str(e)}")
-        return render(request, 'crm_core/analytics.html', {})
+        messages.error(request, f"Unable to load analytics report: {str(e)}")
+        return render(request, 'crm_core/analytics_report.html', {})
 
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
+    """Render Executive Analytics dashboard safely"""
     try:
         context = get_dashboard_context(request)
         return render(request, 'crm_core/executive_analytics.html', context)
