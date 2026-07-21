@@ -423,11 +423,8 @@ def get_dashboard_context(request):
                 y_val = int(sel_year)
                 visit_filters &= Q(visit_date__year=y_val)
                 product_filters &= Q(visit__visit_date__year=y_val)
-            except ValueError:
-                pass
-
-User = get_user_model()
-logger = logging.getLogger(__name__)
+                User = get_user_model()
+                logger = logging.getLogger(__name__)
 
 def get_dashboard_context(request):
     """
