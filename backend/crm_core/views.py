@@ -707,3 +707,22 @@ def dashboard_analytics(request):
 def executive_analytics_view(request):
     context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
+
+@login_required(login_url='/crm/login/')
+@user_passes_test(lambda u: u.is_staff or u.is_superuser)
+def clear_dashboard_data(request):
+    """
+    Clears all farm visit, product detail, and farm records from the CRM.
+    Restricted to superusers/staff.
+    """
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                VisitedProductDetail.objects.all().delete()
+                FarmVisitReport.objects.all().delete()
+                Farm.objects.all().delete()
+            messages.success(request, "Dashboard data cleared successfully!")
+        except Exception as e:
+            logger.error(f"Failed to clear dashboard data: {str(e)}")
+            messages.error(request, f"Error clearing data: {str(e)}")
+    return redirect('dashboard_home')
