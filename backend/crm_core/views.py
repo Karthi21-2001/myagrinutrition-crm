@@ -659,7 +659,7 @@ def get_dashboard_context(request):
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
         year_wise_data = [float(y['revenue'] or 0.0) for y in year_wise_qs]
 
-        # 8. Table Display Mapping
+# 8. Table Display Mapping
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
         ).select_related('farm', 'executive').prefetch_related('visited_products').annotate(
@@ -675,9 +675,9 @@ def get_dashboard_context(request):
             )
         ).order_by('-visit_date')[:10]
 
-        state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
-        district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
-        executive_list = User.objects.filter(is_active=True).values_list('username', flat=True).distinct()
+        state_list = list(Farm.objects.values_list('state', flat=True).distinct().exclude(state=''))
+        district_list = list(Farm.objects.values_list('district', flat=True).distinct().exclude(district=''))
+        executive_list = list(User.objects.filter(is_active=True).values_list('username', flat=True).distinct())
 
     except Exception as e:
         logger.error(f"Error computing get_dashboard_context: {str(e)}", exc_info=True)
@@ -698,6 +698,7 @@ def get_dashboard_context(request):
         'poultry_pct': poultry_pct,
         'aqua_pct': aqua_pct,
 
+        # Chart Data (JSON Encoded)
         'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
         'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
         'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
@@ -709,44 +710,29 @@ def get_dashboard_context(request):
         'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
         'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
-        'funnel_stages': funnel_stages,
-        'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
 
+        # Demographics & Maps
+        'bird_counts_js': json.dumps(bird_counts, cls=DjangoJSONEncoder),
+        'bird_labels_js': json.dumps(bird_labels, cls=DjangoJSONEncoder),
+        'reported_problems': problems_list,
+        'segment_breakdown': segment_breakdown,
+        'visit_frequency_exec': visit_frequency_exec,
         'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
         'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
-        'geo_district_performance': geo_district_performance,
 
-        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
-        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
-        'reported_problems': reported_problems,
-        'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
-        'segment_breakdown': segment_breakdown,
-
-        'visit_frequency_exec': visit_frequency_exec,
-
-        'month_wise_cycle': month_wise_qs,
-        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-
-        'year_wise_trends': year_wise_qs,
-        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
-
+        # Data Lists & Filters
         'recent_visits': recent_visits_queryset,
-
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
-        'country_list': ['India'],
-
-        'selected_state': sel_state,
-        'selected_country': sel_country,
-        'selected_district': sel_district,
-        'selected_executive': sel_executive,
-        'selected_month': sel_month,
-        'selected_year': sel_year,
     }
+
+
+@login_required(login_url='/crm/login/')
+def dashboard_home(request):
+    context = get_dashboard_context(request)
+    return render_safe(request, ['crm_core/dashboard.html', 'dashboard.html'], context)
 
 
 # ==========================================
