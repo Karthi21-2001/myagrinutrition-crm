@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Count, F, Q, Sum
+from django.db.models import Avg, Count, F, Q, Sum, Case, When, IntegerField
 from django.db.models.functions import TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -518,20 +518,26 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
-        # 4. Executive Performance
+        # 4. Executive Performance (Fixed Django conditional aggregation)
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
             .annotate(
                 revenue=Sum('revenue_generated'),
                 total_items=Count('id'),
-                hot_items=Count('id', filter=Q(process_status__iexact='Hot'))
+                hot_items=Sum(
+                    Case(
+                        When(process_status__iexact='Hot', then=1),
+                        default=0,
+                        output_field=IntegerField()
+                    )
+                )
             )
             .order_by('-revenue')
         )
         exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
         exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
-        exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
+        exec_conv_pct = [round(((e['hot_items'] or 0) / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
 
         funnel_stages = (
             VisitedProductDetail.objects.filter(product_filters)
@@ -541,19 +547,17 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
-        # 5. Maps & Telemetry
+        # 5. Maps & Telemetry (Fixed alias conflict)
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
             .annotate(
                 farm_count=Count('visit__farm', distinct=True),
-                revenue=Sum('revenue_generated'),
-                state=F('visit__farm__state'),
-                district=F('visit__farm__district')
+                revenue=Sum('revenue_generated')
             )
             .order_by('-revenue')
         )
-        map_labels = [d['district'] if d.get('district') else 'Unknown' for d in geo_district_performance[:10]]
+        map_labels = [d['visit__farm__district'] if d.get('visit__farm__district') else 'Unknown' for d in geo_district_performance[:10]]
         map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
 
         telemetry_audit_log = (
