@@ -37,7 +37,7 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     'https://*.ngrok-free.app',
     'https://*.trycloudflare.com',       
-    'https://trycloudflare.com',         
+    'https://trycloudflare.com',          
     'https://crm.myagrinutritioncrm.com',
     'https://myagrinutrition-crm.onrender.com'
 ]
@@ -87,7 +87,7 @@ ROOT_URLCONF = 'crm_project.urls'
 # 🛠️ GLOBAL TEMPLATE CONFIGURATION MATRIX
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'BACKEND': 'django.template.backends.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'], 
         'APP_DIRS': True, 
         'OPTIONS': {
@@ -126,21 +126,26 @@ else:
     }
 
 
-# Password validation
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+# ==========================================
+# 🔓 EASY PASSWORD VALIDATION OVERRIDE
+# ==========================================
+# AUTH_PASSWORD_VALIDATORS = [
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+#     },
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+#     },
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+#     },
+#     {
+#         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+#     },
+# ]
+
+# Disable default password restrictions to allow easy passwords:
+AUTH_PASSWORD_VALIDATORS = []
 
 
 # Internationalization
