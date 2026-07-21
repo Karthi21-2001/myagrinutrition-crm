@@ -756,6 +756,6 @@ def get_location_details(request):
 
 @login_required(login_url='/crm/login/')
 def clear_dashboard_data(request):
-    """Placeholder view to handle dashboard data clear requests."""
+    """Placeholder view to handle dashboard data clear requests safely."""
     messages.info(request, "Clear dashboard functionality is currently disabled.")
     return redirect('dashboard_home')
