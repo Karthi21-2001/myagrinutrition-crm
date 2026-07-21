@@ -715,3 +715,7 @@ def dashboard_home(request):
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
         messages.error(request, f"Unable to load dashboard: {str(e)}")
         return render(request, 'crm_core/dashboard_home.html', {})
+
+
+# Function Alias in case URLs or tests route to dashboard_analytics
+dashboard_analytics = dashboard_home
