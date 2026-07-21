@@ -474,7 +474,7 @@
 
             <div class="card" style="border-color: rgba(99, 102, 241, 0.4);">
                 <div class="card-title" style="color: #a5b4fc;">
-                    <span>🚀Pipeline Projections</span>
+                    <span>🚀 Pipeline Projections</span>
                     <button type="button" id="add-pipeline-btn" class="btn-action btn-pipeline" style="padding: 6px 12px; font-size: 0.8rem;">
                         ➕ Add Item
                     </button>
@@ -577,7 +577,6 @@
         const poultrySection = document.getElementById('poultry-section');
         const aquaSection = document.getElementById('aqua-section');
 
-        // Configuration mapping for Sub-Sectors
         const subSectorMap = {
             Poultry: [
                 { value: 'Broiler', text: '🐤 Broiler' },
@@ -595,11 +594,8 @@
 
         function dynamicSectorToggle() {
             const selectedSector = sectorSelect.value;
-            
-            // Clear prior sub-sector selections
             subSectorSelect.innerHTML = '';
             
-            // Build out new configurations safely
             if (subSectorMap[selectedSector]) {
                 subSectorMap[selectedSector].forEach(optionData => {
                     const opt = document.createElement('option');
@@ -609,7 +605,6 @@
                 });
             }
 
-            // Panel view states handling
             if (selectedSector === 'Aqua') {
                 poultrySection.style.display = 'none';
                 aquaSection.style.display = 'block';
@@ -631,7 +626,7 @@
         }
 
         sectorSelect.addEventListener('change', dynamicSectorToggle);
-        dynamicSectorToggle(); // Initialize layout on mount
+        dynamicSectorToggle();
     });
 
     // 📦 Dynamic Row Multiplier: Confirmed Orders
@@ -769,7 +764,7 @@
         }
     });
 
-    // Geolocation Engine
+    // 📍 Geolocation Engine & Automatic Address Fetcher
     document.getElementById('locateBtn').addEventListener('click', function() {
         const btn = this;
         btn.innerText = "⏳ Locating via GPS Grid...";
@@ -787,6 +782,7 @@
                     
                     document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
                     
+                    // Render Map
                     if (!map) {
                         map = L.map('map').setView([lat, lon], 14);
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -799,35 +795,52 @@
                         map.setView(newPos, 14);
                     }
                     
-                    fetch(`/crm/api/get-location-details/?lat=${lat}&lon=${lon}`)
-                        .then(res => {
-                            if (!res.ok) throw new Error("Network response error");
-                            return res.json();
-                        })
+                    // Primary Reverse Geocode Attempt via OpenStreetMap
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`)
+                        .then(res => res.json())
                         .then(data => {
-                            if(!data.error) {
-                                document.getElementById('district').value = data.district || '';
-                                document.getElementById('area').value = data.area || '';
-                                document.getElementById('state').value = data.state || '';
-                                btn.innerText = "✅ Location Secured";
-                            } else {
-                                btn.innerText = "❌ Location Context Error";
-                                btn.disabled = false;
+                            btn.innerText = "✅ Location Secured";
+                            
+                            if (data && data.address) {
+                                const addr = data.address;
+                                const district = addr.state_district || addr.county || addr.district || addr.city || 'N/A';
+                                const area = addr.suburb || addr.village || addr.neighbourhood || addr.town || addr.city_district || 'N/A';
+                                const state = addr.state || 'N/A';
+
+                                document.getElementById('district').value = district;
+                                document.getElementById('area').value = area;
+                                document.getElementById('state').value = state;
                             }
                         })
                         .catch(err => {
-                            console.error(err);
-                            btn.innerText = "❌ Fetch Error";
-                            btn.disabled = false;
+                            console.warn("Direct API failed, trying internal CRM API fallback:", err);
+                            // Secondary Attempt via local API fallback
+                            fetch(`/crm/api/get-location-details/?lat=${lat}&lon=${lon}`)
+                                .then(res => res.json())
+                                .then(localData => {
+                                    btn.innerText = "✅ Location Secured";
+                                    document.getElementById('district').value = localData.district || '';
+                                    document.getElementById('area').value = localData.area || '';
+                                    document.getElementById('state').value = localData.state || '';
+                                })
+                                .catch(() => {
+                                    btn.innerText = "Fetch GPS Verification Coordinate";
+                                    btn.disabled = false;
+                                    alert("Location coordinates captured, but could not auto-resolve address text. Please input manually if required.");
+                                });
                         });
                 },
                 function(error) {
-                    btn.innerText = "❌ GPS Denied/Timeout";
+                    btn.innerText = "Fetch GPS Verification Coordinate";
                     btn.disabled = false;
-                }
+                    alert("GPS Error: " + error.message);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
             );
         } else {
-            btn.innerText = "❌ GPS Not Supported";
+            alert("Geolocation is not supported by this device.");
+            btn.innerText = "Fetch GPS Verification Coordinate";
+            btn.disabled = false;
         }
     });
     </script>
