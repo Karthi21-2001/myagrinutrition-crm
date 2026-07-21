@@ -10,7 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Avg, Count, F, Q, Sum
 from django.db.models.functions import TruncMonth, TruncYear
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -717,5 +717,45 @@ def dashboard_home(request):
         return render(request, 'crm_core/dashboard_home.html', {})
 
 
-# Function Alias in case URLs or tests route to dashboard_analytics
-dashboard_analytics = dashboard_home
+@login_required(login_url='/crm/login/')
+def dashboard_analytics(request):
+    try:
+        context = get_dashboard_context(request)
+        return render(request, 'crm_core/analytics.html', context)
+    except Exception as e:
+        logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
+        messages.error(request, f"Unable to load analytics: {str(e)}")
+        return render(request, 'crm_core/analytics.html', {})
+
+
+@login_required(login_url='/crm/login/')
+def executive_analytics_view(request):
+    try:
+        context = get_dashboard_context(request)
+        return render(request, 'crm_core/executive_analytics.html', context)
+    except Exception as e:
+        logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
+        messages.error(request, f"Unable to load executive analytics: {str(e)}")
+        return render(request, 'crm_core/executive_analytics.html', {})
+
+
+# ==========================================
+# 🛰️ GEOLOCATION & UTILITIES
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+def get_location_details(request):
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+    return JsonResponse({'status': 'success', 'lat': lat, 'lng': lng})
+
+
+# ==========================================
+# 🛠️ DASHBOARD MAINTENANCE & ACTION VIEWS
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+def clear_dashboard_data(request):
+    """Placeholder view to handle dashboard data clear requests."""
+    messages.info(request, "Clear dashboard functionality is currently disabled.")
+    return redirect('dashboard_home')
