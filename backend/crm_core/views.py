@@ -12,6 +12,8 @@ from django.db.models import Avg, Count, F, Q, Sum, Case, When, IntegerField
 from django.db.models.functions import TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
+from django.template import TemplateDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -22,6 +24,20 @@ from .models import Farm, FarmVisitReport, VisitedProductDetail
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+# Helper function to render templates safely across folder structures
+def render_safe(request, template_names, context=None):
+    if isinstance(template_names, str):
+        template_names = [template_names]
+    
+    for t in template_names:
+        try:
+            return render(request, t, context)
+        except TemplateDoesNotExist:
+            continue
+    # Re-raise standard exception if no template variants matched
+    raise TemplateDoesNotExist(f"None of these templates exist: {template_names}")
 
 
 # ==========================================
@@ -39,7 +55,7 @@ def register_user(request):
             return redirect('render_visit_form')
     else:
         form = ExecutiveSignUpForm()
-    return render(request, 'crm_core/register.html', {'form': form})
+    return render_safe(request, ['crm_core/register.html', 'register.html'], {'form': form})
 
 
 def login_user(request):
@@ -56,7 +72,7 @@ def login_user(request):
                 return redirect('render_visit_form')
     else:
         form = AuthenticationForm()
-    return render(request, 'crm_core/login.html', {'form': form})
+    return render_safe(request, ['crm_core/login.html', 'login.html'], {'form': form})
 
 
 def logout_user(request):
@@ -70,7 +86,7 @@ def logout_user(request):
 
 @login_required(login_url='/crm/login/')
 def render_visit_form(request):
-    return render(request, 'crm_core/farm_visit_form.html')
+    return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'])
 
 
 @login_required(login_url='/crm/login/')
@@ -194,12 +210,12 @@ def save_farm_visit(request):
             if request.user.is_staff or request.user.is_superuser:
                 return redirect('dashboard_home')
 
-            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
+            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
             messages.error(request, f"Database transaction block failed: {str(e)}")
-            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
+            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
 
     return redirect('render_visit_form')
 
@@ -711,43 +727,46 @@ def get_dashboard_context(request):
 
 
 # ==========================================
-# 🎯 FIXED RENDER CONTROLLERS
+# 🎯 SAFE CONTROLLER VIEWS (WITH FALLBACKS)
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Render Main Dashboard safely"""
+    """Render Main Dashboard with template safe fallback"""
+    templates = ['crm_core/dashboard.html', 'dashboard.html', 'crm_core/dashboard_home.html']
     try:
         context = get_dashboard_context(request)
-        return render(request, 'crm_core/dashboard.html', context)
+        return render_safe(request, templates, context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
         messages.error(request, f"Unable to load dashboard: {str(e)}")
-        return render(request, 'crm_core/dashboard.html', {})
+        return render_safe(request, templates, {})
 
 
 @login_required(login_url='/crm/login/')
 def dashboard_analytics(request):
-    """Render Analytics Report dashboard safely"""
+    """Render Analytics Report dashboard with template safe fallback"""
+    templates = ['crm_core/analytics_report.html', 'analytics_report.html', 'crm_core/analytics.html', 'analytics.html']
     try:
         context = get_dashboard_context(request)
-        return render(request, 'crm_core/analytics_report.html', context)
+        return render_safe(request, templates, context)
     except Exception as e:
         logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
         messages.error(request, f"Unable to load analytics report: {str(e)}")
-        return render(request, 'crm_core/analytics_report.html', {})
+        return render_safe(request, templates, {})
 
 
 @login_required(login_url='/crm/login/')
 def executive_analytics_view(request):
-    """Render Executive Analytics dashboard safely"""
+    """Render Executive Analytics dashboard with template safe fallback"""
+    templates = ['crm_core/executive_analytics.html', 'executive_analytics.html', 'crm_core/analytics_report.html']
     try:
         context = get_dashboard_context(request)
-        return render(request, 'crm_core/executive_analytics.html', context)
+        return render_safe(request, templates, context)
     except Exception as e:
         logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
         messages.error(request, f"Unable to load executive analytics: {str(e)}")
-        return render(request, 'crm_core/executive_analytics.html', {})
+        return render_safe(request, templates, {})
 
 
 # ==========================================
