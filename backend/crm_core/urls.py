@@ -4,14 +4,14 @@ from . import views
 
 urlpatterns = [
     # ==========================================
-    # 🔐 EXECUTIVE AUTHENTICATION & RECOVERY ROUTES
+    # 🔐 EXECUTIVE AUTHENTICATION & RECOVERY
     # ==========================================
     path('register/', views.register_user, name='register_user'),
     path('account/signup/', views.register_user, name='executive_signup'), 
     path('login/', views.login_user, name='login_user'),
     path('logout/', views.logout_user, name='logout_user'),
     
-    # --- Permanent Password Recovery Admin Router ---
+    # --- Password Reset Template View ---
     path(
         'password-reset/', 
         TemplateView.as_view(template_name='crm_core/password_reset.html'), 
