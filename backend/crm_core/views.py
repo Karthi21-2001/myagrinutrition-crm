@@ -22,23 +22,30 @@ from openpyxl.utils import get_column_letter
 
 # Local Application Imports
 from .forms import ExecutiveSignUpForm
-from .models import Farm, FarmVisitReport, VisitedProductDetail
+from .models import (
+    Farm, FarmVisitReport, VisitedProductDetail,
+    VisitLog, PipelineItem, OrderItem, Executive
+)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-# Helper function to render templates safely across folder structures
+# ==========================================
+# 🛠️ HELPER UTILITIES
+# ==========================================
+
 def render_safe(request, template_names, context=None):
+    """Safe helper function to render templates across varying folder structures."""
     if isinstance(template_names, str):
         template_names = [template_names]
-    
+
     for t in template_names:
         try:
             return render(request, t, context)
         except TemplateDoesNotExist:
             continue
-    raise TemplateDoesNotExist(f"None of these templates exist: {template_names}")
+    raise TemplateDoesNotExist(f"None of these templates exist in search path: {template_names}")
 
 
 # ==========================================
@@ -82,16 +89,127 @@ def logout_user(request):
 
 
 # ==========================================
-# 🌱 AGRI-CORE MANAGEMENT FUNCTIONALITY
+# 🌱 AGRI-CORE FIELD LOG SUBMISSION HANDLERS
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def render_visit_form(request):
-    return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'])
+    return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html', 'field_log_form.html'])
+
+
+@login_required(login_url='/crm/login/')
+def submit_visit_log(request):
+    """
+    Handles POST requests from the 'MY AGRINUTRITION FIELD VISITING LOG' page.
+    Saves Farm Profile, GPS Metrics, Diagnostics, Pipelines, and Orders.
+    """
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                # A. General Farm Profile & GPS Metrics
+                farm_name = request.POST.get('farm_name', '').strip()
+                owner_name = request.POST.get('owner_name', '').strip()
+                contact_number = request.POST.get('contact_number', '').strip()
+
+                district = request.POST.get('district', '').strip()
+                area = request.POST.get('area', '').strip()
+                state = request.POST.get('state', '').strip()
+                latitude = request.POST.get('latitude', None)
+                longitude = request.POST.get('longitude', None)
+
+                # B. Diagnostic Metrics
+                sector = request.POST.get('sector', '').strip()          # e.g. POULTRY / AQUA
+                sub_sector = request.POST.get('sub_sector', '').strip()  # e.g. Broiler / Layer / Shrimp
+                problem_observed = request.POST.get('problem_observed', '').strip()
+
+                # C. Shed Inventory Counts
+                chicks_count = int(request.POST.get('chicks_count', 0) or 0)
+                grower_count = int(request.POST.get('grower_count', 0) or 0)
+                layer_count = int(request.POST.get('layer_count', 0) or 0)
+                culling_count = int(request.POST.get('culling_count', 0) or 0)
+
+                # --- Create or Retrieve Farm Record ---
+                farm_obj, _ = Farm.objects.get_or_create(
+                    name=farm_name if farm_name else "Unassigned Farm",
+                    defaults={'owner_name': owner_name, 'contact': contact_number}
+                )
+
+                # --- Create Main Visit Log Record ---
+                visit = VisitLog.objects.create(
+                    executive=request.user,
+                    farm=farm_obj,
+                    farm_owner=owner_name,
+                    contact=contact_number,
+                    district=district,
+                    area=area,
+                    state=state,
+                    latitude=latitude if latitude else None,
+                    longitude=longitude if longitude else None,
+                    sector=sector,
+                    sub_sector=sub_sector,
+                    problem_observed=problem_observed,
+                    chicks_count=chicks_count,
+                    grower_count=grower_count,
+                    layer_count=layer_count,
+                    culling_count=culling_count
+                )
+
+                # D. Dynamic Pipeline Items Table
+                pipe_products = request.POST.getlist('pipe_product_name[]')
+                pipe_pot_qtys = request.POST.getlist('pipe_potential_qty[]')
+                pipe_target_qtys = request.POST.getlist('pipe_target_qty[]')
+                pipe_units = request.POST.getlist('pipe_units[]')
+                pipe_stages = request.POST.getlist('pipe_stage[]')         # Hot / Warm / Cold
+                pipe_convs = request.POST.getlist('pipe_conversion[]')
+
+                for prod, pot_qty, tgt_qty, unit, stage, conv in zip(
+                    pipe_products, pipe_pot_qtys, pipe_target_qtys, pipe_units, pipe_stages, pipe_convs
+                ):
+                    if prod.strip():
+                        PipelineItem.objects.create(
+                            visit=visit,
+                            product_name=prod.strip(),
+                            potential_qty=float(pot_qty or 0),
+                            target_qty=float(tgt_qty or 0),
+                            unit=unit,
+                            stage=stage,
+                            conversion_percentage=float(conv or 0)
+                        )
+
+                # E. Dynamic Confirmed Orders Table
+                order_products = request.POST.getlist('order_product_name[]')
+                order_qtys = request.POST.getlist('order_quantity[]')
+                order_units = request.POST.getlist('order_units[]')
+                order_rates = request.POST.getlist('order_rate[]')
+
+                for prod, qty, unit, rate in zip(order_products, order_qtys, order_units, order_rates):
+                    num_qty = float(qty or 0)
+                    num_rate = float(rate or 0)
+                    if prod.strip() and num_qty > 0:
+                        OrderItem.objects.create(
+                            visit=visit,
+                            product_name=prod.strip(),
+                            quantity=num_qty,
+                            unit=unit,
+                            rate=num_rate,
+                            total_amount=num_qty * num_rate
+                        )
+
+            messages.success(request, f"Visit entry for '{farm_obj.name}' saved successfully!")
+            return redirect('analytics_dashboard')
+
+        except Exception as e:
+            logger.error(f"Error saving visit log: {str(e)}", exc_info=True)
+            messages.error(request, f"Error saving visit log: {str(e)}")
+            return redirect('submit_visit_log')
+
+    # GET Request: Display form
+    return render_safe(request, ['field_log_form.html', 'crm_core/farm_visit_form.html', 'farm_visit_form.html'])
 
 
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
+    """Legacy/Alternative farm visit record saver."""
     if request.method == 'POST':
         farm_name = request.POST.get('farm_name')
         owner_name = request.POST.get('owner_name')
@@ -147,7 +265,6 @@ def save_farm_visit(request):
                     farm_problem=farm_problem
                 )
 
-                # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
@@ -175,190 +292,208 @@ def save_farm_visit(request):
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
 
-                # Process Pipeline Products
-                pipeline_products = request.POST.getlist('pipeline_discussed_product[]')
-                p_quantities = request.POST.getlist('pipeline_potential_quantity[]')
-                t_quantities = request.POST.getlist('pipeline_target_quantity[]')
-                p_unit_types = request.POST.getlist('pipeline_unit_type[]')
-                p_statuses = request.POST.getlist('pipeline_process_status[]')
-                p_conv_percentages = request.POST.getlist('pipeline_conversion_percentage[]')
-
-                for i in range(len(pipeline_products)):
-                    pipe_prod_name = pipeline_products[i].strip()
-                    if not pipe_prod_name:
-                        continue
-
-                    p_qty = int(p_quantities[i]) if (i < len(p_quantities) and p_quantities[i]) else 0
-                    t_qty = int(t_quantities[i]) if (i < len(t_quantities) and t_quantities[i]) else 0
-                    p_unit = p_unit_types[i] if i < len(p_unit_types) else 'KG'
-                    status = p_statuses[i] if i < len(p_statuses) else 'Warm'
-                    conv_pct = int(p_conv_percentages[i]) if (i < len(p_conv_percentages) and p_conv_percentages[i]) else 0
-
-                    VisitedProductDetail.objects.create(
-                        visit=visit_record,
-                        product_name=pipe_prod_name,
-                        potential_quantity=p_qty,
-                        target_quantity=t_qty,
-                        sale_quantity=0,
-                        primary_price=0.00,
-                        revenue_generated=0.00,
-                        unit_type=p_unit,
-                        process_status=status,
-                        conversion_percentage=conv_pct
-                    )
-
             messages.success(request, "Agri-Field visit logging record processed successfully!")
-            if request.user.is_staff or request.user.is_superuser:
-                return redirect('dashboard_home')
-
-            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
+            return redirect('dashboard_home')
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
-            messages.error(request, f"Database transaction block failed: {str(e)}")
-            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
+            messages.error(request, f"Database transaction failed: {str(e)}")
+            return redirect('render_visit_form')
 
     return redirect('render_visit_form')
 
 
 # ==========================================
-# 📥 EXCEL EXPORT ENGINE
+# 📊 ANALYTICS DASHBOARD CONTROLLER
 # ==========================================
 
-@csrf_exempt
-def export_visits_to_excel(request):
-    start_date_str = request.GET.get('start_date', '').strip()
-    end_date_str = request.GET.get('end_date', '').strip()
-    executive_filter = request.GET.get('executive', '').strip()
-    state_filter = request.GET.get('state', '').strip()
-    district_filter = request.GET.get('district', '').strip()
-    business_type = request.GET.get('business_type', '').strip()
-    sub_segment_filter = request.GET.get('sub_segment', '').strip()
+def analytics_dashboard(request):
+    """
+    Queries submitted VisitLogs, OrderItems, and PipelineItems,
+    aggregates metrics, and passes serialized JSON data for live Chart.js rendering.
+    """
+    # Form Filters
+    selected_exec = request.GET.get('executive', 'ALL')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    selected_sector = request.GET.get('sector', 'ALL')
 
-    export_filters = Q()
+    # Base Querysets
+    visits_qs = VisitLog.objects.all().select_related('executive', 'farm')
+    orders_qs = OrderItem.objects.all().select_related('visit')
+    pipeline_qs = PipelineItem.objects.all().select_related('visit')
 
-    if business_type and business_type not in ['All', 'All Sectors']:
-        export_filters &= Q(farm__business_type__iexact=business_type)
-    if sub_segment_filter and sub_segment_filter != 'All':
-        export_filters &= Q(farm__sub_segment__iexact=sub_segment_filter)
-    if state_filter and state_filter not in ['All', 'All States']:
-        export_filters &= Q(farm__state__iexact=state_filter)
-    if district_filter and district_filter not in ['All', 'All Districts']:
-        export_filters &= Q(farm__district__iexact=district_filter)
-    if executive_filter and executive_filter not in ['All', 'All Executives']:
-        export_filters &= Q(executive__username__iexact=executive_filter)
+    # Apply Filters
+    if selected_exec != 'ALL' and str(selected_exec).isdigit():
+        visits_qs = visits_qs.filter(executive_id=int(selected_exec))
+        orders_qs = orders_qs.filter(visit__executive_id=int(selected_exec))
+        pipeline_qs = pipeline_qs.filter(visit__executive_id=int(selected_exec))
 
-    if start_date_str:
-        try:
-            export_filters &= Q(visit_date__date__gte=start_date_str)
-        except ValueError:
-            pass
-    if end_date_str:
-        try:
-            export_filters &= Q(visit_date__date__lte=end_date_str)
-        except ValueError:
-            pass
+    if start_date:
+        visits_qs = visits_qs.filter(visit_date__gte=start_date)
+        orders_qs = orders_qs.filter(visit__visit_date__gte=start_date)
+        pipeline_qs = pipeline_qs.filter(visit__visit_date__gte=start_date)
 
-    wb = openpyxl.Workbook()
-    ws_data = wb.active
-    ws_data.title = "Field Visit Database Log"
-    ws_data.views.sheetView[0].showGridLines = True
+    if end_date:
+        visits_qs = visits_qs.filter(visit_date__lte=end_date)
+        orders_qs = orders_qs.filter(visit__visit_date__lte=end_date)
+        pipeline_qs = pipeline_qs.filter(visit__visit_date__lte=end_date)
 
-    dark_slate, border_color = "0F172A", "CBD5E1"
-    thin_border = Border(
-        left=Side(style='thin', color=border_color), right=Side(style='thin', color=border_color),
-        top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
+    if selected_sector != 'ALL':
+        visits_qs = visits_qs.filter(sector__iexact=selected_sector)
+        orders_qs = orders_qs.filter(visit__sector__iexact=selected_sector)
+        pipeline_qs = pipeline_qs.filter(visit__sector__iexact=selected_sector)
+
+    # 📊 KPI Calculations
+    total_visits = visits_qs.count()
+    total_executives = visits_qs.values('executive').distinct().count()
+    total_farms = visits_qs.values('farm').distinct().count()
+
+    total_qty = orders_qs.aggregate(sum_qty=Sum('quantity'))['sum_qty'] or 0
+    total_revenue_val = orders_qs.aggregate(sum_rev=Sum('total_amount'))['sum_rev'] or 0.0
+
+    avg_revenue_val = (total_revenue_val / total_visits) if total_visits > 0 else 0.0
+
+    total_revenue_str = f"{total_revenue_val:,.2f}"
+    avg_revenue_str = f"{avg_revenue_val:,.2f}"
+
+    # 📈 CHART 1: MONTH-WISE REVENUE REVIEW
+    monthly_data = (
+        orders_qs.annotate(month=TruncMonth('created_at'))
+        .values('month')
+        .annotate(total=Sum('total_amount'))
+        .order_by('month')
     )
+    month_labels = [d['month'].strftime('%b %Y') for d in monthly_data if d.get('month')]
+    month_values = [float(d['total'] or 0.0) for d in monthly_data if d.get('month')]
 
-    headers = [
-        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
-        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
-        'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
-        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
-        'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
+    # 📈 CHART 2: YEAR-WISE REVENUE REVIEW
+    yearly_data = (
+        orders_qs.annotate(year=TruncYear('created_at'))
+        .values('year')
+        .annotate(total=Sum('total_amount'))
+        .order_by('year')
+    )
+    year_labels = [str(d['year'].year) for d in yearly_data if d.get('year')]
+    year_values = [float(d['total'] or 0.0) for d in yearly_data if d.get('year')]
+
+    # 📊 CHART 3: REVENUE BY EXECUTIVE
+    exec_data = (
+        orders_qs.values('visit__executive__first_name', 'visit__executive__username')
+        .annotate(total=Sum('total_amount'))
+        .order_by('-total')
+    )
+    exec_labels = [
+        d['visit__executive__first_name'] or d['visit__executive__username'] or "Unknown"
+        for d in exec_data
+    ]
+    exec_values = [float(d['total'] or 0.0) for d in exec_data]
+
+    # 🍩 CHART 4: PRODUCT ALLOCATION (ORDER VOLUME)
+    prod_data = (
+        orders_qs.values('product_name')
+        .annotate(total_vol=Sum('quantity'))
+        .order_by('-total_vol')[:6]
+    )
+    prod_labels = [d['product_name'] for d in prod_data]
+    prod_values = [float(d['total_vol'] or 0.0) for d in prod_data]
+
+    # 🗺️ CHART 5: VISITS BY STATE
+    state_data = (
+        visits_qs.values('state')
+        .annotate(total_visits=Count('id'))
+        .order_by('-total_visits')[:6]
+    )
+    state_labels = [d['state'] if d['state'] else "Unassigned" for d in state_data]
+    state_values = [d['total_visits'] for d in state_data]
+
+    # 🔬 CHART 6: FIELD PROBLEMS OBSERVED
+    prob_data = (
+        visits_qs.exclude(problem_observed='')
+        .values('problem_observed')
+        .annotate(prob_count=Count('id'))
+        .order_by('-prob_count')[:5]
+    )
+    prob_labels = [d['problem_observed'] for d in prob_data]
+    prob_values = [d['prob_count'] for d in prob_data]
+
+    # 🌡️ PIPELINE TEMPERATURE % METRICS
+    total_pipe_items = pipeline_qs.count() or 1
+    hot_count = pipeline_qs.filter(stage__iexact='Hot').count()
+    warm_count = pipeline_qs.filter(stage__iexact='Warm').count()
+    cold_count = pipeline_qs.filter(stage__iexact='Cold').count()
+
+    pipeline_hot = round((hot_count / total_pipe_items) * 100)
+    pipeline_warm = round((warm_count / total_pipe_items) * 100)
+    pipeline_cold = round((cold_count / total_pipe_items) * 100)
+
+    # 🐓/🐟 SECTOR DISTRIBUTION % METRICS
+    total_sector_visits = visits_qs.count() or 1
+    poultry_count = visits_qs.filter(sector__iexact='POULTRY').count()
+    aqua_count = visits_qs.filter(sector__iexact='AQUA').count()
+
+    sector_poultry_pct = round((poultry_count / total_sector_visits) * 100)
+    sector_aqua_pct = round((aqua_count / total_sector_visits) * 100)
+
+    # 🏆 TOP FARMS BY BOOKING REVENUE & RECENT VISITS LEDGER
+    top_farms = (
+        orders_qs.values('visit__farm__name')
+        .annotate(revenue=Sum('total_amount'))
+        .order_by('-revenue')[:5]
+    )
+    top_farms_list = [
+        {'name': item['visit__farm__name'] or 'Unnamed Farm', 'revenue': f"{item['revenue']:,.2f}"}
+        for item in top_farms
     ]
 
-    for col_idx, text in enumerate(headers, 1):
-        cell = ws_data.cell(row=1, column=col_idx, value=text)
-        cell.font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-        cell.fill = PatternFill(start_color=dark_slate, end_color=dark_slate, fill_type="solid")
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    ws_data.row_dimensions[1].height = 28
+    recent_visits = visits_qs.order_by('-created_at')[:10]
 
-    all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
-        'farm', 'executive'
-    ).prefetch_related('visited_products').order_by('-visit_date')
+    context = {
+        'executives_list': Executive.objects.all() if hasattr(Executive, 'objects') else [],
+        'selected_executive': selected_exec,
+        'start_date': start_date,
+        'end_date': end_date,
+        'selected_sector': selected_sector,
 
-    current_row = 2
-    for v in all_visits:
-        f = v.farm
-        products = list(v.visited_products.all())
-        product_loop_list = products if products else [None]
+        'total_visits': total_visits,
+        'total_executives': total_executives,
+        'total_farms': total_farms,
+        'total_qty': f"{total_qty:,.0f}",
+        'total_revenue': total_revenue_str,
+        'avg_revenue': avg_revenue_str,
 
-        for p in product_loop_list:
-            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v.visit_date else "")
-            ws_data.cell(row=current_row, column=2, value=v.executive.username if v.executive else "")
-            ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
-            ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
-            ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
-            ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-            ws_data.cell(row=current_row, column=7, value=f.sub_segment if (f and f.sub_segment) else "") 
-            ws_data.cell(row=current_row, column=8, value=f.state if f else "")
-            ws_data.cell(row=current_row, column=9, value=f.district if f else "")
-            ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+        'month_labels_json': json.dumps(month_labels),
+        'month_data_json': json.dumps(month_values),
+        'year_labels_json': json.dumps(year_labels),
+        'year_data_json': json.dumps(year_values),
+        'exec_labels_json': json.dumps(exec_labels),
+        'exec_data_json': json.dumps(exec_values),
+        'prod_labels_json': json.dumps(prod_labels),
+        'prod_data_json': json.dumps(prod_values),
+        'state_labels_json': json.dumps(state_labels),
+        'state_data_json': json.dumps(state_values),
+        'problem_labels_json': json.dumps(prob_labels),
+        'problem_data_json': json.dumps(prob_values),
 
-            ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
-            
-            ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird_count', 0) if f else 0)
+        'pipeline_hot': pipeline_hot,
+        'pipeline_warm': pipeline_warm,
+        'pipeline_cold': pipeline_cold,
+        'sector_poultry_pct': sector_poultry_pct,
+        'sector_aqua_pct': sector_aqua_pct,
 
-            ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
-            ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
-            ws_data.cell(row=current_row, column=18, value=float(p.primary_price) if p else 0.0)
-            ws_data.cell(row=current_row, column=19, value=float(p.revenue_generated) if p else 0.0)
+        'top_farms': top_farms_list,
+        'recent_visits': recent_visits,
+    }
 
-            ws_data.cell(row=current_row, column=20, value=p.potential_quantity if p else 0)
-            ws_data.cell(row=current_row, column=21, value=p.target_quantity if p else 0)
-            ws_data.cell(row=current_row, column=22, value=p.unit_type if p else "N/A")
-            ws_data.cell(row=current_row, column=23, value=p.process_status if p else "N/A")
-            ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%" if p else "0%")
-
-            gps_cell = ws_data.cell(row=current_row, column=25)
-            if f and f.latitude and f.longitude:
-                gps_cell.value = "View on Map"
-                gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
-                gps_cell.font = Font(name="Segoe UI", size=11, color="0000FF", underline="single")
-            else:
-                gps_cell.value = "No GPS Data"
-                gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
-
-            for c_idx in range(1, 26):
-                cell_item = ws_data.cell(row=current_row, column=c_idx)
-                cell_item.border = thin_border
-                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]: 
-                    cell_item.alignment = Alignment(horizontal="center")
-
-            current_row += 1
-
-    if ws_data.max_row > 1:
-        for col in ws_data.columns:
-            max_len = max(len(str(cell.value or '')) for cell in col)
-            col_letter = get_column_letter(col[0].column)
-            ws_data.column_dimensions[col_letter].width = max(max_len + 4, 14)
-
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
-    wb.save(response)
-    return response
+    return render_safe(request, ['dashboard.html', 'crm_core/dashboard.html', 'analytics.html'], context)
 
 
 # ==========================================
-# 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
+# 📊 CONTEXT BUILDER FOR CORE DASHBOARD
 # ==========================================
 
 def get_dashboard_context(request):
+    """Calculates all CRM database aggregations dynamically per request."""
     total_rev = 0.0
     vol_sold = 0
     v_count = 0
@@ -376,21 +511,17 @@ def get_dashboard_context(request):
     pipeline_spread = {'actual': 0, 'target': 0, 'potential': 0}
     product_pricing_table = []
     exec_labels, exec_revenue, exec_conv_pct = [], [], []
-    funnel_stages = []
     funnel_list = []
     geo_district_performance = []
     map_labels, map_revenue = [], []
     telemetry_audit_log = []
     bird_counts = [0, 0, 0, 0]
     bird_labels = ['Chicks', 'Growers', 'Layers', 'Culling Birds']
-    reported_problems = []
     problems_list = []
     segment_breakdown = []
     visit_frequency_exec = []
-    
-    month_wise_qs = []
+
     month_wise_labels, month_wise_data = [], []
-    year_wise_qs = []
     year_wise_labels, year_wise_data = [], []
     recent_visits_queryset = FarmVisitReport.objects.none()
 
@@ -404,7 +535,7 @@ def get_dashboard_context(request):
     sel_executive = request.GET.get('executive', '').strip()
     sel_month = request.GET.get('month', '').strip()
     sel_year = request.GET.get('year', '').strip()
-    
+
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
 
@@ -458,12 +589,10 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        # 1. Primary Metrics Aggregations (COALESCE SAFE NULL HANDLING)
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
         active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
-        # Safely compute calculated revenue dynamically if revenue_generated is NULL
         computed_rev = ExpressionWrapper(
             Coalesce(F('sale_quantity'), 0) * Coalesce(F('primary_price'), 0.0, output_field=FloatField()),
             output_field=FloatField()
@@ -478,7 +607,7 @@ def get_dashboard_context(request):
         )['total_qty'] or 0
 
         paid_orders_count = VisitedProductDetail.objects.filter(
-            product_filters, 
+            product_filters,
             sale_quantity__gt=0
         ).count()
 
@@ -502,7 +631,7 @@ def get_dashboard_context(request):
             poultry_pct = round((poultry_cnt / total_farms_count) * 100, 1)
             aqua_pct = round((aqua_cnt / total_farms_count) * 100, 1)
 
-        # 2. Time Series
+        # Time Series
         time_series_data = (
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
@@ -519,19 +648,6 @@ def get_dashboard_context(request):
         combo_revenue = [float(t.get('revenue') or 0.0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
-        # 3. Product Performance & Pricing Table
-        product_performance = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('product_name')
-            .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
-                qty_sold=Coalesce(Sum('sale_quantity'), 0)
-            )
-            .order_by('-revenue')
-        )
-        top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
-        top_prod_revenue = [float(p['revenue'] or 0.0) for p in product_performance]
-
         pipeline_spread_agg = VisitedProductDetail.objects.filter(product_filters).aggregate(
             actual=Coalesce(Sum('sale_quantity'), 0),
             target=Coalesce(Sum('target_quantity'), 0),
@@ -540,127 +656,6 @@ def get_dashboard_context(request):
         if pipeline_spread_agg:
             pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
 
-        product_pricing_table = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('product_name')
-            .annotate(avg_unit_price=Coalesce(Avg('primary_price'), 0.0))
-            .order_by('product_name')
-        )
-
-        # 4. Executive Performance
-        executive_performance = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('visit__executive__username')
-            .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
-                total_items=Count('id'),
-                hot_items=Sum(
-                    Case(
-                        When(process_status__iexact='Hot', then=1),
-                        default=0,
-                        output_field=IntegerField()
-                    )
-                )
-            )
-            .order_by('-revenue')
-        )
-        exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
-        exec_revenue = [float(e['revenue'] or 0.0) for e in executive_performance]
-        exec_conv_pct = [round(((e['hot_items'] or 0) / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
-
-        funnel_stages = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('process_status')
-            .annotate(count=Count('id'))
-            .order_by('-count')
-        )
-        funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
-
-        # 5. Maps & Telemetry
-        geo_district_performance = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('visit__farm__state', 'visit__farm__district')
-            .annotate(
-                farm_count=Count('visit__farm', distinct=True),
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField())
-            )
-            .order_by('-revenue')
-        )
-        map_labels = [d['visit__farm__district'] if d.get('visit__farm__district') else 'Unknown' for d in geo_district_performance[:10]]
-        map_revenue = [float(d['revenue'] or 0.0) for d in geo_district_performance[:10]]
-
-        telemetry_audit_log = (
-            FarmVisitReport.objects.filter(visit_filters)
-            .select_related('farm', 'executive')
-            .values('visit_date', 'farm__area', 'farm__latitude', 'farm__longitude', 'executive__username', 'farm__farm_name')
-            .order_by('-visit_date')[:15]
-        )
-
-        # 6. Demographics
-        try:
-            bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-                chicks=Coalesce(Sum('farm__chicks_count'), 0),
-                growers=Coalesce(Sum('farm__grower_count'), 0),
-                layers=Coalesce(Sum('farm__layer_count'), 0),
-                culling=Coalesce(Sum('farm__culling_bird_count'), 0)
-            )
-            if bird_population:
-                bird_counts = [
-                    (bird_population.get('chicks') or 0),
-                    (bird_population.get('growers') or 0),
-                    (bird_population.get('layers') or 0),
-                    (bird_population.get('culling') or 0)
-                ]
-        except Exception as b_err:
-            logger.warning(f"Bird count aggregation skipped: {b_err}")
-
-        reported_problems = (
-            FarmVisitReport.objects.filter(visit_filters)
-            .values('farm_problem')
-            .annotate(frequency=Count('id'))
-            .exclude(farm_problem__in=['', None])
-            .order_by('-frequency')[:10]
-        )
-        problems_list = [dict(prob) for prob in reported_problems] if reported_problems else []
-
-        segment_breakdown = (
-            Farm.objects.filter(farm_filters)
-            .values('business_type', 'sub_segment')
-            .annotate(total_farms=Count('id'))
-            .order_by('-total_farms')
-        )
-
-        visit_frequency_exec = (
-            FarmVisitReport.objects.filter(visit_filters)
-            .values('executive__username')
-            .annotate(visit_count=Count('id'))
-            .order_by('-visit_count')
-        )
-
-        # 7. Trends
-        month_wise_qs = list(
-            VisitedProductDetail.objects.filter(product_filters)
-            .annotate(month=TruncMonth('visit__visit_date'))
-            .values('month')
-            .annotate(revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()))
-            .filter(month__isnull=False)
-            .order_by('month')
-        )
-        month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
-        month_wise_data = [float(m['revenue'] or 0.0) for m in month_wise_qs]
-
-        year_wise_qs = list(
-            VisitedProductDetail.objects.filter(product_filters)
-            .annotate(year=TruncYear('visit__visit_date'))
-            .values('year')
-            .annotate(revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()))
-            .filter(year__isnull=False)
-            .order_by('year')
-        )
-        year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
-        year_wise_data = [float(y['revenue'] or 0.0) for y in year_wise_qs]
-
-        # 8. Table Display Mapping
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
         ).select_related('farm', 'executive').prefetch_related('visited_products').annotate(
@@ -710,36 +705,28 @@ def get_dashboard_context(request):
         'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
         'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
-        'funnel_stages': funnel_stages,
-        'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
+        'funnel_list': funnel_list,
 
+        'geo_district_performance': geo_district_performance,
         'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
         'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
-        'geo_district_performance': geo_district_performance,
 
-        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
-        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
-        'reported_problems': reported_problems,
-        'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
+        'bird_counts_js': json.dumps(bird_counts, cls=DjangoJSONEncoder),
+        'bird_labels_js': json.dumps(bird_labels, cls=DjangoJSONEncoder),
+        'problems_list': problems_list,
         'segment_breakdown': segment_breakdown,
-
         'visit_frequency_exec': visit_frequency_exec,
-        
-        'month_wise_cycle': month_wise_qs,
-        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-        
-        'year_wise_trends': year_wise_qs,
-        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
+
+        'month_wise_labels_js': json.dumps(list(month_wise_labels), cls=DjangoJSONEncoder),
+        'month_wise_data_js': json.dumps(list(month_wise_data), cls=DjangoJSONEncoder),
+        'year_wise_labels_js': json.dumps(list(year_wise_labels), cls=DjangoJSONEncoder),
+        'year_wise_data_js': json.dumps(list(year_wise_data), cls=DjangoJSONEncoder),
 
         'recent_visits': recent_visits_queryset,
-
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
-        'country_list': ['India'],
 
         'selected_state': sel_state,
         'selected_country': sel_country,
@@ -747,69 +734,168 @@ def get_dashboard_context(request):
         'selected_executive': sel_executive,
         'selected_month': sel_month,
         'selected_year': sel_year,
+        'start_date': start_date_str,
+        'end_date': end_date_str,
     }
 
 
 # ==========================================
-# 🎯 SAFE CONTROLLER VIEWS (WITH FALLBACKS)
+# 🖥️ CORE DASHBOARD ENDPOINTS
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Render Main Dashboard with template safe fallback"""
-    templates = ['crm_core/dashboard.html', 'dashboard.html', 'crm_core/dashboard_home.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load dashboard: {str(e)}")
-        return render_safe(request, templates, {})
+    """Primary Executive & Admin Dashboard endpoint."""
+    context = get_dashboard_context(request)
+    return render_safe(request, ['crm_core/dashboard.html', 'dashboard.html'], context)
 
 
 @login_required(login_url='/crm/login/')
-def dashboard_analytics(request):
-    """Render Analytics Report dashboard with template safe fallback"""
-    templates = ['crm_core/analytics_report.html', 'analytics_report.html', 'crm_core/analytics.html', 'analytics.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load analytics report: {str(e)}")
-        return render_safe(request, templates, {})
-
-
-@login_required(login_url='/crm/login/')
-def executive_analytics_view(request):
-    """Render Executive Analytics dashboard with template safe fallback"""
-    templates = ['crm_core/executive_analytics.html', 'executive_analytics.html', 'crm_core/analytics_report.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load executive analytics: {str(e)}")
-        return render_safe(request, templates, {})
+def api_dashboard_metrics(request):
+    """JSON API endpoint for async metrics updates."""
+    context = get_dashboard_context(request)
+    api_payload = {
+        'total_revenue': context['total_revenue'],
+        'total_visits': context['total_visits'],
+        'active_executives': context['active_executives'],
+        'total_farms': context['total_farms'],
+        'total_sales_volume': context['total_sales_volume'],
+        'paid_orders_count': context['paid_orders_count'],
+        'avg_order_value': context['avg_order_value'],
+        'conversion_rate': context['conversion_rate'],
+        'pipeline_spread': context['pipeline_spread'],
+    }
+    return JsonResponse(api_payload)
 
 
 # ==========================================
-# 🛰️ GEOLOCATION & UTILITIES
+# 📥 EXCEL EXPORT CONTROLLER
 # ==========================================
 
-@login_required(login_url='/crm/login/')
-def get_location_details(request):
-    lat = request.GET.get('lat')
-    lng = request.GET.get('lng')
-    return JsonResponse({'status': 'success', 'lat': lat, 'lng': lng})
+@csrf_exempt
+def export_visits_to_excel(request):
+    start_date_str = request.GET.get('start_date', '').strip()
+    end_date_str = request.GET.get('end_date', '').strip()
+    executive_filter = request.GET.get('executive', '').strip()
+    state_filter = request.GET.get('state', '').strip()
+    district_filter = request.GET.get('district', '').strip()
+    business_type = request.GET.get('business_type', '').strip()
+    sub_segment_filter = request.GET.get('sub_segment', '').strip()
 
+    export_filters = Q()
 
-# ==========================================
-# 🛠️ DASHBOARD MAINTENANCE & ACTION VIEWS
-# ==========================================
+    if business_type and business_type not in ['All', 'All Sectors']:
+        export_filters &= Q(farm__business_type__iexact=business_type)
+    if sub_segment_filter and sub_segment_filter != 'All':
+        export_filters &= Q(farm__sub_segment__iexact=sub_segment_filter)
+    if state_filter and state_filter not in ['All', 'All States']:
+        export_filters &= Q(farm__state__iexact=state_filter)
+    if district_filter and district_filter not in ['All', 'All Districts']:
+        export_filters &= Q(farm__district__iexact=district_filter)
+    if executive_filter and executive_filter not in ['All', 'All Executives']:
+        export_filters &= Q(executive__username__iexact=executive_filter)
 
-@login_required(login_url='/crm/login/')
-def clear_dashboard_data(request):
-    """Placeholder view to handle dashboard data clear requests safely."""
-    messages.info(request, "Clear dashboard functionality is currently disabled.")
-    return redirect('dashboard_home')
+    if start_date_str:
+        try:
+            export_filters &= Q(visit_date__date__gte=start_date_str)
+        except ValueError:
+            pass
+    if end_date_str:
+        try:
+            export_filters &= Q(visit_date__date__lte=end_date_str)
+        except ValueError:
+            pass
+
+    wb = openpyxl.Workbook()
+    ws_data = wb.active
+    ws_data.title = "Field Visit Database Log"
+    ws_data.views.sheetView[0].showGridLines = True
+
+    dark_slate, border_color = "0F172A", "CBD5E1"
+    thin_border = Border(
+        left=Side(style='thin', color=border_color), right=Side(style='thin', color=border_color),
+        top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
+    )
+
+    headers = [
+        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number',
+        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb',
+        'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
+        'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
+        'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
+    ]
+
+    for col_idx, text in enumerate(headers, 1):
+        cell = ws_data.cell(row=1, column=col_idx, value=text)
+        cell.font = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color=dark_slate, end_color=dark_slate, fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws_data.row_dimensions[1].height = 28
+
+    all_visits = FarmVisitReport.objects.filter(export_filters).select_related(
+        'farm', 'executive'
+    ).prefetch_related('visited_products').order_by('-visit_date')
+
+    current_row = 2
+    for v in all_visits:
+        f = v.farm
+        products = list(v.visited_products.all())
+        product_loop_list = products if products else [None]
+
+        for p in product_loop_list:
+            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v.visit_date else "")
+            ws_data.cell(row=current_row, column=2, value=v.executive.username if v.executive else "")
+            ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
+            ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
+            ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
+            ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
+            ws_data.cell(row=current_row, column=7, value=f.sub_segment if (f and f.sub_segment) else "")
+            ws_data.cell(row=current_row, column=8, value=f.state if f else "")
+            ws_data.cell(row=current_row, column=9, value=f.district if f else "")
+            ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+
+            ws_data.cell(row=current_row, column=11, value=v.farm_problem if v.farm_problem else "None reported")
+
+            ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird_count', 0) if f else 0)
+
+            ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
+            ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
+            ws_data.cell(row=current_row, column=18, value=float(p.primary_price) if p else 0.0)
+            ws_data.cell(row=current_row, column=19, value=float(p.revenue_generated) if p else 0.0)
+
+            ws_data.cell(row=current_row, column=20, value=p.potential_quantity if p else 0)
+            ws_data.cell(row=current_row, column=21, value=p.target_quantity if p else 0)
+            ws_data.cell(row=current_row, column=22, value=p.unit_type if p else "N/A")
+            ws_data.cell(row=current_row, column=23, value=p.process_status if p else "N/A")
+            ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%" if p else "0%")
+
+            gps_cell = ws_data.cell(row=current_row, column=25)
+            if f and f.latitude and f.longitude:
+                gps_cell.value = "View on Map"
+                gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
+                gps_cell.font = Font(name="Segoe UI", size=11, color="0000FF", underline="single")
+            else:
+                gps_cell.value = "No GPS Data"
+                gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
+
+            for c_idx in range(1, 26):
+                cell_item = ws_data.cell(row=current_row, column=c_idx)
+                cell_item.border = thin_border
+                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]:
+                    cell_item.alignment = Alignment(horizontal="center")
+
+            current_row += 1
+
+    if ws_data.max_row > 1:
+        for col in ws_data.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws_data.column_dimensions[col_letter].width = max(max_len + 4, 14)
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="MyAgrinutrition_CRM_Field_Logs.xlsx"'
+    wb.save(response)
+    return response
