@@ -14,7 +14,6 @@ from django.db.models import (
 from django.db.models.functions import TruncMonth, TruncYear, Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render, get_object_or_400
-from django.template.loader import render_to_string
 from django.template import TemplateDoesNotExist
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -203,7 +202,6 @@ def submit_visit_log(request):
             messages.error(request, f"Error saving visit log: {str(e)}")
             return redirect('submit_visit_log')
 
-    # GET Request: Display form
     return render_safe(request, ['field_log_form.html', 'crm_core/farm_visit_form.html', 'farm_visit_form.html'])
 
 
@@ -448,8 +446,11 @@ def analytics_dashboard(request):
 
     recent_visits = visits_qs.order_by('-created_at')[:10]
 
+    # Safely load executive list inside function call
+    exec_queryset = Executive.objects.all() if hasattr(Executive, 'objects') else []
+
     context = {
-        'executives_list': Executive.objects.all() if hasattr(Executive, 'objects') else [],
+        'executives_list': exec_queryset,
         'selected_executive': selected_exec,
         'start_date': start_date,
         'end_date': end_date,
