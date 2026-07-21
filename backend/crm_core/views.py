@@ -445,24 +445,23 @@ def get_dashboard_context(request):
 
         if start_date_str:
             try:
-                visit_filters &= Q(visit_date__date__gte=start_date_str)
-                product_filters &= Q(visit__visit_date__date__gte=start_date_str)
+                visit_filters &= Q(visit_date__gte=start_date_str)
+                product_filters &= Q(visit__visit_date__gte=start_date_str)
             except ValueError:
                 pass
 
         if end_date_str:
             try:
-                visit_filters &= Q(visit_date__date__lte=end_date_str)
-                product_filters &= Q(visit__visit_date__date__lte=end_date_str)
+                visit_filters &= Q(visit_date__lte=end_date_str)
+                product_filters &= Q(visit__visit_date__lte=end_date_str)
             except ValueError:
                 pass
 
-        # 1. Primary Metrics Aggregations (COALESCE SAFE NULL HANDLING)
+        # 1. Primary Metrics Aggregations
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
         active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
-        # Safely compute calculated revenue dynamically if revenue_generated is NULL
         computed_rev = ExpressionWrapper(
             Coalesce(F('sale_quantity'), 0) * Coalesce(F('primary_price'), 0.0, output_field=FloatField()),
             output_field=FloatField()
@@ -698,22 +697,25 @@ def get_dashboard_context(request):
         'poultry_pct': poultry_pct,
         'aqua_pct': aqua_pct,
 
-        'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
-        'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
-        'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
-        'top_prod_labels_js': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
-        'top_prod_revenue_js': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
+        # Chart JSON Mapping - Exactly matching template keys
+        'time_series_labels_json': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
+        'time_series_revenue_json': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
+        'time_series_volume_json': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
+
+        'top_product_labels_json': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
+        'top_product_revenue_json': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
+
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
 
-        'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
-        'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
+        'executive_labels_json': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
+        'executive_revenue_json': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
         'funnel_stages': funnel_stages,
         'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
 
-        'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
-        'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
+        'district_labels_json': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
+        'district_revenue_json': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
         'telemetry_audit_log': telemetry_audit_log,
         'geo_district_performance': geo_district_performance,
 
@@ -726,12 +728,12 @@ def get_dashboard_context(request):
         'visit_frequency_exec': visit_frequency_exec,
 
         'month_wise_cycle': month_wise_qs,
-        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
+        'month_labels_json': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
+        'month_data_json': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
 
         'year_wise_trends': year_wise_qs,
-        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
+        'year_labels_json': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
+        'year_data_json': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
 
         'recent_visits': recent_visits_queryset,
 
