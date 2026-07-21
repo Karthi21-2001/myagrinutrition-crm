@@ -1,4 +1,3 @@
-$content = @'
 import json
 import logging
 import openpyxl
@@ -813,7 +812,3 @@ def clear_dashboard_data(request):
     """Placeholder view to handle dashboard data clear requests safely."""
     messages.info(request, "Clear dashboard functionality is currently disabled.")
     return redirect('dashboard_home')
-
-'@
-Set-Content -Path 'crm_core\views.py' -Value $content -Encoding UTF8 -NoNewline
-Write-Host 'WRITE COMPLETE'
