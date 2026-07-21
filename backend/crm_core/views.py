@@ -562,41 +562,54 @@ def get_dashboard_context(request):
     prob_labels = [p["farm_problem"] for p in prob_qs]
     prob_data = [p["frequency"] for p in prob_qs]
 
-    # ------------------------------------------------------------------
+  # ------------------------------------------------------------------
     # 6. DEMOGRAPHICS, MAPS & LIST DATA
     # ------------------------------------------------------------------
 
     # Top Farms Table by Revenue
-    top_farms_table = (
-        product_qs.values(
-            "visit__farm__farm_name", "visit__farm__owner_name"
+    try:
+        top_farms_table = (
+            product_qs.values(
+                "visit__farm__farm_name", "visit__farm__owner_name"
+            )
+            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
+            .filter(revenue__gt=0)
+            .order_by("-revenue")[:5]
         )
-        .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
-        .filter(revenue__gt=0)
-        .order_by("-revenue")[:5]
-    )
+    except Exception as e:
+        logger.warning(f"Top farms table aggregation skipped: {e}")
+        top_farms_table = []
 
-    # Bird Population Aggregates
-    bird_population = visit_qs.aggregate(
-        chicks=Coalesce(Sum("chicks_count"), 0),
-        growers=Coalesce(Sum("grower_count"), 0),
-        layers=Coalesce(Sum("layer_count"), 0),
-        culling=Coalesce(Sum("culling_bird"), 0),
-    )
+    # Bird Population Aggregates (Wrapped defensively to prevent missing field crashes)
+    try:
+        bird_population = visit_qs.aggregate(
+            chicks=Coalesce(Sum("chicks_count"), 0),
+            growers=Coalesce(Sum("grower_count"), 0),
+            layers=Coalesce(Sum("layer_count"), 0),
+            culling=Coalesce(Sum("culling_bird"), 0),
+        )
+        bird_counts = [
+            bird_population["chicks"],
+            bird_population["growers"],
+            bird_population["layers"],
+            bird_population["culling"],
+        ]
+    except Exception as e:
+        logger.warning(f"Bird count aggregation skipped: {e}")
+        bird_counts = [0, 0, 0, 0]
+
     bird_labels = ["Chicks", "Growers", "Layers", "Culling Birds"]
-    bird_counts = [
-        bird_population["chicks"],
-        bird_population["growers"],
-        bird_population["layers"],
-        bird_population["culling"],
-    ]
 
     # Pipeline Quantities
-    pipeline_spread_agg = product_qs.aggregate(
-        actual=Coalesce(Sum("sale_quantity"), 0),
-        target=Coalesce(Sum("target_quantity"), 0),
-        potential=Coalesce(Sum("potential_quantity"), 0),
-    )
+    try:
+        pipeline_spread_agg = product_qs.aggregate(
+            actual=Coalesce(Sum("sale_quantity"), 0),
+            target=Coalesce(Sum("target_quantity"), 0),
+            potential=Coalesce(Sum("potential_quantity"), 0),
+        )
+    except Exception as e:
+        logger.warning(f"Pipeline spread aggregation skipped: {e}")
+        pipeline_spread_agg = {"actual": 0, "target": 0, "potential": 0}
 
     # Recent Visit Activity Feed
     recent_visits = visit_qs.select_related("farm", "executive").order_by(
@@ -605,17 +618,19 @@ def get_dashboard_context(request):
 
     # Filter Options Dynamic Querying
     state_list = list(
-        Farm.objects.values_list("state", flat=True)
+        Farm.objects.exclude(Q(state__isnull=True) | Q(state=""))
+        .values_list("state", flat=True)
         .distinct()
-        .exclude(state="")
     )
     district_list = list(
-        Farm.objects.values_list("district", flat=True)
+        Farm.objects.exclude(Q(district__isnull=True) | Q(district=""))
+        .values_list("district", flat=True)
         .distinct()
-        .exclude(district="")
     )
     executive_list = list(
-        User.objects.filter(is_active=True).values_list("username", flat=True).distinct()
+        User.objects.filter(is_active=True)
+        .values_list("username", flat=True)
+        .distinct()
     )
 
     # ------------------------------------------------------------------
