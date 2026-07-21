@@ -12,7 +12,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Avg, Count, DecimalField, F, Q, Sum
-from django.db.models.functions import TruncMonth, TruncYear
+from django.db.models.functions import Coalesce, TruncMonth, TruncYear  # <-- Added Coalesce here
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
