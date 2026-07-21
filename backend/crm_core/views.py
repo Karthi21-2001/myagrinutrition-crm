@@ -83,12 +83,6 @@ def logout_user(request):
 # ==========================================
 # AGRI-CORE MANAGEMENT FUNCTIONALITY
 # ==========================================
-
-@login_required(login_url='/crm/login/')
-def render_visit_form(request):
-    return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'])
-
-
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
     if request.method == 'POST':
@@ -151,6 +145,8 @@ def save_farm_visit(request):
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
                 primary_prices = request.POST.getlist('primary_price[]')
+                # Grab explicit total revenue array if passed from form
+                explicit_revenues = request.POST.getlist('revenue_generated[]') or request.POST.getlist('total_amount[]')
 
                 for i in range(len(order_products)):
                     prod_name = order_products[i].strip()
@@ -160,6 +156,13 @@ def save_farm_visit(request):
                     s_qty = int(sale_quantities[i]) if (i < len(sale_quantities) and sale_quantities[i]) else 0
                     unit = unit_types[i] if i < len(unit_types) else 'KG'
                     price = float(primary_prices[i]) if (i < len(primary_prices) and primary_prices[i]) else 0.00
+                    
+                    # PRESERVE EXECUTIVE DATA: 
+                    # If total revenue was explicitly passed, use it directly.
+                    if i < len(explicit_revenues) and explicit_revenues[i]:
+                        revenue = float(explicit_revenues[i])
+                    else:
+                        revenue = price  # Uses entered price as flat value if no dynamic math desired
 
                     VisitedProductDetail.objects.create(
                         visit=visit_record,
@@ -169,7 +172,7 @@ def save_farm_visit(request):
                         sale_quantity=s_qty,
                         unit_type=unit,
                         primary_price=price,
-                        revenue_generated=price * s_qty,
+                        revenue_generated=revenue,  # Saves exact entry
                         process_status='Hot' if s_qty > 0 else 'Warm',
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
