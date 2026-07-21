@@ -409,22 +409,21 @@ def get_dashboard_context(request):
             farm_filters &= Q(executive__username__iexact=sel_executive)
             visit_filters &= Q(executive__username__iexact=sel_executive)
             product_filters &= Q(visit__executive__username__iexact=sel_executive)
-
         if sel_month and sel_month not in ['All', 'All Months', '']:
-            try:
-                m_val = int(sel_month)
-                visit_filters &= Q(visit_date__month=m_val)
-                product_filters &= Q(visit__visit_date__month=m_val)
-            except ValueError:
-                pass
+        try:
+            m_val = int(sel_month)
+            visit_filters &= Q(visit_date__month=m_val)
+            product_filters &= Q(visit__visit_date__month=m_val)
+        except ValueError:
+            pass
 
-      if sel_year and sel_year not in ['All', '']:
-    try:
-        y_val = int(sel_year)
-        visit_filters &= Q(visit_date__year=y_val)
-        product_filters &= Q(visit__visit_date__year=y_val)
-    except ValueError:
-        pass
+        if sel_year and sel_year not in ['All', '']:
+        try:
+            y_val = int(sel_year)
+            visit_filters &= Q(visit_date__year=y_val)
+            product_filters &= Q(visit__visit_date__year=y_val)
+        except ValueError:
+            pass
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
