@@ -343,7 +343,15 @@ def export_visits_to_excel(request):
 # 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
 # ==========================================
 
+User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
 def get_dashboard_context(request):
+    """
+    Computes all KPI aggregates, Chart data series, and list structures
+    for the MyAgriNutrition Analytics Dashboard.
+    """
     total_rev = 0.0
     vol_sold = 0
     v_count = 0
@@ -409,25 +417,27 @@ def get_dashboard_context(request):
             farm_filters &= Q(executive__username__iexact=sel_executive)
             visit_filters &= Q(executive__username__iexact=sel_executive)
             product_filters &= Q(visit__executive__username__iexact=sel_executive)
+
         if sel_month and sel_month not in ['All', 'All Months', '']:
-        try:
-            m_val = int(sel_month)
-            visit_filters &= Q(visit_date__month=m_val)
-            product_filters &= Q(visit__visit_date__month=m_val)
-        except ValueError:
-            pass
+            try:
+                m_val = int(sel_month)
+                visit_filters &= Q(visit_date__month=m_val)
+                product_filters &= Q(visit__visit_date__month=m_val)
+            except ValueError:
+                pass
 
         if sel_year and sel_year not in ['All', '']:
-        try:
-            y_val = int(sel_year)
-            visit_filters &= Q(visit_date__year=y_val)
-            product_filters &= Q(visit__visit_date__year=y_val)
-        except ValueError:
-            pass
+            try:
+                y_val = int(sel_year)
+                visit_filters &= Q(visit_date__year=y_val)
+                product_filters &= Q(visit__visit_date__year=y_val)
+            except ValueError:
+                pass
 
-User = get_user_model()
-logger = logging.getLogger(__name__)
+    except Exception as e:
+        logger.error(f"Error preparing query filters in get_dashboard_context: {e}")
 
+    # Rest of your query computation and context dictionary return logic goes here...
 def get_dashboard_context(request):
     """
     Computes all KPI aggregates, Chart data series, and list structures
