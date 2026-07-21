@@ -81,12 +81,12 @@ def logout_user(request):
 
 
 # ==========================================
-# AGRI-CORE MANAGEMENT FUNCTIONALITY
+# 🌱 AGRI-CORE MANAGEMENT FUNCTIONALITY
 # ==========================================
 
 @login_required(login_url='/crm/login/')
 def render_visit_form(request):
-    return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'])
+    return render(request, 'crm_core/farm_visit_form.html')
 
 
 @login_required(login_url='/crm/login/')
@@ -161,6 +161,9 @@ def save_farm_visit(request):
                     unit = unit_types[i] if i < len(unit_types) else 'KG'
                     price = float(primary_prices[i]) if (i < len(primary_prices) and primary_prices[i]) else 0.00
 
+                    # Fixed revenue calculation logic
+                    calculated_revenue = price * s_qty if s_qty > 0 else price
+
                     VisitedProductDetail.objects.create(
                         visit=visit_record,
                         product_name=prod_name,
@@ -169,9 +172,9 @@ def save_farm_visit(request):
                         sale_quantity=s_qty,
                         unit_type=unit,
                         primary_price=price,
-                        revenue_generated=price * s_qty,
-                        process_status='Hot' if s_qty > 0 else 'Warm',
-                        conversion_percentage=100 if s_qty > 0 else 0
+                        revenue_generated=calculated_revenue,
+                        process_status='Hot' if calculated_revenue > 0 else 'Warm',
+                        conversion_percentage=100 if calculated_revenue > 0 else 0
                     )
 
                 # Process Pipeline Products
@@ -210,12 +213,12 @@ def save_farm_visit(request):
             if request.user.is_staff or request.user.is_superuser:
                 return redirect('dashboard_home')
 
-            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
+            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
             messages.error(request, f"Database transaction block failed: {str(e)}")
-            return render_safe(request, ['crm_core/farm_visit_form.html', 'farm_visit_form.html'], {'saved_data': request.POST})
+            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
     return redirect('render_visit_form')
 
@@ -354,7 +357,7 @@ def export_visits_to_excel(request):
 
 
 # ==========================================
-# DASHBOARDS & ADVANCED ANALYTICS PIPELINES
+# 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
 # ==========================================
 
 def get_dashboard_context(request):
@@ -386,7 +389,7 @@ def get_dashboard_context(request):
     problems_list = []
     segment_breakdown = []
     visit_frequency_exec = []
-
+    
     month_wise_qs = []
     month_wise_labels, month_wise_data = [], []
     year_wise_qs = []
@@ -403,7 +406,7 @@ def get_dashboard_context(request):
     sel_executive = request.GET.get('executive', '').strip()
     sel_month = request.GET.get('month', '').strip()
     sel_year = request.GET.get('year', '').strip()
-
+    
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
 
@@ -457,29 +460,23 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        # 1. Primary Metrics Aggregations (COALESCE SAFE NULL HANDLING)
+        # 1. Primary Metrics Aggregations
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
         active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
-        # Safely compute calculated revenue dynamically if revenue_generated is NULL
-        computed_rev = ExpressionWrapper(
-            Coalesce(F('sale_quantity'), 0) * Coalesce(F('primary_price'), 0.0, output_field=FloatField()),
-            output_field=FloatField()
-        )
-
         total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            total=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField())
+            total=Sum('revenue_generated')
         )['total'] or 0.0
 
         vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            total_qty=Coalesce(Sum('sale_quantity'), 0)
+            total_qty=Sum('sale_quantity')
         )['total_qty'] or 0
 
+        # Updated to check revenue_generated OR sale_quantity to avoid zero divisions
         paid_orders_count = VisitedProductDetail.objects.filter(
-            product_filters,
-            sale_quantity__gt=0
-        ).count()
+            product_filters
+        ).filter(Q(sale_quantity__gt=0) | Q(revenue_generated__gt=0)).count()
 
         avg_order_value = (total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
 
@@ -506,35 +503,29 @@ def get_dashboard_context(request):
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
-            .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
-                volume=Coalesce(Sum('sale_quantity'), 0)
-            )
+            .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
             .filter(month__isnull=False)
             .order_by('month')
         )
 
         combo_labels = [t['month'].strftime("%b %Y") for t in time_series_data if t.get('month')]
-        combo_revenue = [float(t.get('revenue') or 0.0) for t in time_series_data]
+        combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
         combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
 
         # 3. Product Performance & Pricing Table
         product_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
-            .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
-                qty_sold=Coalesce(Sum('sale_quantity'), 0)
-            )
+            .annotate(revenue=Sum('revenue_generated'), qty_sold=Sum('sale_quantity'))
             .order_by('-revenue')
         )
         top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
-        top_prod_revenue = [float(p['revenue'] or 0.0) for p in product_performance]
+        top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
 
         pipeline_spread_agg = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            actual=Coalesce(Sum('sale_quantity'), 0),
-            target=Coalesce(Sum('target_quantity'), 0),
-            potential=Coalesce(Sum('potential_quantity'), 0)
+            actual=Sum('sale_quantity'),
+            target=Sum('target_quantity'),
+            potential=Sum('potential_quantity')
         )
         if pipeline_spread_agg:
             pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
@@ -542,7 +533,7 @@ def get_dashboard_context(request):
         product_pricing_table = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('product_name')
-            .annotate(avg_unit_price=Coalesce(Avg('primary_price'), 0.0))
+            .annotate(avg_unit_price=Avg('primary_price'))
             .order_by('product_name')
         )
 
@@ -551,21 +542,15 @@ def get_dashboard_context(request):
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
             .annotate(
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()),
+                revenue=Sum('revenue_generated'),
                 total_items=Count('id'),
-                hot_items=Sum(
-                    Case(
-                        When(process_status__iexact='Hot', then=1),
-                        default=0,
-                        output_field=IntegerField()
-                    )
-                )
+                hot_items=Count('id', filter=Q(process_status__iexact='Hot'))
             )
             .order_by('-revenue')
         )
         exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
-        exec_revenue = [float(e['revenue'] or 0.0) for e in executive_performance]
-        exec_conv_pct = [round(((e['hot_items'] or 0) / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
+        exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
+        exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
 
         funnel_stages = (
             VisitedProductDetail.objects.filter(product_filters)
@@ -581,12 +566,14 @@ def get_dashboard_context(request):
             .values('visit__farm__state', 'visit__farm__district')
             .annotate(
                 farm_count=Count('visit__farm', distinct=True),
-                revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField())
+                revenue=Sum('revenue_generated'),
+                state=F('visit__farm__state'),
+                district=F('visit__farm__district')
             )
             .order_by('-revenue')
         )
-        map_labels = [d['visit__farm__district'] if d.get('visit__farm__district') else 'Unknown' for d in geo_district_performance[:10]]
-        map_revenue = [float(d['revenue'] or 0.0) for d in geo_district_performance[:10]]
+        map_labels = [d['district'] if d.get('district') else 'Unknown' for d in geo_district_performance[:10]]
+        map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
 
         telemetry_audit_log = (
             FarmVisitReport.objects.filter(visit_filters)
@@ -598,10 +585,10 @@ def get_dashboard_context(request):
         # 6. Demographics
         try:
             bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-                chicks=Coalesce(Sum('farm__chicks_count'), 0),
-                growers=Coalesce(Sum('farm__grower_count'), 0),
-                layers=Coalesce(Sum('farm__layer_count'), 0),
-                culling=Coalesce(Sum('farm__culling_bird_count'), 0)
+                chicks=Sum('farm__chicks_count'),
+                growers=Sum('farm__grower_count'),
+                layers=Sum('farm__layer_count'),
+                culling=Sum('farm__culling_bird_count')
             )
             if bird_population:
                 bird_counts = [
@@ -641,39 +628,28 @@ def get_dashboard_context(request):
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(month=TruncMonth('visit__visit_date'))
             .values('month')
-            .annotate(revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()))
+            .annotate(revenue=Sum('revenue_generated'))
             .filter(month__isnull=False)
             .order_by('month')
         )
         month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
-        month_wise_data = [float(m['revenue'] or 0.0) for m in month_wise_qs]
+        month_wise_data = [float(m['revenue'] or 0) for m in month_wise_qs]
 
         year_wise_qs = list(
             VisitedProductDetail.objects.filter(product_filters)
             .annotate(year=TruncYear('visit__visit_date'))
             .values('year')
-            .annotate(revenue=Coalesce(Sum(Coalesce('revenue_generated', computed_rev)), 0.0, output_field=FloatField()))
+            .annotate(revenue=Sum('revenue_generated'))
             .filter(year__isnull=False)
             .order_by('year')
         )
         year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
-        year_wise_data = [float(y['revenue'] or 0.0) for y in year_wise_qs]
+        year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
 
-        # 8. Table Display Mapping
+        # 8. Recent Visits Queryset
         recent_visits_queryset = FarmVisitReport.objects.filter(
             visit_filters
-        ).select_related('farm', 'executive').prefetch_related('visited_products').annotate(
-            total_calculated_revenue=Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        Coalesce(F('visited_products__sale_quantity'), 0) * Coalesce(F('visited_products__primary_price'), 0.0, output_field=FloatField()),
-                        output_field=FloatField()
-                    )
-                ),
-                0.0,
-                output_field=FloatField()
-            )
-        ).order_by('-visit_date')[:10]
+        ).select_related('farm', 'executive').order_by('-visit_date')[:10]
 
         state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
         district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
@@ -724,11 +700,11 @@ def get_dashboard_context(request):
         'segment_breakdown': segment_breakdown,
 
         'visit_frequency_exec': visit_frequency_exec,
-
+        
         'month_wise_cycle': month_wise_qs,
         'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
         'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-
+        
         'year_wise_trends': year_wise_qs,
         'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
         'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
