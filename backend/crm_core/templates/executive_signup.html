@@ -50,7 +50,7 @@
                     <div>
                         <label class="block text-xs font-bold text-slate-400 uppercase mb-1">{{ field.label }}</label>
                         {{ field }}
-                        {% if field.help_text and field.name != 'password' %}
+                        {% if field.help_text and field.name != 'password' and field.name != 'password1' and field.name != 'password2' %}
                             <p class="text-[11px] text-slate-500 mt-1">{{ field.help_text|safe }}</p>
                         {% endif %}
                         {% if field.errors %}
