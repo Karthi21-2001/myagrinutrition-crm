@@ -518,7 +518,7 @@ def get_dashboard_context(request):
             .order_by('product_name')
         )
 
-        # 4. Executive Performance (Fixed Django conditional aggregation)
+        # 4. Executive Performance (Safely handling conditional aggregations)
         executive_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__executive__username')
@@ -547,7 +547,7 @@ def get_dashboard_context(request):
         )
         funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
 
-        # 5. Maps & Telemetry (Fixed alias conflict)
+        # 5. Maps & Telemetry (Safely avoiding key alias duplication)
         geo_district_performance = (
             VisitedProductDetail.objects.filter(product_filters)
             .values('visit__farm__state', 'visit__farm__district')
