@@ -446,7 +446,7 @@ def analytics_dashboard(request):
 
     recent_visits = visits_qs.order_by('-created_at')[:10]
 
-    # Safely load executive list inside function call
+    # Safely dynamic load executive list inside function context to prevent DB calls on app init
     exec_queryset = Executive.objects.all() if hasattr(Executive, 'objects') else []
 
     context = {
@@ -756,7 +756,7 @@ def api_dashboard_metrics(request):
     """JSON API endpoint for async metrics updates."""
     context = get_dashboard_context(request)
     
-    # Strip out non-serializable elements (like QuerySets) prior to returning as JSON
+    # Exclude non-serializable elements prior to returning as JSON
     context.pop('recent_visits', None)
     context.pop('state_list', None)
     context.pop('district_list', None)
