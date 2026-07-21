@@ -38,6 +38,13 @@
             filter: invert(0.8);
             cursor: pointer;
         }
+
+        /* Ensure options are clearly visible inside Native Dropdowns across browsers */
+        select option {
+            background-color: #131c2e !important;
+            color: #f1f5f9 !important;
+            padding: 8px;
+        }
     </style>
 </head>
 <body class="min-h-full flex flex-col antialiased custom-scrollbar pb-12">
@@ -54,10 +61,16 @@
             </div>
             
             <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
-                <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
-                    <option value="ALL" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>👥 All Executives</option>
+                
+                <!-- EXECUTIVE DROPDOWN FIX -->
+                <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[180px] shadow-md transition">
+                    <option value="ALL" class="bg-slate-900 text-slate-200" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>
+                        👥 All Executives
+                    </option>
                     {% for exec in executives_list %}
-                        <option value="{{ exec.id }}" {% if selected_executive == exec.id|stringformat:"s" %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
+                        <option value="{{ exec.id }}" class="bg-slate-900 text-slate-200" {% if selected_executive|stringformat:"s" == exec.id|stringformat:"s" %}selected{% endif %}>
+                            👤 {{ exec.get_full_name|default:exec.first_name|default:exec.username|default:exec.name }}
+                        </option>
                     {% endfor %}
                 </select>
 
@@ -68,9 +81,9 @@
                     <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
                 <select name="sector" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
-                    <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
-                    <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
-                    <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
+                    <option value="ALL" class="bg-slate-900 text-slate-200" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
+                    <option value="POULTRY" class="bg-slate-900 text-slate-200" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
+                    <option value="AQUA" class="bg-slate-900 text-slate-200" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
                 </select>
                 
                 <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
@@ -93,7 +106,7 @@
             </span>
         </div>
 
-        <!-- ================= STATISTICAL KPI CARD DECK ================= -->
+        <!-- KPI CARD DECK -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-sky-400"></i></div>
@@ -127,7 +140,7 @@
             </div>
         </div>
 
-        <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
+        <!-- 📈 MONTH & YEAR TRENDS -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg relative">
                 <div>
@@ -162,7 +175,7 @@
             </div>
         </div>
 
-        <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
+        <!-- DATA LEDGERS & CHARTS -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg relative">
                 <div>
@@ -208,7 +221,7 @@
             </div>
         </div>
 
-        <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
+        <!-- DIAGNOSTICS & METRICS -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg relative">
                 <div>
@@ -287,7 +300,7 @@
             </div>
         </div>
 
-        <!-- ================= LIVE LOG ENTRIES AUDIT MATRIX LEDGER ================= -->
+        <!-- 📋 TABLE AUDIT LOG -->
         <div class="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-xl">
             <div class="p-4 border-b border-slate-800 bg-slate-900/20 flex justify-between items-center">
                 <div>
@@ -316,7 +329,8 @@
                                     {{ visit.visit_date|default:visit.created_at|date:"d-M-Y" }}
                                 </td>
                                 <td class="p-3.5 text-slate-200 font-bold">
-                                    {{ visit.executive.get_full_name|default:visit.executive.username }}
+                                    <!-- TABLE EXECUTIVE NAME FIX -->
+                                    {{ visit.executive.get_full_name|default:visit.executive.first_name|default:visit.executive.username|default:"Unassigned" }}
                                 </td>
                                 <td class="p-3.5 flex flex-col">
                                     <span class="font-bold text-slate-300">
@@ -375,7 +389,6 @@
             Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
             Chart.defaults.font.family = "'Inter', sans-serif";
 
-            // Safe JSON Parsing from Django context
             const parseJSON = (str) => {
                 try {
                     return JSON.parse(str);
@@ -402,7 +415,6 @@
             const probLabels  = parseJSON('{{ problem_labels_json|escapejs|default:"[]" }}');
             const probData    = parseJSON('{{ problem_data_json|escapejs|default:"[]" }}');
 
-            // Helper to hide chart and show empty overlay if dataset is empty
             const renderOrHide = (canvasId, fallbackId, hasData, chartInitializer) => {
                 const canvas = document.getElementById(canvasId);
                 const fallback = document.getElementById(fallbackId);
@@ -487,7 +499,7 @@
                 });
             });
 
-            // 4. Product Sales Donut Chart
+            // 4. Product Sales Donut
             renderOrHide('prodSalesDonut', 'noDataProd', prodData.length > 0, () => {
                 new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
                     type: 'doughnut',
@@ -495,7 +507,7 @@
                         labels: prodLabels,
                         datasets: [{
                             data: prodData,
-                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
+                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
                             borderWidth: 0
                         }]
                     },
@@ -503,7 +515,7 @@
                 });
             });
 
-            // 5. State Visits Bar Chart
+            // 5. State Visits Chart
             renderOrHide('stateVisitsChart', 'noDataState', stateData.length > 0, () => {
                 new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
                     type: 'bar',
@@ -511,7 +523,7 @@
                         labels: stateLabels,
                         datasets: [{
                             data: stateData,
-                            backgroundColor: '#8b5cf6',
+                            backgroundColor: '#10b981',
                             borderRadius: 4,
                             barThickness: 10
                         }]
@@ -520,7 +532,7 @@
                 });
             });
 
-            // 6. Problems Donut Chart
+            // 6. Field Problems Donut
             renderOrHide('problemsDonut', 'noDataProblems', probData.length > 0, () => {
                 new Chart(document.getElementById('problemsDonut').getContext('2d'), {
                     type: 'doughnut',
@@ -528,7 +540,7 @@
                         labels: probLabels,
                         datasets: [{
                             data: probData,
-                            backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#06b6d4', '#64748b'],
+                            backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#a855f7'],
                             borderWidth: 0
                         }]
                     },
