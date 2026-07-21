@@ -726,3 +726,32 @@ def clear_dashboard_data(request):
             logger.error(f"Failed to clear dashboard data: {str(e)}")
             messages.error(request, f"Error clearing data: {str(e)}")
     return redirect('dashboard_home')
+
+@login_required(login_url='/crm/login/')
+def get_location_details(request):
+    """
+    API endpoint for reverse geocoding latitude and longitude into location details.
+    """
+    lat = request.GET.get('lat')
+    lon = request.GET.get('lon')
+
+    if not lat or not lon:
+        return JsonResponse({'error': 'Latitude and longitude required.'}, status=400)
+
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+        headers = {'User-Agent': 'AgriNutritionCRM/1.0'}
+        res = requests.get(url, headers=headers, timeout=5)
+        
+        if res.status_code == 200:
+            data = res.json()
+            address = data.get('address', {})
+            return JsonResponse({
+                'state': address.get('state', ''),
+                'district': address.get('state_district') or address.get('county') or address.get('district', ''),
+                'area': address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
+            })
+        return JsonResponse({'error': 'Failed to fetch location data.'}, status=500)
+    except Exception as e:
+        logger.error(f"Geocoding error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
