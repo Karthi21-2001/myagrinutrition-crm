@@ -343,11 +343,6 @@ def export_visits_to_excel(request):
 # 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
 # ==========================================
 
-# ==========================================
-# 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
-# ==========================================
-
-
 def get_dashboard_context(request):
     """Computes all KPI aggregates, Chart data series, and list structures
 
