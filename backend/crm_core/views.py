@@ -161,7 +161,7 @@ def save_farm_visit(request):
                     unit = unit_types[i] if i < len(unit_types) else 'KG'
                     price = float(primary_prices[i]) if (i < len(primary_prices) and primary_prices[i]) else 0.00
 
-                    # Fixed revenue calculation logic
+                    # Revenue calculation logic
                     calculated_revenue = price * s_qty if s_qty > 0 else price
 
                     VisitedProductDetail.objects.create(
@@ -389,7 +389,7 @@ def get_dashboard_context(request):
     problems_list = []
     segment_breakdown = []
     visit_frequency_exec = []
-    
+
     month_wise_qs = []
     month_wise_labels, month_wise_data = [], []
     year_wise_qs = []
@@ -401,12 +401,11 @@ def get_dashboard_context(request):
     executive_list = []
 
     sel_state = request.GET.get('state', '').strip()
-    sel_country = request.GET.get('country', '').strip()
     sel_district = request.GET.get('district', '').strip()
     sel_executive = request.GET.get('executive', '').strip()
     sel_month = request.GET.get('month', '').strip()
     sel_year = request.GET.get('year', '').strip()
-    
+
     start_date_str = request.GET.get('start_date', '').strip()
     end_date_str = request.GET.get('end_date', '').strip()
 
@@ -473,7 +472,6 @@ def get_dashboard_context(request):
             total_qty=Sum('sale_quantity')
         )['total_qty'] or 0
 
-        # Updated to check revenue_generated OR sale_quantity to avoid zero divisions
         paid_orders_count = VisitedProductDetail.objects.filter(
             product_filters
         ).filter(Q(sale_quantity__gt=0) | Q(revenue_generated__gt=0)).count()
@@ -700,11 +698,11 @@ def get_dashboard_context(request):
         'segment_breakdown': segment_breakdown,
 
         'visit_frequency_exec': visit_frequency_exec,
-        
+
         'month_wise_cycle': month_wise_qs,
         'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
         'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-        
+
         'year_wise_trends': year_wise_qs,
         'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
         'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
@@ -714,77 +712,17 @@ def get_dashboard_context(request):
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
-        'country_list': ['India'],
-
-        'selected_state': sel_state,
-        'selected_country': sel_country,
-        'selected_district': sel_district,
-        'selected_executive': sel_executive,
-        'selected_month': sel_month,
-        'selected_year': sel_year,
     }
 
 
-# ==========================================
-# SAFE CONTROLLER VIEWS (WITH FALLBACKS)
-# ==========================================
-
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    """Render Main Dashboard with template safe fallback"""
-    templates = ['crm_core/dashboard.html', 'dashboard.html', 'crm_core/dashboard_home.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load dashboard: {str(e)}")
-        return render_safe(request, templates, {})
-
-
-@login_required(login_url='/crm/login/')
-def dashboard_analytics(request):
-    """Render Analytics Report dashboard with template safe fallback"""
-    templates = ['crm_core/analytics_report.html', 'analytics_report.html', 'crm_core/analytics.html', 'analytics.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load analytics report: {str(e)}")
-        return render_safe(request, templates, {})
-
-
-@login_required(login_url='/crm/login/')
-def executive_analytics_view(request):
-    """Render Executive Analytics dashboard with template safe fallback"""
-    templates = ['crm_core/executive_analytics.html', 'executive_analytics.html', 'crm_core/analytics_report.html']
-    try:
-        context = get_dashboard_context(request)
-        return render_safe(request, templates, context)
-    except Exception as e:
-        logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
-        messages.error(request, f"Unable to load executive analytics: {str(e)}")
-        return render_safe(request, templates, {})
-
-
-# ==========================================
-# GEOLOCATION & UTILITIES
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-def get_location_details(request):
-    lat = request.GET.get('lat')
-    lng = request.GET.get('lng')
-    return JsonResponse({'status': 'success', 'lat': lat, 'lng': lng})
-
-
-# ==========================================
-# DASHBOARD MAINTENANCE & ACTION VIEWS
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-def clear_dashboard_data(request):
-    """Placeholder view to handle dashboard data clear requests safely."""
-    messages.info(request, "Clear dashboard functionality is currently disabled.")
-    return redirect('dashboard_home')
+    """
+    Renders primary Analytics Dashboard with computed metrics context.
+    """
+    context = get_dashboard_context(request)
+    return render_safe(
+        request, 
+        ['crm_core/dashboard.html', 'dashboard.html'], 
+        context
+    )
