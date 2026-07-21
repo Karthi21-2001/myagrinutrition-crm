@@ -151,8 +151,6 @@ def save_farm_visit(request):
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
                 primary_prices = request.POST.getlist('primary_price[]')
-                # Grab explicit total revenue array if passed from form
-                explicit_revenues = request.POST.getlist('revenue_generated[]') or request.POST.getlist('total_amount[]')
 
                 for i in range(len(order_products)):
                     prod_name = order_products[i].strip()
@@ -163,13 +161,6 @@ def save_farm_visit(request):
                     unit = unit_types[i] if i < len(unit_types) else 'KG'
                     price = float(primary_prices[i]) if (i < len(primary_prices) and primary_prices[i]) else 0.00
 
-                    # PRESERVE EXECUTIVE DATA:
-                    # If revenue or explicit total was passed directly, save it without forced multiplication.
-                    if i < len(explicit_revenues) and explicit_revenues[i]:
-                        revenue = float(explicit_revenues[i])
-                    else:
-                        revenue = price  # Default flat entry value
-
                     VisitedProductDetail.objects.create(
                         visit=visit_record,
                         product_name=prod_name,
@@ -178,7 +169,7 @@ def save_farm_visit(request):
                         sale_quantity=s_qty,
                         unit_type=unit,
                         primary_price=price,
-                        revenue_generated=revenue,
+                        revenue_generated=price * s_qty,
                         process_status='Hot' if s_qty > 0 else 'Warm',
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
@@ -466,11 +457,12 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        # 1. Primary Metrics Aggregations
+        # 1. Primary Metrics Aggregations (COALESCE SAFE NULL HANDLING)
         v_count = FarmVisitReport.objects.filter(visit_filters).count()
         total_farms_count = Farm.objects.filter(farm_filters).count()
         active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
+        # Safely compute calculated revenue dynamically if revenue_generated is NULL
         computed_rev = ExpressionWrapper(
             Coalesce(F('sale_quantity'), 0) * Coalesce(F('primary_price'), 0.0, output_field=FloatField()),
             output_field=FloatField()
@@ -672,7 +664,12 @@ def get_dashboard_context(request):
             visit_filters
         ).select_related('farm', 'executive').prefetch_related('visited_products').annotate(
             total_calculated_revenue=Coalesce(
-                Sum(Coalesce('visited_products__revenue_generated', computed_rev)),
+                Sum(
+                    ExpressionWrapper(
+                        Coalesce(F('visited_products__sale_quantity'), 0) * Coalesce(F('visited_products__primary_price'), 0.0, output_field=FloatField()),
+                        output_field=FloatField()
+                    )
+                ),
                 0.0,
                 output_field=FloatField()
             )
@@ -704,61 +701,114 @@ def get_dashboard_context(request):
         'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
         'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
         'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
-
         'top_prod_labels_js': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
         'top_prod_revenue_js': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
-
         'pipeline_spread': pipeline_spread,
         'product_pricing_table': product_pricing_table,
 
         'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
         'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
         'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
+        'funnel_stages': funnel_stages,
+        'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
 
-        'funnel_stages': funnel_list,
-        'geo_district_performance': geo_district_performance,
         'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
         'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
-
         'telemetry_audit_log': telemetry_audit_log,
-        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
-        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
+        'geo_district_performance': geo_district_performance,
 
-        'problems_list': problems_list,
+        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
+        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
+        'reported_problems': reported_problems,
+        'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
         'segment_breakdown': segment_breakdown,
+
         'visit_frequency_exec': visit_frequency_exec,
 
-        'month_wise_labels_js': json.dumps(list(month_wise_labels), cls=DjangoJSONEncoder),
-        'month_wise_data_js': json.dumps(list(month_wise_data), cls=DjangoJSONEncoder),
+        'month_wise_cycle': month_wise_qs,
+        'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
+        'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
 
-        'year_wise_labels_js': json.dumps(list(year_wise_labels), cls=DjangoJSONEncoder),
-        'year_wise_data_js': json.dumps(list(year_wise_data), cls=DjangoJSONEncoder),
+        'year_wise_trends': year_wise_qs,
+        'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
+        'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
 
         'recent_visits': recent_visits_queryset,
+
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
+        'country_list': ['India'],
 
         'selected_state': sel_state,
+        'selected_country': sel_country,
         'selected_district': sel_district,
         'selected_executive': sel_executive,
         'selected_month': sel_month,
         'selected_year': sel_year,
-        'start_date': start_date_str,
-        'end_date': end_date_str,
     }
 
 
+# ==========================================
+# SAFE CONTROLLER VIEWS (WITH FALLBACKS)
+# ==========================================
+
 @login_required(login_url='/crm/login/')
 def dashboard_home(request):
-    context = get_dashboard_context(request)
-    return render_safe(request, ['crm_core/dashboard.html', 'dashboard.html'], context)
+    """Render Main Dashboard with template safe fallback"""
+    templates = ['crm_core/dashboard.html', 'dashboard.html', 'crm_core/dashboard_home.html']
+    try:
+        context = get_dashboard_context(request)
+        return render_safe(request, templates, context)
+    except Exception as e:
+        logger.error(f"Error rendering dashboard_home: {str(e)}", exc_info=True)
+        messages.error(request, f"Unable to load dashboard: {str(e)}")
+        return render_safe(request, templates, {})
 
 
-def api_get_districts(request):
-    state_name = request.GET.get('state', '').strip()
-    if state_name:
-        districts = list(Farm.objects.filter(state__iexact=state_name).values_list('district', flat=True).distinct().exclude(district=''))
-    else:
-        districts = list(Farm.objects.values_list('district', flat=True).distinct().exclude(district=''))
-    return JsonResponse({'districts': sorted(districts)})
+@login_required(login_url='/crm/login/')
+def dashboard_analytics(request):
+    """Render Analytics Report dashboard with template safe fallback"""
+    templates = ['crm_core/analytics_report.html', 'analytics_report.html', 'crm_core/analytics.html', 'analytics.html']
+    try:
+        context = get_dashboard_context(request)
+        return render_safe(request, templates, context)
+    except Exception as e:
+        logger.error(f"Error rendering dashboard_analytics: {str(e)}", exc_info=True)
+        messages.error(request, f"Unable to load analytics report: {str(e)}")
+        return render_safe(request, templates, {})
+
+
+@login_required(login_url='/crm/login/')
+def executive_analytics_view(request):
+    """Render Executive Analytics dashboard with template safe fallback"""
+    templates = ['crm_core/executive_analytics.html', 'executive_analytics.html', 'crm_core/analytics_report.html']
+    try:
+        context = get_dashboard_context(request)
+        return render_safe(request, templates, context)
+    except Exception as e:
+        logger.error(f"Error rendering executive_analytics_view: {str(e)}", exc_info=True)
+        messages.error(request, f"Unable to load executive analytics: {str(e)}")
+        return render_safe(request, templates, {})
+
+
+# ==========================================
+# GEOLOCATION & UTILITIES
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+def get_location_details(request):
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+    return JsonResponse({'status': 'success', 'lat': lat, 'lng': lng})
+
+
+# ==========================================
+# DASHBOARD MAINTENANCE & ACTION VIEWS
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+def clear_dashboard_data(request):
+    """Placeholder view to handle dashboard data clear requests safely."""
+    messages.info(request, "Clear dashboard functionality is currently disabled.")
+    return redirect('dashboard_home')
