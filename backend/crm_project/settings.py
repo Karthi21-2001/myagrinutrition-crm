@@ -87,7 +87,7 @@ ROOT_URLCONF = 'crm_project.urls'
 # 🛠️ GLOBAL TEMPLATE CONFIGURATION MATRIX
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.DjangoTemplates',
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',  # Fixed template engine import string
         'DIRS': [BASE_DIR / 'templates'], 
         'APP_DIRS': True, 
         'OPTIONS': {
