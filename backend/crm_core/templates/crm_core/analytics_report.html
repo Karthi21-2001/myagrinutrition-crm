@@ -483,11 +483,11 @@
                             barThickness: 10 
                         }] 
                     },
-                    options: { ...baseOptions, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { display: false }, grid: { display: false } } } }
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
                 });
             });
 
-// 4. Product Sales Donut Chart
+            // 4. Product Sales Donut Chart
             renderOrHide('prodSalesDonut', 'noDataProd', prodData.length > 0, () => {
                 new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
                     type: 'doughnut',
@@ -495,22 +495,15 @@
                         labels: prodLabels,
                         datasets: [{
                             data: prodData,
-                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'],
-                            borderWidth: 2,
-                            borderColor: '#131c2e'
+                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
+                            borderWidth: 0
                         }]
                     },
-                    options: {
-                        ...baseOptions,
-                        cutout: '70%',
-                        plugins: {
-                            legend: { display: true, position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
-                        }
-                    }
+                    options: { ...baseOptions, cutout: '70%' }
                 });
             });
 
-            // 5. State Visits Chart
+            // 5. State Visits Bar Chart
             renderOrHide('stateVisitsChart', 'noDataState', stateData.length > 0, () => {
                 new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
                     type: 'bar',
@@ -518,22 +511,16 @@
                         labels: stateLabels,
                         datasets: [{
                             data: stateData,
-                            backgroundColor: '#10b981',
+                            backgroundColor: '#8b5cf6',
                             borderRadius: 4,
-                            barThickness: 12
+                            barThickness: 10
                         }]
                     },
-                    options: {
-                        ...baseOptions,
-                        scales: {
-                            x: { grid: { display: false } },
-                            y: { beginAtZero: true, grid: { display: false } }
-                        }
-                    }
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
                 });
             });
 
-            // 6. Field Problems Observed Donut Chart
+            // 6. Problems Donut Chart
             renderOrHide('problemsDonut', 'noDataProblems', probData.length > 0, () => {
                 new Chart(document.getElementById('problemsDonut').getContext('2d'), {
                     type: 'doughnut',
@@ -541,20 +528,14 @@
                         labels: probLabels,
                         datasets: [{
                             data: probData,
-                            backgroundColor: ['#f43f5e', '#fb923c', '#facc15', '#a855f7', '#3b82f6'],
-                            borderWidth: 2,
-                            borderColor: '#131c2e'
+                            backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#06b6d4', '#64748b'],
+                            borderWidth: 0
                         }]
                     },
-                    options: {
-                        ...baseOptions,
-                        cutout: '65%',
-                        plugins: {
-                            legend: { display: true, position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
-                        }
-                    }
+                    options: { ...baseOptions, cutout: '70%' }
                 });
             });
         });
     </script>
 </body>
+</html>
