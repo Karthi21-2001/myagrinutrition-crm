@@ -425,206 +425,255 @@ def get_dashboard_context(request):
                 product_filters &= Q(visit__visit_date__year=y_val)
             except ValueError:
                 pass
+User = get_user_model()
+logger = logging.getLogger(__name__)
 
-        # 1. Primary Metrics Aggregations
-        v_count = FarmVisitReport.objects.filter(visit_filters).count()
-        total_farms_count = Farm.objects.filter(farm_filters).count()
-        active_executives = FarmVisitReport.objects.filter(visit_filters).values('executive').distinct().count()
 
-        total_rev = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            total=Sum('revenue_generated')
-        )['total'] or 0.0
+def get_dashboard_context(request):
+    """
+    Computes all KPI aggregates, Chart data series, and list structures
+    for the MyAgriNutrition Analytics Dashboard.
+    """
+    # ------------------------------------------------------------------
+    # 1. READ FILTER INPUTS FROM REQUEST
+    # ------------------------------------------------------------------
+    sel_state = request.GET.get('state', '').strip()
+    sel_country = request.GET.get('country', '').strip()
+    sel_district = request.GET.get('district', '').strip()
+    sel_executive = request.GET.get('executive', '').strip()
+    sel_month = request.GET.get('month', '').strip()
+    sel_year = request.GET.get('year', '').strip()
+    sel_sector = request.GET.get('sector', '').strip()
 
-        vol_sold = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            total_qty=Sum('sale_quantity')
-        )['total_qty'] or 0
+    # ------------------------------------------------------------------
+    # 2. CONSTRUCT FILTER CONDITIONS
+    # ------------------------------------------------------------------
+    farm_filters = Q()
+    visit_filters = Q()
+    product_filters = Q()
 
-        paid_orders_count = VisitedProductDetail.objects.filter(
-            product_filters, 
-            sale_quantity__gt=0
-        ).count()
+    # Geographic Filters
+    if sel_state and sel_state not in ['All', 'All States', '']:
+        farm_filters &= Q(state__iexact=sel_state)
+        visit_filters &= Q(farm__state__iexact=sel_state)
+        product_filters &= Q(visit__farm__state__iexact=sel_state)
 
-        avg_order_value = (total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
+    if sel_district and sel_district not in ['All', 'All Districts', '']:
+        farm_filters &= Q(district__iexact=sel_district)
+        visit_filters &= Q(farm__district__iexact=sel_district)
+        product_filters &= Q(visit__farm__district__iexact=sel_district)
 
-        total_leads = VisitedProductDetail.objects.filter(product_filters).count()
-        if total_leads > 0:
-            hot_count = VisitedProductDetail.objects.filter(product_filters, process_status__iexact='Hot').count()
-            warm_count = VisitedProductDetail.objects.filter(product_filters, process_status__iexact='Warm').count()
-            cold_count = VisitedProductDetail.objects.filter(product_filters, process_status__iexact='Cold').count()
+    # Executive Filters
+    if sel_executive and sel_executive not in ['All', 'All Executives', '']:
+        farm_filters &= Q(executive__username__iexact=sel_executive)
+        visit_filters &= Q(executive__username__iexact=sel_executive)
+        product_filters &= Q(visit__executive__username__iexact=sel_executive)
 
-            hot_pct = round((hot_count / total_leads) * 100, 1)
-            warm_pct = round((warm_count / total_leads) * 100, 1)
-            cold_pct = round((cold_count / total_leads) * 100, 1)
-            conversion_rate = hot_pct
-
-        if total_farms_count > 0:
-            poultry_cnt = Farm.objects.filter(farm_filters, business_type__iexact='Poultry').count()
-            aqua_cnt = Farm.objects.filter(farm_filters, business_type__iexact='Aqua').count()
-
-            poultry_pct = round((poultry_cnt / total_farms_count) * 100, 1)
-            aqua_pct = round((aqua_cnt / total_farms_count) * 100, 1)
-
-        # 2. Time Series
-        time_series_data = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .annotate(month=TruncMonth('visit__visit_date'))
-            .values('month')
-            .annotate(revenue=Sum('revenue_generated'), volume=Sum('sale_quantity'))
-            .filter(month__isnull=False)
-            .order_by('month')
-        )
-
-        combo_labels = [t['month'].strftime("%b %Y") for t in time_series_data if t.get('month')]
-        combo_revenue = [float(t.get('revenue') or 0) for t in time_series_data]
-        combo_volume = [int(t.get('volume') or 0) for t in time_series_data]
-
-        # 3. Product Performance & Pricing Table
-        product_performance = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('product_name')
-            .annotate(revenue=Sum('revenue_generated'), qty_sold=Sum('sale_quantity'))
-            .order_by('-revenue')
-        )
-        top_prod_labels = [p['product_name'] for p in product_performance if p.get('product_name')]
-        top_prod_revenue = [float(p['revenue'] or 0) for p in product_performance]
-
-        pipeline_spread_agg = VisitedProductDetail.objects.filter(product_filters).aggregate(
-            actual=Sum('sale_quantity'),
-            target=Sum('target_quantity'),
-            potential=Sum('potential_quantity')
-        )
-        if pipeline_spread_agg:
-            pipeline_spread = {k: (v or 0) for k, v in pipeline_spread_agg.items()}
-
-        product_pricing_table = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('product_name')
-            .annotate(avg_unit_price=Avg('primary_price'))
-            .order_by('product_name')
-        )
-
-        # 4. Executive Performance
-        executive_performance = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('visit__executive__username')
-            .annotate(
-                revenue=Sum('revenue_generated'),
-                total_items=Count('id'),
-                hot_items=Count('id', filter=Q(process_status__iexact='Hot'))
-            )
-            .order_by('-revenue')
-        )
-        exec_labels = [e['visit__executive__username'] if e.get('visit__executive__username') else 'Unknown' for e in executive_performance]
-        exec_revenue = [float(e['revenue'] or 0) for e in executive_performance]
-        exec_conv_pct = [round((e['hot_items'] / e['total_items'] * 100), 1) if e.get('total_items') else 0.0 for e in executive_performance]
-
-        funnel_stages = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('process_status')
-            .annotate(count=Count('id'))
-            .order_by('-count')
-        )
-        funnel_list = [dict(stage) for stage in funnel_stages] if funnel_stages else []
-
-        # 5. Maps & Telemetry
-        geo_district_performance = (
-            VisitedProductDetail.objects.filter(product_filters)
-            .values('visit__farm__state', 'visit__farm__district')
-            .annotate(
-                farm_count=Count('visit__farm', distinct=True),
-                revenue=Sum('revenue_generated'),
-                state=F('visit__farm__state'),
-                district=F('visit__farm__district')
-            )
-            .order_by('-revenue')
-        )
-        map_labels = [d['district'] if d.get('district') else 'Unknown' for d in geo_district_performance[:10]]
-        map_revenue = [float(d['revenue'] or 0) for d in geo_district_performance[:10]]
-
-        telemetry_audit_log = (
-            FarmVisitReport.objects.filter(visit_filters)
-            .select_related('farm', 'executive')
-            .values('visit_date', 'farm__area', 'farm__latitude', 'farm__longitude', 'executive__username', 'farm__farm_name')
-            .order_by('-visit_date')[:15]
-        )
-
-        # 6. Demographics
+    # Date Filters (Month / Year)
+    if sel_month and sel_month not in ['All', 'All Months', '']:
         try:
-            bird_population = FarmVisitReport.objects.filter(visit_filters).aggregate(
-                chicks=Sum('chicks_count'),
-                growers=Sum('grower_count'),
-                layers=Sum('layer_count'),
-                culling=Sum('culling_bird')
-            )
-            if bird_population:
-                bird_counts = [
-                    (bird_population.get('chicks') or 0),
-                    (bird_population.get('growers') or 0),
-                    (bird_population.get('layers') or 0),
-                    (bird_population.get('culling') or 0)
-                ]
-        except Exception as b_err:
-            logger.warning(f"Bird count aggregation skipped: {b_err}")
+            m_val = int(sel_month)
+            visit_filters &= Q(visit_date__month=m_val)
+            product_filters &= Q(visit__visit_date__month=m_val)
+        except ValueError:
+            pass
 
-        reported_problems = (
-            FarmVisitReport.objects.filter(visit_filters)
-            .values('farm_problem')
-            .annotate(frequency=Count('id'))
-            .exclude(farm_problem__in=['', None])
-            .order_by('-frequency')[:10]
+    if sel_year and sel_year not in ['All', '']:
+        try:
+            y_val = int(sel_year)
+            visit_filters &= Q(visit_date__year=y_val)
+            product_filters &= Q(visit__visit_date__year=y_val)
+        except ValueError:
+            pass
+
+    # Sector Filter
+    if sel_sector and sel_sector not in ['All', 'All Sectors', '']:
+        farm_filters &= Q(business_type__icontains=sel_sector)
+        visit_filters &= Q(farm__business_type__icontains=sel_sector)
+        product_filters &= Q(visit__farm__business_type__icontains=sel_sector)
+
+    # ------------------------------------------------------------------
+    # 3. BASE QUERYSETS
+    # ------------------------------------------------------------------
+    visit_qs = FarmVisitReport.objects.filter(visit_filters)
+    farm_qs = Farm.objects.filter(farm_filters)
+    product_qs = VisitedProductDetail.objects.filter(product_filters)
+
+    # Fallback check: If product_qs is empty, fallback to visit_qs for primary KPIs
+    has_product_records = product_qs.exists()
+
+    # ------------------------------------------------------------------
+    # 4. PRIMARY METRICS ACCUMULATION
+    # ------------------------------------------------------------------
+    v_count = visit_qs.count()
+    total_farms_count = farm_qs.count()
+    
+    # Unique Active Executives logging visits
+    active_execs_qs = visit_qs.exclude(
+        Q(executive__isnull=True) | Q(executive__username='')
+    ).values('executive').distinct()
+    active_executives = active_execs_qs.count()
+
+    # Financial Aggregations with Coalesce Protection
+    total_rev = float(product_qs.aggregate(
+        total=Coalesce(Sum('revenue_generated'), 0.0)
+    )['total'])
+
+    vol_sold = int(product_qs.aggregate(
+        total_qty=Coalesce(Sum('sale_quantity'), 0)
+    )['total_qty'])
+
+    paid_orders_count = product_qs.filter(
+        Q(sale_quantity__gt=0) | Q(revenue_generated__gt=0)
+    ).count()
+
+    avg_order_value = float(total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
+
+    # Sector Breakdown Percentages
+    poultry_pct, aqua_pct = 0.0, 0.0
+    if total_farms_count > 0:
+        p_cnt = farm_qs.filter(business_type__icontains='Poultry').count()
+        a_cnt = farm_qs.filter(business_type__icontains='Aqua').count()
+        poultry_pct = round((p_cnt / total_farms_count) * 100, 1)
+        aqua_pct = round((a_cnt / total_farms_count) * 100, 1)
+
+    # Lead Temperature / Pipeline Conversions
+    total_leads = product_qs.count()
+    hot_pct, warm_pct, cold_pct = 0.0, 0.0, 0.0
+    if total_leads > 0:
+        h_cnt = product_qs.filter(process_status__iexact='Hot').count()
+        w_cnt = product_qs.filter(process_status__iexact='Warm').count()
+        c_cnt = product_qs.filter(process_status__iexact='Cold').count()
+
+        hot_pct = round((h_cnt / total_leads) * 100, 1)
+        warm_pct = round((w_cnt / total_leads) * 100, 1)
+        cold_pct = round((c_cnt / total_leads) * 100, 1)
+
+    conversion_rate = hot_pct
+
+    # ------------------------------------------------------------------
+    # 5. CHART DATA SERIES GENERATION (SAFE JSON MATRICES)
+    # ------------------------------------------------------------------
+
+    # Chart 1: Month-Wise Revenue & Trends
+    month_wise_qs = list(
+        product_qs.annotate(month=TruncMonth('visit__visit_date'))
+        .values('month')
+        .annotate(revenue=Coalesce(Sum('revenue_generated'), 0.0))
+        .filter(month__isnull=False)
+        .order_by('month')
+    )
+    month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
+    month_wise_data = [float(m['revenue']) for m in month_wise_qs]
+
+    # Chart 2: Year-Wise Revenue
+    year_wise_qs = list(
+        product_qs.annotate(year=TruncYear('visit__visit_date'))
+        .values('year')
+        .annotate(revenue=Coalesce(Sum('revenue_generated'), 0.0))
+        .filter(year__isnull=False)
+        .order_by('year')
+    )
+    year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
+    year_wise_data = [float(y['revenue']) for y in year_wise_qs]
+
+    # Chart 3: Executive Performance Breakdown
+    exec_perf = (
+        product_qs.values('visit__executive__username')
+        .annotate(
+            revenue=Coalesce(Sum('revenue_generated'), 0.0),
+            total_items=Count('id'),
+            hot_items=Count('id', filter=Q(process_status__iexact='Hot'))
         )
-        problems_list = [dict(prob) for prob in reported_problems] if reported_problems else []
+        .order_by('-revenue')[:10]
+    )
+    exec_labels = [e['visit__executive__username'] or 'Unassigned' for e in exec_perf]
+    exec_revenue = [float(e['revenue']) for e in exec_perf]
+    exec_conv_pct = [
+        round((e['hot_items'] / e['total_items'] * 100), 1) if e['total_items'] > 0 else 0.0 
+        for e in exec_perf
+    ]
 
-        segment_breakdown = (
-            Farm.objects.filter(farm_filters)
-            .values('business_type', 'sub_segment')
-            .annotate(total_farms=Count('id'))
-            .order_by('-total_farms')
+    # Chart 4: Product Allocation / Volume
+    prod_perf = (
+        product_qs.values('product_name')
+        .annotate(
+            revenue=Coalesce(Sum('revenue_generated'), 0.0),
+            qty_sold=Coalesce(Sum('sale_quantity'), 0)
         )
+        .exclude(Q(product_name__isnull=True) | Q(product_name=''))
+        .order_by('-qty_sold')[:6]
+    )
+    top_prod_labels = [p['product_name'] for p in prod_perf]
+    top_prod_revenue = [float(p['revenue']) for p in prod_perf]
 
-        visit_frequency_exec = (
-            FarmVisitReport.objects.filter(visit_filters)
-            .values('executive__username')
-            .annotate(visit_count=Count('id'))
-            .order_by('-visit_count')
-        )
+    # Chart 5: Visits By State
+    state_qs = (
+        visit_qs.values('farm__state')
+        .annotate(total_visits=Count('id'))
+        .exclude(Q(farm__state__isnull=True) | Q(farm__state=''))
+        .order_by('-total_visits')[:6]
+    )
+    state_labels = [s['farm__state'] for s in state_qs]
+    state_data = [s['total_visits'] for s in state_qs]
 
-        # 7. Trends
-        month_wise_qs = list(
-            VisitedProductDetail.objects.filter(product_filters)
-            .annotate(month=TruncMonth('visit__visit_date'))
-            .values('month')
-            .annotate(revenue=Sum('revenue_generated'))
-            .filter(month__isnull=False)
-            .order_by('month')
-        )
-        month_wise_labels = [m['month'].strftime("%b %Y") for m in month_wise_qs if m.get('month')]
-        month_wise_data = [float(m['revenue'] or 0) for m in month_wise_qs]
+    # Chart 6: Field Problems Observed
+    prob_qs = (
+        visit_qs.values('farm_problem')
+        .annotate(frequency=Count('id'))
+        .exclude(Q(farm_problem__isnull=True) | Q(farm_problem=''))
+        .order_by('-frequency')[:5]
+    )
+    prob_labels = [p['farm_problem'] for p in prob_qs]
+    prob_data = [p['frequency'] for p in prob_qs]
 
-        year_wise_qs = list(
-            VisitedProductDetail.objects.filter(product_filters)
-            .annotate(year=TruncYear('visit__visit_date'))
-            .values('year')
-            .annotate(revenue=Sum('revenue_generated'))
-            .filter(year__isnull=False)
-            .order_by('year')
-        )
-        year_wise_labels = [y['year'].strftime("%Y") for y in year_wise_qs if y.get('year')]
-        year_wise_data = [float(y['revenue'] or 0) for y in year_wise_qs]
+    # ------------------------------------------------------------------
+    # 6. DEMOGRAPHICS, MAPS & LIST DATA
+    # ------------------------------------------------------------------
+    
+    # Top Farms Table by Revenue
+    top_farms_table = (
+        product_qs.values('visit__farm__farm_name', 'visit__farm__owner_name')
+        .annotate(revenue=Coalesce(Sum('revenue_generated'), 0.0))
+        .filter(revenue__gt=0)
+        .order_by('-revenue')[:5]
+    )
 
-        # 8. Tables
-        recent_visits_queryset = FarmVisitReport.objects.filter(
-            visit_filters
-        ).select_related('farm', 'executive').order_by('-visit_date')[:10]
+    # Bird Population Aggregates
+    bird_population = visit_qs.aggregate(
+        chicks=Coalesce(Sum('chicks_count'), 0),
+        growers=Coalesce(Sum('grower_count'), 0),
+        layers=Coalesce(Sum('layer_count'), 0),
+        culling=Coalesce(Sum('culling_bird'), 0)
+    )
+    bird_labels = ['Chicks', 'Growers', 'Layers', 'Culling Birds']
+    bird_counts = [
+        bird_population['chicks'],
+        bird_population['growers'],
+        bird_population['layers'],
+        bird_population['culling']
+    ]
 
-        state_list = Farm.objects.values_list('state', flat=True).distinct().exclude(state='')
-        district_list = Farm.objects.values_list('district', flat=True).distinct().exclude(district='')
-        executive_list = User.objects.filter(is_active=True).values_list('username', flat=True).distinct()
+    # Pipeline Quantities
+    pipeline_spread_agg = product_qs.aggregate(
+        actual=Coalesce(Sum('sale_quantity'), 0),
+        target=Coalesce(Sum('target_quantity'), 0),
+        potential=Coalesce(Sum('potential_quantity'), 0)
+    )
 
-    except Exception as e:
-        logger.error(f"Error computing get_dashboard_context: {str(e)}", exc_info=True)
+    # Recent Visit Activity Feed
+    recent_visits = visit_qs.select_related('farm', 'executive').order_by('-visit_date')[:10]
 
+    # Filter Options Dynamic Querying
+    state_list = list(Farm.objects.values_list('state', flat=True).distinct().exclude(state=''))
+    district_list = list(Farm.objects.values_list('district', flat=True).distinct().exclude(district=''))
+    executive_list = list(User.objects.filter(is_active=True).values_list('username', flat=True).distinct())
+
+    # ------------------------------------------------------------------
+    # 7. ASSEMBLE CONTEXT
+    # ------------------------------------------------------------------
     return {
+        # Primary Numeric KPIs
         'total_revenue': total_rev,
         'total_visits': v_count,
         'active_executives': active_executives,
@@ -634,61 +683,56 @@ def get_dashboard_context(request):
         'avg_order_value': avg_order_value,
         'conversion_rate': conversion_rate,
 
+        # Metrics Percentages
         'hot_pct': hot_pct,
         'warm_pct': warm_pct,
         'cold_pct': cold_pct,
         'poultry_pct': poultry_pct,
         'aqua_pct': aqua_pct,
 
-        'combo_labels_js': json.dumps(list(combo_labels), cls=DjangoJSONEncoder),
-        'combo_revenue_js': json.dumps(list(combo_revenue), cls=DjangoJSONEncoder),
-        'combo_volume_js': json.dumps(list(combo_volume), cls=DjangoJSONEncoder),
-        'top_prod_labels_js': json.dumps(list(top_prod_labels), cls=DjangoJSONEncoder),
-        'top_prod_revenue_js': json.dumps(list(top_prod_revenue), cls=DjangoJSONEncoder),
-        'pipeline_spread': pipeline_spread,
-        'product_pricing_table': product_pricing_table,
-
-        'exec_labels_js': json.dumps(list(exec_labels), cls=DjangoJSONEncoder),
-        'exec_revenue_js': json.dumps(list(exec_revenue), cls=DjangoJSONEncoder),
-        'exec_conv_pct_js': json.dumps(list(exec_conv_pct), cls=DjangoJSONEncoder),
-        'funnel_stages': funnel_stages,
-        'funnel_stages_js': json.dumps(funnel_list, cls=DjangoJSONEncoder),
-
-        'map_labels_js': json.dumps(list(map_labels), cls=DjangoJSONEncoder),
-        'map_revenue_js': json.dumps(list(map_revenue), cls=DjangoJSONEncoder),
-        'telemetry_audit_log': telemetry_audit_log,
-        'geo_district_performance': geo_district_performance,
-
-        'bird_labels_js': json.dumps(list(bird_labels), cls=DjangoJSONEncoder),
-        'bird_counts_js': json.dumps(list(bird_counts), cls=DjangoJSONEncoder),
-        'reported_problems': reported_problems,
-        'reported_problems_js': json.dumps(problems_list, cls=DjangoJSONEncoder),
-        'segment_breakdown': segment_breakdown,
-
-        'visit_frequency_exec': visit_frequency_exec,
-
-        'month_wise_cycle': month_wise_qs,
+        # Pre-Serialized Safe JSON Data for Chart.js
         'month_wise_labels_js': json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
         'month_wise_data_js': json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-
-        'year_wise_trends': year_wise_qs,
         'year_wise_labels_js': json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
         'year_wise_data_js': json.dumps(year_wise_data, cls=DjangoJSONEncoder),
+        'exec_labels_js': json.dumps(exec_labels, cls=DjangoJSONEncoder),
+        'exec_revenue_js': json.dumps(exec_revenue, cls=DjangoJSONEncoder),
+        'exec_conv_pct_js': json.dumps(exec_conv_pct, cls=DjangoJSONEncoder),
+        'top_prod_labels_js': json.dumps(top_prod_labels, cls=DjangoJSONEncoder),
+        'top_prod_revenue_js': json.dumps(top_prod_revenue, cls=DjangoJSONEncoder),
+        'state_labels_js': json.dumps(state_labels, cls=DjangoJSONEncoder),
+        'state_data_js': json.dumps(state_data, cls=DjangoJSONEncoder),
+        'prob_labels_js': json.dumps(prob_labels, cls=DjangoJSONEncoder),
+        'prob_data_js': json.dumps(prob_data, cls=DjangoJSONEncoder),
+        'bird_labels_js': json.dumps(bird_labels, cls=DjangoJSONEncoder),
+        'bird_counts_js': json.dumps(bird_counts, cls=DjangoJSONEncoder),
 
-        'recent_visits': recent_visits_queryset,
+        # Structured Tables & Querysets
+        'pipeline_spread': pipeline_spread_agg,
+        'top_farms': top_farms_table,
+        'recent_visits': recent_visits,
 
+        # Dropdown Options
         'state_list': state_list,
         'district_list': district_list,
         'executive_list': executive_list,
         'country_list': ['India'],
 
+        # Filter State Retention
         'selected_state': sel_state,
         'selected_country': sel_country,
         'selected_district': sel_district,
         'selected_executive': sel_executive,
         'selected_month': sel_month,
         'selected_year': sel_year,
+        'selected_sector': sel_sector,
     }
+
+
+def dashboard_view(request):
+    """View handler that renders the context into the HTML template."""
+    context = get_dashboard_context(request)
+    return render(request, 'dashboard.html', context)
 
 
 @login_required(login_url='/crm/login/')
