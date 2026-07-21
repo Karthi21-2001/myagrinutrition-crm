@@ -425,13 +425,9 @@ def get_dashboard_context(request):
                 product_filters &= Q(visit__visit_date__year=y_val)
             except ValueError:
                 pass
-    # your try block logic
-    User = get_user_model()
-except Exception as e:
-    # handle error or pass
-    print(f"Error: {e}")
-logger = logging.getLogger(__name__)
 
+User = get_user_model()
+logger = logging.getLogger(__name__)
 
 def get_dashboard_context(request):
     """
