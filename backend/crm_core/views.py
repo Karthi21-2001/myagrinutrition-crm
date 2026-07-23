@@ -82,11 +82,36 @@ def save_farm_visit(request):
         owner_name = request.POST.get('owner_name')
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
-        sub_segment = request.POST.get('sub_business_type_select', '').strip()
+        sub_segment = request.POST.get('sub_business_type', '').strip()
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
+
+        # Poultry Shed Population Inventory (form sends these; previously dropped)
+        def _int(key, default=0):
+            val = request.POST.get(key)
+            try:
+                return int(val) if val not in (None, '') else default
+            except (TypeError, ValueError):
+                return default
+
+        def _float(key, default=0.0):
+            val = request.POST.get(key)
+            try:
+                return float(val) if val not in (None, '') else default
+            except (TypeError, ValueError):
+                return default
+
+        chicks_count = _int('chicks_count')
+        grower_count = _int('grower_count')
+        layer_count = _int('layer_count')
+        culling_bird_count = _int('culling_bird_count')
+
+        # Aqua Pond Tracking Inventory (form sends these; previously dropped)
+        pond_acre = _float('pond_acre')
+        pond_doc = _int('pond_doc')
+        fish_variety = request.POST.get('fish_variety', '').strip()
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
@@ -126,11 +151,37 @@ def save_farm_visit(request):
                     farm_instance.area = area
                     farm_instance.save()
 
-                visit_record = FarmVisitReport.objects.create(
-                    farm=farm_instance,
-                    executive=current_user,
-                    farm_problem=farm_problem
-                )
+                inventory_fields = {
+                    'chicks_count': chicks_count,
+                    'grower_count': grower_count,
+                    'layer_count': layer_count,
+                    'culling_bird': culling_bird_count,
+                    'pond_acre': pond_acre,
+                    'pond_doc': pond_doc,
+                    'fish_variety': fish_variety,
+                }
+                try:
+                    visit_record = FarmVisitReport.objects.create(
+                        farm=farm_instance,
+                        executive=current_user,
+                        farm_problem=farm_problem,
+                        **inventory_fields,
+                    )
+                except TypeError as field_err:
+                    # FarmVisitReport model doesn't have one or more of these
+                    # fields yet (needs a migration) - save the core visit
+                    # record so the submission still succeeds, but log it
+                    # loudly so the missing inventory data doesn't go unnoticed.
+                    logger.error(
+                        f"FarmVisitReport is missing inventory fields "
+                        f"{list(inventory_fields.keys())} - add them via migration. "
+                        f"Original error: {field_err}"
+                    )
+                    visit_record = FarmVisitReport.objects.create(
+                        farm=farm_instance,
+                        executive=current_user,
+                        farm_problem=farm_problem,
+                    )
 
                 # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
