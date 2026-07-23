@@ -389,6 +389,7 @@ def get_dashboard_context(request):
         "exec_conv_pct_js": json.dumps([]),
         "top_prod_labels_js": json.dumps([]),
         "top_prod_revenue_js": json.dumps([]),
+        "top_prod_qty_js": json.dumps([]),
         "state_labels_js": json.dumps([]),
         "state_data_js": json.dumps([]),
         "chart_labels_js": json.dumps([]),
@@ -587,6 +588,7 @@ def get_dashboard_context(request):
         )
         top_prod_labels = [p["product_name"] for p in prod_perf]
         top_prod_revenue = [float(p["revenue"]) for p in prod_perf]
+        top_prod_qty = [int(p["qty_sold"]) for p in prod_perf]
 
         state_qs = (
             visit_qs.values("farm__state")
@@ -618,7 +620,7 @@ def get_dashboard_context(request):
         # ------------------------------------------------------------------
         # 6. DEMOGRAPHICS & LIST DATA
         # ------------------------------------------------------------------
-        top_farms_table = list(
+        top_farms_raw = (
             product_qs.values(
                 "visit__farm__farm_name", "visit__farm__owner_name"
             )
@@ -626,6 +628,16 @@ def get_dashboard_context(request):
             .filter(revenue__gt=0)
             .order_by("-revenue")[:5]
         )
+        # Re-keyed to plain "name"/"owner"/"revenue" so templates can use
+        # {{ farm.name }} instead of the raw dunder lookup path.
+        top_farms_table = [
+            {
+                "name": f["visit__farm__farm_name"],
+                "owner": f["visit__farm__owner_name"],
+                "revenue": f["revenue"],
+            }
+            for f in top_farms_raw
+        ]
 
         try:
             bird_population = visit_qs.aggregate(
@@ -650,9 +662,19 @@ def get_dashboard_context(request):
             potential=Coalesce(Sum("potential_quantity"), 0),
         )
 
-        recent_visits = visit_qs.select_related("farm", "executive").order_by(
-            "-visit_date"
-        )[:10]
+        recent_visits = list(
+            visit_qs.select_related("farm", "executive").order_by(
+                "-visit_date"
+            )[:10]
+        )
+        # analytics_report.html reads visit.calculated_total, which isn't a
+        # model field — attach it here as the visit's total product revenue.
+        for rv in recent_visits:
+            rv.calculated_total = float(
+                VisitedProductDetail.objects.filter(visit=rv).aggregate(
+                    total=Coalesce(Sum("revenue_generated"), 0.0)
+                )["total"]
+            )
 
         state_list = list(
             Farm.objects.exclude(Q(state__isnull=True) | Q(state=""))
@@ -712,6 +734,9 @@ def get_dashboard_context(request):
                 ),
                 "top_prod_revenue_js": json.dumps(
                     top_prod_revenue, cls=DjangoJSONEncoder
+                ),
+                "top_prod_qty_js": json.dumps(
+                    top_prod_qty, cls=DjangoJSONEncoder
                 ),
                 "state_labels_js": json.dumps(
                     state_labels, cls=DjangoJSONEncoder
