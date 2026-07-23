@@ -11,8 +11,8 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Count, DecimalField, F, Q, Sum
-from django.db.models.functions import Coalesce, TruncMonth, TruncYear
+from django.db.models import Avg, Count, DecimalField, F, Q, Sum, Value
+from django.db.models.functions import Coalesce, Concat, TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -658,6 +658,28 @@ def get_dashboard_context(request):
             .values_list("username", flat=True)
             .distinct()
         )
+        # ------------------------------------------------------------------
+        # GENERATE EXECUTIVE DROPDOWN LIST (First Name + Last Name / Username)
+        # ------------------------------------------------------------------
+        raw_exec_list = list(
+            FarmVisitReport.objects.annotate(
+                full_name=Concat('executive__first_name', Value(' '), 'executive__last_name')
+            )
+            .values_list('full_name', 'executive__username')
+            .distinct()
+        )
+        
+        executive_list = []
+        for name, uname in raw_exec_list:
+            clean_name = name.strip() if name else ""
+            if clean_name:
+                executive_list.append(clean_name)
+            elif uname:
+                executive_list.append(uname)
+
+        executive_list = sorted(list(set(executive_list)))
+
+        context.update(
 
         # Update context dictionary with calculated values
         context.update(
