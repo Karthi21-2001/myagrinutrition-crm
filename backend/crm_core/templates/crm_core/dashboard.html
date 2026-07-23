@@ -52,7 +52,7 @@
             gap: 20px;
         }
 
-        /* 🌿 Brand & Logo Styling */
+        /* Brand & Logo Styling */
         .brand-container {
             display: flex;
             align-items: center;
@@ -72,7 +72,7 @@
             letter-spacing: -0.02em; 
         }
 
-        /* 🎛️ Active Dropdown Filter Toolbar Configuration Layout Grid */
+        /* Filter Toolbar Grid */
         .filter-toolbar-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -193,14 +193,14 @@
 
         .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: #cbd5e1; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
-        /* Structured Matrix Layout Rules */
+        /* Table Styling */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
         th { background-color: var(--table-header); color: #cbd5e1; font-weight: 600; padding: 14px 16px; border-bottom: 2px solid var(--border); white-space: nowrap; }
         td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: var(--text-main); vertical-align: middle; }
         tr:hover { background-color: #334155; }
 
-        /* Dynamic Status Badges styling */
+        /* Status Badges */
         .badge-month { background-color: #1e3a8a; color: #93c5fd; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
         .badge-user { background-color: #4c1d95; color: #ddd6fe; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
         .status-pill { background: #0369a1; color: #e0f2fe; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; display: inline-block; }
@@ -220,23 +220,14 @@
                 <!-- Brand Header with Integrated SVG Logo -->
                 <div class="brand-container">
                     <svg class="brand-logo" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Main Circular Swoosh -->
                         <path d="M 230,440 C 130,440 60,360 60,250 C 60,140 140,70 250,70 C 290,70 320,80 340,95 C 320,85 270,80 230,95 C 150,125 100,200 100,280 C 100,360 160,420 250,420 C 310,420 360,390 385,340 C 370,380 330,420 270,435 Z" fill="#6b7c52" />
                         <path d="M 250,450 C 120,450 40,360 40,240 C 40,130 130,50 250,50 C 320,50 380,80 410,120 C 360,80 290,70 230,90 C 130,125 70,220 80,310 C 90,380 160,440 250,440 C 310,440 370,410 400,350 C 370,410 310,450 250,450 Z" fill="#586743" />
-                        
-                        <!-- Large Top Leaf -->
                         <path d="M 170,35 C 240,35 340,110 380,240 C 270,240 170,160 170,35 Z" fill="#78b14a" />
                         <path d="M 170,35 C 240,100 310,180 380,240" stroke="#1d2613" stroke-width="4" fill="none" />
-                        
-                        <!-- Medium Leaf -->
                         <path d="M 260,160 C 320,160 380,220 380,250 C 300,250 250,210 260,160 Z" fill="#78b14a" />
                         <path d="M 260,160 C 310,200 350,230 380,250" stroke="#1d2613" stroke-width="3" fill="none" />
-
-                        <!-- Small Top-Right Leaf 1 -->
                         <path d="M 360,10 C 380,40 395,110 395,160 C 360,120 340,60 360,10 Z" fill="#78b14a" />
                         <path d="M 360,10 C 370,60 385,110 395,160" stroke="#1d2613" stroke-width="3" fill="none" />
-
-                        <!-- Small Top-Right Leaf 2 -->
                         <path d="M 410,110 C 440,130 475,200 475,250 C 430,220 405,160 410,110 Z" fill="#78b14a" />
                         <path d="M 410,110 C 430,160 455,210 475,250" stroke="#1d2613" stroke-width="3" fill="none" />
                     </svg>
@@ -244,6 +235,7 @@
                 </div>
                 <p style="color: var(--text-muted); margin-top: 4px;">Live Management Performance & Pipeline Telemetry</p>
                 
+                <!-- Filter Section -->
                 <div class="filter-toolbar-grid">
                     
                     <div class="filter-group">
@@ -330,6 +322,7 @@
             </div>
         </div>
 
+        <!-- Metric KPI Cards -->
         <div class="metrics-grid">
             <div class="kpi-card" style="border-top: 4px solid var(--primary);">
                 <div class="kpi-title">Total Registered Farms</div>
@@ -353,6 +346,7 @@
             </div>
         </div>
 
+        <!-- Chart and Dispatch Feed -->
         <div class="analytics-row">
             <div class="card" style="margin-bottom: 0;">
                 <div class="card-title">📈 Regional Farm Penetration Density (Top Districts)</div>
@@ -411,6 +405,7 @@
             </div>
         </div>
 
+        <!-- Monthly Report Table -->
         <div class="card">
             <div class="card-title">📅 Monthly Sales Report (User & Regional Hierarchy Matrix)</div>
             <div class="table-wrapper">
@@ -451,12 +446,12 @@
 
     </div>
 
-    <!-- Securely pass Chart JSON from Django to JS -->
+    <!-- Pass JSON Data Safely to JS -->
     {{ chart_labels_js|json_script:"chart-labels-data" }}
     {{ chart_counts_js|json_script:"chart-counts-data" }}
 
     <script>
-        // Synchronize and update browser address bar queries seamlessly on value updates
+        // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
             const country = document.getElementById('filter-country').value;
