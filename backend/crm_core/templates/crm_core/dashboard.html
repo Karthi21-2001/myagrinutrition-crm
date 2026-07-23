@@ -56,12 +56,21 @@
         .brand-container {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
+        }
+
+        .brand-logo-wrapper {
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
         .brand-logo {
-            height: 48px;
-            width: 48px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
         }
 
@@ -217,20 +226,26 @@
         
         <div class="header-section">
             <div>
-                <!-- Brand Header with Integrated SVG Logo -->
+                <!-- Brand Header with Fixed Aspect-Ratio Logo -->
                 <div class="brand-container">
-                    <svg class="brand-logo" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M 230,440 C 130,440 60,360 60,250 C 60,140 140,70 250,70 C 290,70 320,80 340,95 C 320,85 270,80 230,95 C 150,125 100,200 100,280 C 100,360 160,420 250,420 C 310,420 360,390 385,340 C 370,380 330,420 270,435 Z" fill="#6b7c52" />
-                        <path d="M 250,450 C 120,450 40,360 40,240 C 40,130 130,50 250,50 C 320,50 380,80 410,120 C 360,80 290,70 230,90 C 130,125 70,220 80,310 C 90,380 160,440 250,440 C 310,440 370,410 400,350 C 370,410 310,450 250,450 Z" fill="#586743" />
-                        <path d="M 170,35 C 240,35 340,110 380,240 C 270,240 170,160 170,35 Z" fill="#78b14a" />
-                        <path d="M 170,35 C 240,100 310,180 380,240" stroke="#1d2613" stroke-width="4" fill="none" />
-                        <path d="M 260,160 C 320,160 380,220 380,250 C 300,250 250,210 260,160 Z" fill="#78b14a" />
-                        <path d="M 260,160 C 310,200 350,230 380,250" stroke="#1d2613" stroke-width="3" fill="none" />
-                        <path d="M 360,10 C 380,40 395,110 395,160 C 360,120 340,60 360,10 Z" fill="#78b14a" />
-                        <path d="M 360,10 C 370,60 385,110 395,160" stroke="#1d2613" stroke-width="3" fill="none" />
-                        <path d="M 410,110 C 440,130 475,200 475,250 C 430,220 405,160 410,110 Z" fill="#78b14a" />
-                        <path d="M 410,110 C 430,160 455,210 475,250" stroke="#1d2613" stroke-width="3" fill="none" />
-                    </svg>
+                    <div class="brand-logo-wrapper">
+                        <!-- Option A: Inline SVG with Aspect Ratio Preserved -->
+                        <svg class="brand-logo" viewBox="0 0 500 500" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M 230,440 C 130,440 60,360 60,250 C 60,140 140,70 250,70 C 290,70 320,80 340,95 C 320,85 270,80 230,95 C 150,125 100,200 100,280 C 100,360 160,420 250,420 C 310,420 360,390 385,340 C 370,380 330,420 270,435 Z" fill="#6b7c52" />
+                            <path d="M 250,450 C 120,450 40,360 40,240 C 40,130 130,50 250,50 C 320,50 380,80 410,120 C 360,80 290,70 230,90 C 130,125 70,220 80,310 C 90,380 160,440 250,440 C 310,440 370,410 400,350 C 370,410 310,450 250,450 Z" fill="#586743" />
+                            <path d="M 170,35 C 240,35 340,110 380,240 C 270,240 170,160 170,35 Z" fill="#78b14a" />
+                            <path d="M 170,35 C 240,100 310,180 380,240" stroke="#1d2613" stroke-width="4" fill="none" />
+                            <path d="M 260,160 C 320,160 380,220 380,250 C 300,250 250,210 260,160 Z" fill="#78b14a" />
+                            <path d="M 260,160 C 310,200 350,230 380,250" stroke="#1d2613" stroke-width="3" fill="none" />
+                            <path d="M 360,10 C 380,40 395,110 395,160 C 360,120 340,60 360,10 Z" fill="#78b14a" />
+                            <path d="M 360,10 C 370,60 385,110 395,160" stroke="#1d2613" stroke-width="3" fill="none" />
+                            <path d="M 410,110 C 440,130 475,200 475,250 C 430,220 405,160 410,110 Z" fill="#78b14a" />
+                            <path d="M 410,110 C 430,160 455,210 475,250" stroke="#1d2613" stroke-width="3" fill="none" />
+                        </svg>
+
+                        <!-- Option B: If using a static logo file, uncomment below and comment out the svg tag above: -->
+                        <!-- <img src="{% static 'images/logo.svg' %}" alt="AgriNutrition Logo" class="brand-logo"> -->
+                    </div>
                     <h2>MY AGRINUTRITION</h2>
                 </div>
                 <p style="color: var(--text-muted); margin-top: 4px;">Live Management Performance & Pipeline Telemetry</p>
@@ -451,7 +466,6 @@
     {{ chart_counts_js|json_script:"chart-counts-data" }}
 
     <script>
-        // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
             const country = document.getElementById('filter-country').value;
@@ -472,7 +486,6 @@
             window.location.href = url.toString();
         }
 
-        // Cascading Dependent Filter Dropdowns Handler via AJAX 
         document.addEventListener("DOMContentLoaded", function () {
             const stateSel = document.getElementById('filter-state');
             const districtSel = document.getElementById('filter-district');
@@ -503,7 +516,6 @@
                 });
             }
 
-            // Safe parsing of chart scripts
             const canvasElem = document.getElementById('districtChart');
             if (!canvasElem) return;
 
