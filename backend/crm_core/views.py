@@ -658,29 +658,7 @@ def get_dashboard_context(request):
             .values_list("username", flat=True)
             .distinct()
         )
-        # ------------------------------------------------------------------
-        # GENERATE EXECUTIVE DROPDOWN LIST (First Name + Last Name / Username)
-        # ------------------------------------------------------------------
-        raw_exec_list = list(
-            FarmVisitReport.objects.annotate(
-                full_name=Concat('executive__first_name', Value(' '), 'executive__last_name')
-            )
-            .values_list('full_name', 'executive__username')
-            .distinct()
-        )
-        
-        executive_list = []
-        for name, uname in raw_exec_list:
-            clean_name = name.strip() if name else ""
-            if clean_name:
-                executive_list.append(clean_name)
-            elif uname:
-                executive_list.append(uname)
-
-        executive_list = sorted(list(set(executive_list)))
-
-        context.update(
-
+   
         # Update context dictionary with calculated values
         context.update(
             {
