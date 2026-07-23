@@ -55,9 +55,9 @@
             
             <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
                 <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
-                    <option value="ALL" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>👥 All Executives</option>
-                    {% for exec in executives_list %}
-                        <option value="{{ exec.id }}" {% if selected_executive == exec.id|stringformat:"s" %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
+                    <option value="" {% if not selected_executive %}selected{% endif %}>👥 All Executives</option>
+                    {% for exec_name in executive_list %}
+                        <option value="{{ exec_name }}" {% if selected_executive == exec_name %}selected{% endif %}>👤 {{ exec_name }}</option>
                     {% endfor %}
                 </select>
 
@@ -68,7 +68,7 @@
                     <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
                 </div>
                 <select name="sector" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
-                    <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
+                    <option value="" {% if not selected_sector %}selected{% endif %}>All Sectors</option>
                     <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
                     <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
                 </select>
@@ -102,7 +102,7 @@
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Active Executives</span><i class="fa-solid fa-user-tie text-violet-400"></i></div>
-                <h3 id="kpiExecs" class="text-2xl font-black text-white mt-2">{{ total_executives|default:"0" }}</h3>
+                <h3 id="kpiExecs" class="text-2xl font-black text-white mt-2">{{ active_executives|default:"0" }}</h3>
                 <span class="text-[9px] text-slate-500 font-bold mt-1">Live Tracking Active</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
@@ -112,7 +112,7 @@
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Orders Qty</span><i class="fa-solid fa-boxes-stacked text-orange-400"></i></div>
-                <h3 id="kpiQty" class="text-2xl font-black text-white mt-2">{{ total_qty|default:"0" }} <span class="text-xs font-medium text-slate-400">Units</span></h3>
+                <h3 id="kpiQty" class="text-2xl font-black text-white mt-2">{{ total_sales_volume|default:"0" }} <span class="text-xs font-medium text-slate-400">Units</span></h3>
                 <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ qty_velocity|default:"0%" }} velocity</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
@@ -122,7 +122,7 @@
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
-                <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"0" }}</h3>
+                <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_order_value|floatformat:2|default:"0" }}</h3>
                 <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ avg_growth|default:"0%" }}</span>
             </div>
         </div>
@@ -198,7 +198,7 @@
                     </div>
                     {% for farm in top_farms %}
                         <div class="flex justify-between py-2.5 items-center">
-                            <span class="font-medium text-slate-200">{{ farm.name|default:"Unnamed Farm" }}</span>
+                            <span class="font-medium text-slate-200">{{ farm.visit__farm__farm_name|default:"Unnamed Farm" }}</span>
                             <span class="font-bold text-emerald-400">₹{{ farm.revenue|floatformat:2 }}</span>
                         </div>
                     {% empty %}
@@ -239,21 +239,21 @@
                 </div>
                 <div class="flex-1 flex flex-col justify-center space-y-3 font-semibold text-xs mt-2 px-1">
                     <div>
-                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>💥 Hot Deals Pipeline</span><span>{{ pipeline_hot|default:"0" }}%</span></div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>💥 Hot Deals Pipeline</span><span>{{ hot_pct|default:"0" }}%</span></div>
                         <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
-                            <div class="bg-rose-500 h-full rounded-full transition-all duration-500" style="width: {{ pipeline_hot|default:0 }}%"></div>
+                            <div class="bg-rose-500 h-full rounded-full transition-all duration-500" style="width: {{ hot_pct|default:0 }}%"></div>
                         </div>
                     </div>
                     <div>
-                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>🔥 Warm Leads Engagement</span><span>{{ pipeline_warm|default:"0" }}%</span></div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>🔥 Warm Leads Engagement</span><span>{{ warm_pct|default:"0" }}%</span></div>
                         <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
-                            <div class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: {{ pipeline_warm|default:0 }}%"></div>
+                            <div class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: {{ warm_pct|default:0 }}%"></div>
                         </div>
                     </div>
                     <div>
-                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>❄️ Cold Accounts Analysis</span><span>{{ pipeline_cold|default:"0" }}%</span></div>
+                        <div class="flex justify-between text-[10px] mb-1 text-slate-400"><span>❄️ Cold Accounts Analysis</span><span>{{ cold_pct|default:"0" }}%</span></div>
                         <div class="w-full bg-[var(--bg-main)] h-2.5 rounded-full overflow-hidden border border-slate-800">
-                            <div class="bg-slate-500 h-full rounded-full transition-all duration-500" style="width: {{ pipeline_cold|default:0 }}%"></div>
+                            <div class="bg-slate-500 h-full rounded-full transition-all duration-500" style="width: {{ cold_pct|default:0 }}%"></div>
                         </div>
                     </div>
                 </div>
@@ -270,7 +270,7 @@
                             <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Poultry</span>
                         </div>
                         <div class="mt-2">
-                            <span class="text-2xl font-black text-white">{{ sector_poultry_pct|default:"0" }}%</span>
+                            <span class="text-2xl font-black text-white">{{ poultry_pct|default:"0" }}%</span>
                             <p class="text-[9px] font-medium text-amber-500/70 mt-0.5">Broiler/Layer Matrix</p>
                         </div>
                     </div>
@@ -279,7 +279,7 @@
                             <span class="text-xs uppercase tracking-wide font-extrabold text-slate-100">Aqua</span>
                         </div>
                         <div class="mt-2">
-                            <span class="text-2xl font-black text-white">{{ sector_aqua_pct|default:"0" }}%</span>
+                            <span class="text-2xl font-black text-white">{{ aqua_pct|default:"0" }}%</span>
                             <p class="text-[9px] font-medium text-sky-500/70 mt-0.5">Shrimp Tracking</p>
                         </div>
                     </div>
@@ -313,7 +313,7 @@
                         {% for visit in recent_visits %}
                             <tr class="hover:bg-slate-800/10 transition duration-150">
                                 <td class="p-3.5 pl-5 font-semibold text-slate-500">
-                                    {{ visit.visit_date|date:"d-M-Y" }}
+                                    {{ visit.visit_date|default:visit.created_at|date:"d-M-Y" }}
                                 </td>
                                 <td class="p-3.5 text-slate-200 font-bold">
                                     {{ visit.executive.get_full_name|default:visit.executive.username }}
@@ -334,7 +334,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">
-                                    ₹{{ visit.calculated_total|floatformat:2 }}
+                                    ₹{{ visit.total_calculated_revenue|default:"0.00"|floatformat:2 }}
                                 </td>
                                 <td class="p-3.5 text-center">
                                     {% if visit.farm.latitude and visit.farm.longitude %}
@@ -394,7 +394,7 @@
             const execData    = parseJSON('{{ exec_revenue_js|escapejs|default:"[]" }}');
             
             const prodLabels  = parseJSON('{{ top_prod_labels_js|escapejs|default:"[]" }}');
-            const prodData    = parseJSON('{{ top_prod_qty_js|escapejs|default:"[]" }}');
+            const prodData    = parseJSON('{{ top_prod_revenue_js|escapejs|default:"[]" }}');
             
             const stateLabels = parseJSON('{{ state_labels_js|escapejs|default:"[]" }}');
             const stateData   = parseJSON('{{ state_data_js|escapejs|default:"[]" }}');
