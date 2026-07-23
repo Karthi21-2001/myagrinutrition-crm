@@ -38,42 +38,6 @@
             filter: invert(0.8);
             cursor: pointer;
         }
-
-        /* Native Dropdown styling */
-        select option {
-            background-color: #131c2e !important;
-            color: #f1f5f9 !important;
-            padding: 8px;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .filter-label {
-            font-size: 10px;
-            font-weight: 700;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .select-filter {
-            background-color: var(--bg-input);
-            border: 1px solid var(--border);
-            color: #f1f5f9;
-            font-weight: 700;
-            border-radius: 0.5rem;
-            padding: 0.5rem 0.75rem;
-            cursor: pointer;
-            outline: none;
-            min-width: 180px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transition: border-color 0.15s ease-in-out;
-        }
-        .select-filter:focus {
-            border-color: var(--border-focus);
-        }
     </style>
 </head>
 <body class="min-h-full flex flex-col antialiased custom-scrollbar pb-12">
@@ -89,51 +53,27 @@
                 <p class="text-xs text-slate-400 font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
             </div>
             
-            <form id="analyticsFilterForm" method="GET" action="" class="flex flex-wrap items-end gap-3 w-full md:w-auto text-xs font-semibold">
+            <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
+                <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
+                    <option value="ALL" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>👥 All Executives</option>
+                    {% for exec in executives_list %}
+                        <option value="{{ exec.id }}" {% if selected_executive == exec.id|stringformat:"s" %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
+                    {% endfor %}
+                </select>
+
+                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                    <input type="date" name="start_date" value="{{ start_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                </div>
+                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                    <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                </div>
+                <select name="sector" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
+                    <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
+                    <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
+                    <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
+                </select>
                 
-                <!-- 👤 ADDED EXECUTIVE FILTER GROUP -->
-                <div class="filter-group">
-                    <label class="filter-label">👤 EXECUTIVE</label>
-                    <select id="filter-executive" name="executive" class="select-filter" onchange="applyLiveFilters()">
-                        <option value="">All Executives</option>
-                        {% for name in executive_list %}
-                            <option value="{{ name }}" {% if sel_executive == name or selected_executive == name %}selected{% endif %}>
-                                {{ name }}
-                            </option>
-                        {% empty %}
-                            {% for exec in executives_list %}
-                                <option value="{{ exec.id }}" {% if selected_executive|stringformat:"s" == exec.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ exec.get_full_name|default:exec.first_name|default:exec.username|default:exec.name }}
-                                </option>
-                            {% endfor %}
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label">📅 START DATE</label>
-                    <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
-                        <input type="date" name="start_date" value="{{ start_date|default:'' }}" onchange="applyLiveFilters()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
-                    </div>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label">📅 END DATE</label>
-                    <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
-                        <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="applyLiveFilters()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
-                    </div>
-                </div>
-
-                <div class="filter-group">
-                    <label class="filter-label">🌾 SECTOR</label>
-                    <select name="sector" onchange="applyLiveFilters()" class="select-filter min-w-[140px]">
-                        <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
-                        <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry</option>
-                        <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua</option>
-                    </select>
-                </div>
-                
-                <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20 mb-[1px]">
+                <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
                     <i class="fa-solid fa-file-excel"></i> Export Matrix
                 </a>
             </form>
@@ -153,7 +93,7 @@
             </span>
         </div>
 
-        <!-- KPI CARD DECK -->
+        <!-- ================= STATISTICAL KPI CARD DECK ================= -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Total Visits Logged</span><i class="fa-solid fa-folder-open text-sky-400"></i></div>
@@ -187,7 +127,7 @@
             </div>
         </div>
 
-        <!-- 📈 MONTH & YEAR TRENDS -->
+        <!-- ================= 📈 MONTH-WISE & YEAR-WISE MATCHING LINE MATRIX ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-6 h-80 flex flex-col justify-between shadow-lg relative">
                 <div>
@@ -222,7 +162,7 @@
             </div>
         </div>
 
-        <!-- DATA LEDGERS & CHARTS -->
+        <!-- ================= INDUSTRIAL DATA LEDGERS & CHARTS LAYER ================= -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] lg:col-span-4 h-80 flex flex-col justify-between shadow-lg relative">
                 <div>
@@ -258,8 +198,8 @@
                     </div>
                     {% for farm in top_farms %}
                         <div class="flex justify-between py-2.5 items-center">
-                            <span class="font-medium text-slate-200">{{ farm.name }}</span>
-                            <span class="font-bold text-emerald-400">₹{{ farm.revenue }}</span>
+                            <span class="font-medium text-slate-200">{{ farm.name|default:"Unnamed Farm" }}</span>
+                            <span class="font-bold text-emerald-400">₹{{ farm.revenue|floatformat:2 }}</span>
                         </div>
                     {% empty %}
                         <p class="text-slate-500 text-center py-8">No farm data recorded.</p>
@@ -268,7 +208,7 @@
             </div>
         </div>
 
-        <!-- DIAGNOSTICS & METRICS -->
+        <!-- ================= PIPELINE VISIONS & DIAGNOSTIC OBSERVATIONS GRID ================= -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div class="bg-[var(--bg-card)] p-5 rounded-xl border border-[var(--border)] h-80 flex flex-col justify-between shadow-lg relative">
                 <div>
@@ -347,7 +287,7 @@
             </div>
         </div>
 
-        <!-- 📋 TABLE AUDIT LOG -->
+        <!-- ================= LIVE LOG ENTRIES AUDIT MATRIX LEDGER ================= -->
         <div class="bg-[var(--bg-card)] rounded-xl border border-[var(--border)] flex flex-col overflow-hidden shadow-xl">
             <div class="p-4 border-b border-slate-800 bg-slate-900/20 flex justify-between items-center">
                 <div>
@@ -373,40 +313,40 @@
                         {% for visit in recent_visits %}
                             <tr class="hover:bg-slate-800/10 transition duration-150">
                                 <td class="p-3.5 pl-5 font-semibold text-slate-500">
-                                    {{ visit.visit_date|default:visit.created_at|date:"d-M-Y" }}
+                                    {{ visit.visit_date|date:"d-M-Y" }}
                                 </td>
                                 <td class="p-3.5 text-slate-200 font-bold">
-                                    {{ visit.executive.get_full_name|default:visit.executive.first_name|default:visit.executive.username|default:"Unassigned" }}
+                                    {{ visit.executive.get_full_name|default:visit.executive.username }}
                                 </td>
                                 <td class="p-3.5 flex flex-col">
                                     <span class="font-bold text-slate-300">
-                                        {{ visit.farm.name|default:"Unnamed Farm" }}
+                                        {{ visit.farm.farm_name|default:"Unnamed Farm" }}
                                     </span>
                                     <span class="text-[10px] text-slate-500">
-                                        Owner: {{ visit.farm_owner|default:"N/A" }}
+                                        Owner: {{ visit.farm.owner_name|default:"N/A" }}
                                     </span>
                                 </td>
                                 <td class="p-3.5 text-slate-400">
-                                    {% if visit.district or visit.state %}
-                                        {{ visit.district }}{% if visit.district and visit.state %}, {% endif %}{{ visit.state }}
+                                    {% if visit.farm.district or visit.farm.state %}
+                                        {{ visit.farm.district }}{% if visit.farm.district and visit.farm.state %}, {% endif %}{{ visit.farm.state }}
                                     {% else %}
                                         Unassigned Region
                                     {% endif %}
                                 </td>
                                 <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">
-                                    ₹{{ visit.calculated_total|default:"0.00" }}
+                                    ₹{{ visit.calculated_total|floatformat:2 }}
                                 </td>
                                 <td class="p-3.5 text-center">
-                                    {% if visit.latitude and visit.longitude %}
-                                        <a href="https://maps.google.com/?q={{ visit.latitude }},{{ visit.longitude }}" 
+                                    {% if visit.farm.latitude and visit.farm.longitude %}
+                                        <a href="https://maps.google.com/?q={{ visit.farm.latitude }},{{ visit.farm.longitude }}" 
                                            target="_blank" 
                                            class="text-slate-500 hover:text-cyan-400 text-sm transition"
-                                           title="View on Maps ({{ visit.latitude }}, {{ visit.longitude }})">
+                                           title="View on Maps ({{ visit.farm.latitude }}, {{ visit.farm.longitude }})">
                                             <i class="fa-solid fa-location-dot"></i>
                                         </a>
-                                    {% elif visit.latitude %}
+                                    {% elif visit.farm.latitude %}
                                         <span class="text-slate-400 text-xs font-mono" title="Latitude">
-                                            📍 {{ visit.latitude }}
+                                            📍 {{ visit.farm.latitude }}
                                         </span>
                                     {% else %}
                                         <span class="text-slate-600"><i class="fa-solid fa-location-dot"></i></span>
@@ -427,169 +367,175 @@
 
     </main>
 
-   <!-- CHART.JS INTEGRATION -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    document.addEventListener("DOMContentLoaded", () => {
-        Chart.defaults.color = '#64748b';
-        Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
-        Chart.defaults.font.family = "'Inter', sans-serif";
+    <!-- CHART.JS INTEGRATION -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            Chart.defaults.color = '#64748b';
+            Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
+            Chart.defaults.font.family = "'Inter', sans-serif";
 
-        // Helper function for safe JSON parsing
-        const parseJSON = (str, fallback = []) => {
-            try {
-                const parsed = JSON.parse(str);
-                return (Array.isArray(parsed) && parsed.length > 0) ? parsed : fallback;
-            } catch (e) {
-                return fallback;
-            }
-        };
+            // Safe JSON Parsing from Django context
+            const parseJSON = (str) => {
+                try {
+                    return JSON.parse(str);
+                } catch (e) {
+                    return [];
+                }
+            };
 
-        // Parse Data safely from Django View context
-        const monthLabels = parseJSON('{{ month_labels_json|safe }}', ['Jan', 'Feb', 'Mar', 'Apr']);
-        const monthData   = parseJSON('{{ month_data_json|safe }}', [0, 0, 0, 0]);
-        
-        const yearLabels  = parseJSON('{{ year_labels_json|safe }}', ['2025', '2026']);
-        const yearData    = parseJSON('{{ year_data_json|safe }}', [0, 0]);
-        
-        const execLabels  = parseJSON('{{ exec_labels_json|safe }}', ['No Executive']);
-        const execData    = parseJSON('{{ exec_data_json|safe }}', [0]);
-        
-        const prodLabels  = parseJSON('{{ prod_labels_json|safe }}', ['No Product']);
-        const prodData    = parseJSON('{{ prod_data_json|safe }}', [1]);
-        
-        const stateLabels = parseJSON('{{ state_labels_json|safe }}', ['No Territory']);
-        const stateData   = parseJSON('{{ state_data_json|safe }}', [0]);
-        
-        const probLabels  = parseJSON('{{ problem_labels_json|safe }}', ['None Logged']);
-        const probData    = parseJSON('{{ problem_data_json|safe }}', [1]);
+            const monthLabels = parseJSON('{{ month_wise_labels_js|escapejs|default:"[]" }}');
+            const monthData   = parseJSON('{{ month_wise_data_js|escapejs|default:"[]" }}');
+            
+            const yearLabels  = parseJSON('{{ year_wise_labels_js|escapejs|default:"[]" }}');
+            const yearData    = parseJSON('{{ year_wise_data_js|escapejs|default:"[]" }}');
+            
+            const execLabels  = parseJSON('{{ exec_labels_js|escapejs|default:"[]" }}');
+            const execData    = parseJSON('{{ exec_revenue_js|escapejs|default:"[]" }}');
+            
+            const prodLabels  = parseJSON('{{ top_prod_labels_js|escapejs|default:"[]" }}');
+            const prodData    = parseJSON('{{ top_prod_qty_js|escapejs|default:"[]" }}');
+            
+            const stateLabels = parseJSON('{{ state_labels_js|escapejs|default:"[]" }}');
+            const stateData   = parseJSON('{{ state_data_js|escapejs|default:"[]" }}');
+            
+            const probLabels  = parseJSON('{{ prob_labels_js|escapejs|default:"[]" }}');
+            const probData    = parseJSON('{{ prob_data_js|escapejs|default:"[]" }}');
 
-        const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
+            // Helper to hide chart and show empty overlay if dataset is empty
+            const renderOrHide = (canvasId, fallbackId, hasData, chartInitializer) => {
+                const canvas = document.getElementById(canvasId);
+                const fallback = document.getElementById(fallbackId);
+                if (!hasData) {
+                    if (canvas) canvas.style.display = 'none';
+                    if (fallback) fallback.classList.remove('hidden');
+                } else {
+                    chartInitializer();
+                }
+            };
 
-        // 1. Month Trend Chart
-        const monthCanvas = document.getElementById('monthWiseTrendChart');
-        if (monthCanvas) {
-            const ctxMonth = monthCanvas.getContext('2d');
-            const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
-            gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
-            gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+            const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
-            new Chart(ctxMonth, {
-                type: 'line',
-                data: { 
-                    labels: monthLabels, 
-                    datasets: [{ 
-                        label: 'Monthly Net', 
-                        data: monthData, 
-                        borderColor: '#10b981', 
-                        backgroundColor: gradMonth, 
-                        borderWidth: 2.5, 
-                        tension: 0.38, 
-                        fill: true, 
-                        pointBackgroundColor: '#10b981', 
-                        pointHoverRadius: 6 
-                    }] 
-                },
-                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            // 1. Month Trend Chart
+            renderOrHide('monthWiseTrendChart', 'noDataMonth', monthData.length > 0, () => {
+                const ctxMonth = document.getElementById('monthWiseTrendChart').getContext('2d');
+                const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
+                gradMonth.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+                gradMonth.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+                new Chart(ctxMonth, {
+                    type: 'line',
+                    data: { 
+                        labels: monthLabels, 
+                        datasets: [{ 
+                            label: 'Monthly Net', 
+                            data: monthData, 
+                            borderColor: '#10b981', 
+                            backgroundColor: gradMonth, 
+                            borderWidth: 2.5, 
+                            tension: 0.38, 
+                            fill: true, 
+                            pointBackgroundColor: '#10b981', 
+                            pointHoverRadius: 6 
+                        }] 
+                    },
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                });
             });
-        }
 
-        // 2. Year Trend Chart
-        const yearCanvas = document.getElementById('yearWiseTrendChart');
-        if (yearCanvas) {
-            const ctxYear = yearCanvas.getContext('2d');
-            const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
-            gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
-            gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+            // 2. Year Trend Chart
+            renderOrHide('yearWiseTrendChart', 'noDataYear', yearData.length > 0, () => {
+                const ctxYear = document.getElementById('yearWiseTrendChart').getContext('2d');
+                const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
+                gradYear.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+                gradYear.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
 
-            new Chart(ctxYear, {
-                type: 'line',
-                data: { 
-                    labels: yearLabels, 
-                    datasets: [{ 
-                        label: 'Yearly Aggregate', 
-                        data: yearData, 
-                        borderColor: '#06b6d4', 
-                        backgroundColor: gradYear, 
-                        borderWidth: 2.5, 
-                        tension: 0.38, 
-                        fill: true, 
-                        pointBackgroundColor: '#06b6d4', 
-                        pointHoverRadius: 6 
-                    }] 
-                },
-                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                new Chart(ctxYear, {
+                    type: 'line',
+                    data: { 
+                        labels: yearLabels, 
+                        datasets: [{ 
+                            label: 'Yearly Aggregate', 
+                            data: yearData, 
+                            borderColor: '#06b6d4', 
+                            backgroundColor: gradYear, 
+                            borderWidth: 2.5, 
+                            tension: 0.38, 
+                            fill: true, 
+                            pointBackgroundColor: '#06b6d4', 
+                            pointHoverRadius: 6 
+                        }] 
+                    },
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                });
             });
-        }
 
-        // 3. Exec Bar Chart
-        const execCanvas = document.getElementById('execRevBarChart');
-        if (execCanvas) {
-            new Chart(execCanvas.getContext('2d'), {
-                type: 'bar',
-                data: { 
-                    labels: execLabels, 
-                    datasets: [{ 
-                        data: execData, 
-                        backgroundColor: '#38bdf8', 
-                        borderRadius: 4, 
-                        barThickness: 12 
-                    }] 
-                },
-                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+            // 3. Exec Bar Chart
+            renderOrHide('execRevBarChart', 'noDataExec', execData.length > 0, () => {
+                new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
+                    type: 'bar',
+                    data: { 
+                        labels: execLabels, 
+                        datasets: [{ 
+                            data: execData, 
+                            backgroundColor: '#38bdf8', 
+                            borderRadius: 4, 
+                            barThickness: 10 
+                        }] 
+                    },
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                });
             });
-        }
 
-        // 4. Product Sales Donut Chart
-        const prodCanvas = document.getElementById('prodSalesDonut');
-        if (prodCanvas) {
-            new Chart(prodCanvas.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: prodLabels,
-                    datasets: [{
-                        data: prodData,
-                        backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { ...baseOptions, cutout: '70%' }
+            // 4. Product Sales Donut Chart
+            renderOrHide('prodSalesDonut', 'noDataProd', prodData.length > 0, () => {
+                new Chart(document.getElementById('prodSalesDonut').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: prodLabels,
+                        datasets: [{
+                            data: prodData,
+                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { ...baseOptions, cutout: '70%' }
+                });
             });
-        }
 
-        // 5. State Visits Bar Chart
-        const stateCanvas = document.getElementById('stateVisitsChart');
-        if (stateCanvas) {
-            new Chart(stateCanvas.getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: stateLabels,
-                    datasets: [{
-                        data: stateData,
-                        backgroundColor: '#8b5cf6',
-                        borderRadius: 4,
-                        barThickness: 12
-                    }]
-                },
-                options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
+            // 5. State Visits Bar Chart
+            renderOrHide('stateVisitsChart', 'noDataState', stateData.length > 0, () => {
+                new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: stateLabels,
+                        datasets: [{
+                            data: stateData,
+                            backgroundColor: '#8b5cf6',
+                            borderRadius: 4,
+                            barThickness: 10
+                        }]
+                    },
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
+                });
             });
-        }
 
-        // 6. Problems Donut Chart
-        const probCanvas = document.getElementById('problemsDonut');
-        if (probCanvas) {
-            new Chart(probCanvas.getContext('2d'), {
-                type: 'doughnut',
-                data: {
-                    labels: probLabels,
-                    datasets: [{
-                        data: probData,
-                        backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#06b6d4', '#64748b'],
-                        borderWidth: 0
-                    }]
-                },
-                options: { ...baseOptions, cutout: '70%' }
+            // 6. Problems Donut Chart
+            renderOrHide('problemsDonut', 'noDataProblems', probData.length > 0, () => {
+                new Chart(document.getElementById('problemsDonut').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: probLabels,
+                        datasets: [{
+                            data: probData,
+                            backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#06b6d4', '#64748b'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { ...baseOptions, cutout: '70%' }
+                });
             });
-        }
-    });
-</script>
+        });
+    </script>
+</body>
+</html>
