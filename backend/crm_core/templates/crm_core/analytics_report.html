@@ -39,11 +39,40 @@
             cursor: pointer;
         }
 
-        /* Ensure options are clearly visible inside Native Dropdowns across browsers */
+        /* Native Dropdown styling */
         select option {
             background-color: #131c2e !important;
             color: #f1f5f9 !important;
             padding: 8px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .filter-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .select-filter {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            color: #f1f5f9;
+            font-weight: 700;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            outline: none;
+            min-width: 180px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: border-color 0.15s ease-in-out;
+        }
+        .select-filter:focus {
+            border-color: var(--border-focus);
         }
     </style>
 </head>
@@ -60,33 +89,51 @@
                 <p class="text-xs text-slate-400 font-medium mt-0.5">Real-time data synchronization from Field Visit Logs</p>
             </div>
             
-            <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
+            <form id="analyticsFilterForm" method="GET" action="" class="flex flex-wrap items-end gap-3 w-full md:w-auto text-xs font-semibold">
                 
-                <!-- EXECUTIVE DROPDOWN FIX -->
-                <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[180px] shadow-md transition">
-                    <option value="ALL" class="bg-slate-900 text-slate-200" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>
-                        👥 All Executives
-                    </option>
-                    {% for exec in executives_list %}
-                        <option value="{{ exec.id }}" class="bg-slate-900 text-slate-200" {% if selected_executive|stringformat:"s" == exec.id|stringformat:"s" %}selected{% endif %}>
-                            👤 {{ exec.get_full_name|default:exec.first_name|default:exec.username|default:exec.name }}
-                        </option>
-                    {% endfor %}
-                </select>
+                <!-- 👤 ADDED EXECUTIVE FILTER GROUP -->
+                <div class="filter-group">
+                    <label class="filter-label">👤 EXECUTIVE</label>
+                    <select id="filter-executive" name="executive" class="select-filter" onchange="applyLiveFilters()">
+                        <option value="">All Executives</option>
+                        {% for name in executive_list %}
+                            <option value="{{ name }}" {% if sel_executive == name or selected_executive == name %}selected{% endif %}>
+                                {{ name }}
+                            </option>
+                        {% empty %}
+                            {% for exec in executives_list %}
+                                <option value="{{ exec.id }}" {% if selected_executive|stringformat:"s" == exec.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ exec.get_full_name|default:exec.first_name|default:exec.username|default:exec.name }}
+                                </option>
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                </div>
 
-                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
-                    <input type="date" name="start_date" value="{{ start_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                <div class="filter-group">
+                    <label class="filter-label">📅 START DATE</label>
+                    <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                        <input type="date" name="start_date" value="{{ start_date|default:'' }}" onchange="applyLiveFilters()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                    </div>
                 </div>
-                <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
-                    <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="this.form.submit()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+
+                <div class="filter-group">
+                    <label class="filter-label">📅 END DATE</label>
+                    <div class="relative flex items-center bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 min-w-[130px]">
+                        <input type="date" name="end_date" value="{{ end_date|default:'' }}" onchange="applyLiveFilters()" class="w-full bg-transparent text-slate-200 outline-none font-medium cursor-pointer [color-scheme:dark]">
+                    </div>
                 </div>
-                <select name="sector" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none">
-                    <option value="ALL" class="bg-slate-900 text-slate-200" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
-                    <option value="POULTRY" class="bg-slate-900 text-slate-200" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry Sector</option>
-                    <option value="AQUA" class="bg-slate-900 text-slate-200" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua Sector</option>
-                </select>
+
+                <div class="filter-group">
+                    <label class="filter-label">🌾 SECTOR</label>
+                    <select name="sector" onchange="applyLiveFilters()" class="select-filter min-w-[140px]">
+                        <option value="ALL" {% if selected_sector == "ALL" or not selected_sector %}selected{% endif %}>All Sectors</option>
+                        <option value="POULTRY" {% if selected_sector == "POULTRY" %}selected{% endif %}>🐓 Poultry</option>
+                        <option value="AQUA" {% if selected_sector == "AQUA" %}selected{% endif %}>🐟 Aqua</option>
+                    </select>
+                </div>
                 
-                <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20">
+                <a href="{% url 'export_excel' %}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2.5 rounded-lg transition font-bold flex items-center gap-1.5 ml-auto md:ml-0 shadow-lg shadow-cyan-950/20 mb-[1px]">
                     <i class="fa-solid fa-file-excel"></i> Export Matrix
                 </a>
             </form>
@@ -329,7 +376,6 @@
                                     {{ visit.visit_date|default:visit.created_at|date:"d-M-Y" }}
                                 </td>
                                 <td class="p-3.5 text-slate-200 font-bold">
-                                    <!-- TABLE EXECUTIVE NAME FIX -->
                                     {{ visit.executive.get_full_name|default:visit.executive.first_name|default:visit.executive.username|default:"Unassigned" }}
                                 </td>
                                 <td class="p-3.5 flex flex-col">
@@ -381,9 +427,17 @@
 
     </main>
 
-    <!-- CHART.JS INTEGRATION -->
+    <!-- CHART.JS & FILTER INTEGRATION -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // Live Filter Trigger Function
+        function applyLiveFilters() {
+            const form = document.getElementById('analyticsFilterForm');
+            if (form) {
+                form.submit();
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
             Chart.defaults.color = '#64748b';
             Chart.defaults.borderColor = 'rgba(30, 41, 59, 0.5)';
@@ -486,16 +540,15 @@
             renderOrHide('execRevBarChart', 'noDataExec', execData.length > 0, () => {
                 new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
                     type: 'bar',
-                    data: { 
-                        labels: execLabels, 
-                        datasets: [{ 
-                            data: execData, 
-                            backgroundColor: '#38bdf8', 
-                            borderRadius: 4, 
-                            barThickness: 10 
-                        }] 
+                    data: {
+                        labels: execLabels,
+                        datasets: [{
+                            data: execData,
+                            backgroundColor: '#8b5cf6',
+                            borderRadius: 6
+                        }]
                     },
-                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
+                    options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
                 });
             });
 
@@ -507,15 +560,14 @@
                         labels: prodLabels,
                         datasets: [{
                             data: prodData,
-                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
-                            borderWidth: 0
+                            backgroundColor: ['#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
                         }]
                     },
-                    options: { ...baseOptions, cutout: '70%' }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' } } }
                 });
             });
 
-            // 5. State Visits Chart
+            // 5. State Visits Bar Chart
             renderOrHide('stateVisitsChart', 'noDataState', stateData.length > 0, () => {
                 new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
                     type: 'bar',
@@ -523,16 +575,15 @@
                         labels: stateLabels,
                         datasets: [{
                             data: stateData,
-                            backgroundColor: '#10b981',
-                            borderRadius: 4,
-                            barThickness: 10
+                            backgroundColor: '#3b82f6',
+                            borderRadius: 6
                         }]
                     },
                     options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
                 });
             });
 
-            // 6. Field Problems Donut
+            // 6. Problems Donut
             renderOrHide('problemsDonut', 'noDataProblems', probData.length > 0, () => {
                 new Chart(document.getElementById('problemsDonut').getContext('2d'), {
                     type: 'doughnut',
@@ -540,11 +591,10 @@
                         labels: probLabels,
                         datasets: [{
                             data: probData,
-                            backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#a855f7'],
-                            borderWidth: 0
+                            backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#a855f7']
                         }]
                     },
-                    options: { ...baseOptions, cutout: '70%' }
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom' } } }
                 });
             });
         });
