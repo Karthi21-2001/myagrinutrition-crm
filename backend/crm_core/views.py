@@ -11,8 +11,8 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Count, DecimalField, ExpressionWrapper, FloatField, F, Q, Sum, Value
-from django.db.models.functions import Coalesce, Concat, TruncMonth, TruncYear
+from django.db.models import Avg, Count, DecimalField, F, Q, Sum
+from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -78,37 +78,28 @@ def render_visit_form(request):
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
     if request.method == 'POST':
-        # 1. Extract Form Data (Fixed key to 'sub_business_type')
-        farm_name = request.POST.get('farm_name', '').strip()
-        owner_name = request.POST.get('owner_name', '').strip()
-        contact_number = request.POST.get('contact_number', '').strip()
-        business_type = request.POST.get('business_type', 'Poultry').strip()
-        sub_segment = request.POST.get('sub_business_type', '').strip()  # FIXED: Matched HTML field name
+        farm_name = request.POST.get('farm_name')
+        owner_name = request.POST.get('owner_name')
+        contact_number = request.POST.get('contact_number')
+        business_type = request.POST.get('business_type', 'Poultry')
+        sub_segment = request.POST.get('sub_business_type_select', '').strip()
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
-        farm_problem = request.POST.get('farm_problem', '').strip()
+        farm_problem = request.POST.get('farm_problem')
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
 
-        # Extract Coordinates
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
-        latitude = float(lat) if (lat and lat != 'null') else None
-        longitude = float(lon) if (lon and lon != 'null') else None
-
-        # Poultry / Aqua Demographics
-        chicks_count = int(request.POST.get('chicks_count') or 0)
-        grower_count = int(request.POST.get('grower_count') or 0)
-        layer_count = int(request.POST.get('layer_count') or 0)
-        culling_bird_count = int(request.POST.get('culling_bird_count') or 0)
+        latitude = float(lat) if lat else None
+        longitude = float(lon) if lon else None
 
         current_user = request.user if request.user.is_authenticated else None
 
         try:
             with transaction.atomic():
-                # 2. Get or Create Farm Record
                 farm_instance, created = Farm.objects.get_or_create(
                     farm_name=farm_name,
                     owner_name=owner_name,
@@ -135,18 +126,13 @@ def save_farm_visit(request):
                     farm_instance.area = area
                     farm_instance.save()
 
-                # 3. Save Farm Visit Log
                 visit_record = FarmVisitReport.objects.create(
                     farm=farm_instance,
                     executive=current_user,
-                    farm_problem=farm_problem,
-                    chicks_count=chicks_count,
-                    grower_count=grower_count,
-                    layer_count=layer_count,
-                    culling_bird=culling_bird_count
+                    farm_problem=farm_problem
                 )
 
-                # 4. Save Confirmed Orders
+                # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
@@ -174,7 +160,7 @@ def save_farm_visit(request):
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
 
-                # 5. Save Pipeline Items
+                # Process Pipeline Products
                 pipeline_products = request.POST.getlist('pipeline_discussed_product[]')
                 p_quantities = request.POST.getlist('pipeline_potential_quantity[]')
                 t_quantities = request.POST.getlist('pipeline_target_quantity[]')
@@ -207,13 +193,14 @@ def save_farm_visit(request):
                     )
 
             messages.success(request, "Agri-Field visit logging record processed successfully!")
-            
-            # Redirect to Dashboard Home so metrics are updated immediately
-            return redirect('dashboard_home')
+            if request.user.is_staff or request.user.is_superuser:
+                return redirect('dashboard_home')
+
+            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
-            messages.error(request, f"Database transaction failed: {str(e)}")
+            messages.error(request, f"Database transaction block failed: {str(e)}")
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
     return redirect('render_visit_form')
@@ -356,10 +343,15 @@ def export_visits_to_excel(request):
 # 📊 DASHBOARDS & ADVANCED ANALYTICS PIPELINES
 # ==========================================
 
+
 def get_dashboard_context(request):
     """Computes all KPI aggregates, Chart data series, and list structures
+
     for the MyAgriNutrition Analytics Dashboard safely with complete error protection.
     """
+    # ------------------------------------------------------------------
+    # 1. READ FILTER INPUTS FROM REQUEST
+    # ------------------------------------------------------------------
     sel_state = request.GET.get("state", "").strip()
     sel_country = request.GET.get("country", "").strip()
     sel_district = request.GET.get("district", "").strip()
@@ -368,6 +360,9 @@ def get_dashboard_context(request):
     sel_year = request.GET.get("year", "").strip()
     sel_sector = request.GET.get("sector", "").strip()
 
+    # ------------------------------------------------------------------
+    # 2. INITIALIZE SAFE DEFAULT CONTEXT
+    # ------------------------------------------------------------------
     context = {
         # Numeric KPIs
         "total_revenue": 0.0,
@@ -384,38 +379,26 @@ def get_dashboard_context(request):
         "cold_pct": 0.0,
         "poultry_pct": 0.0,
         "aqua_pct": 0.0,
-        
-        # Safe Defaults for JavaScript Chart.js
+        # Pre-Serialized Safe JSON for Chart.js
         "month_wise_labels_js": json.dumps([]),
         "month_wise_data_js": json.dumps([]),
-        "month_labels_json": json.dumps([]),
-        "month_data_json": json.dumps([]),
         "year_wise_labels_js": json.dumps([]),
         "year_wise_data_js": json.dumps([]),
-        "year_labels_json": json.dumps([]),
-        "year_data_json": json.dumps([]),
         "exec_labels_js": json.dumps([]),
         "exec_revenue_js": json.dumps([]),
-        "exec_labels_json": json.dumps([]),
-        "exec_data_json": json.dumps([]),
         "exec_conv_pct_js": json.dumps([]),
         "top_prod_labels_js": json.dumps([]),
         "top_prod_revenue_js": json.dumps([]),
-        "prod_labels_json": json.dumps([]),
-        "prod_data_json": json.dumps([]),
         "state_labels_js": json.dumps([]),
         "state_data_js": json.dumps([]),
-        "state_labels_json": json.dumps([]),
-        "state_data_json": json.dumps([]),
-        "prob_labels_js": json.dumps([]),
-        "prob_data_js": json.dumps([]),
-        "problem_labels_json": json.dumps([]),
-        "problem_data_json": json.dumps([]),
         "chart_labels_js": json.dumps([]),
         "chart_counts_js": json.dumps([]),
-        "bird_labels_js": json.dumps(["Chicks", "Growers", "Layers", "Culling Birds"]),
+        "prob_labels_js": json.dumps([]),
+        "prob_data_js": json.dumps([]),
+        "bird_labels_js": json.dumps(
+            ["Chicks", "Growers", "Layers", "Culling Birds"]
+        ),
         "bird_counts_js": json.dumps([0, 0, 0, 0]),
-        
         # Structured Tables & Querysets
         "pipeline_spread": {"actual": 0, "target": 0, "potential": 0},
         "top_farms": [],
@@ -436,6 +419,9 @@ def get_dashboard_context(request):
     }
 
     try:
+        # ------------------------------------------------------------------
+        # 3. CONSTRUCT FILTER CONDITIONS
+        # ------------------------------------------------------------------
         farm_filters = Q()
         visit_filters = Q()
         product_filters = Q()
@@ -453,7 +439,9 @@ def get_dashboard_context(request):
         if sel_executive and sel_executive not in ["All", "All Executives", ""]:
             farm_filters &= Q(executive__username__iexact=sel_executive)
             visit_filters &= Q(executive__username__iexact=sel_executive)
-            product_filters &= Q(visit__executive__username__iexact=sel_executive)
+            product_filters &= Q(
+                visit__executive__username__iexact=sel_executive
+            )
 
         if sel_month and sel_month not in ["All", "All Months", ""]:
             try:
@@ -474,26 +462,50 @@ def get_dashboard_context(request):
         if sel_sector and sel_sector not in ["All", "All Sectors", ""]:
             farm_filters &= Q(business_type__icontains=sel_sector)
             visit_filters &= Q(farm__business_type__icontains=sel_sector)
-            product_filters &= Q(visit__farm__business_type__icontains=sel_sector)
+            product_filters &= Q(
+                visit__farm__business_type__icontains=sel_sector
+            )
 
+        # Base Querysets
         visit_qs = FarmVisitReport.objects.filter(visit_filters)
         farm_qs = Farm.objects.filter(farm_filters)
         product_qs = VisitedProductDetail.objects.filter(product_filters)
 
+        # ------------------------------------------------------------------
+        # 4. PRIMARY METRICS ACCUMULATION
+        # ------------------------------------------------------------------
         v_count = visit_qs.count()
         total_farms_count = farm_qs.count()
 
         active_execs_qs = (
-            visit_qs.exclude(Q(executive__isnull=True) | Q(executive__username=""))
+            visit_qs.exclude(
+                Q(executive__isnull=True) | Q(executive__username="")
+            )
             .values("executive")
             .distinct()
         )
         active_executives = active_execs_qs.count()
 
-        total_rev = float(product_qs.aggregate(total=Coalesce(Sum("revenue_generated"), 0.0))["total"])
-        vol_sold = int(product_qs.aggregate(total_qty=Coalesce(Sum("sale_quantity"), 0))["total_qty"])
-        paid_orders_count = product_qs.filter(Q(sale_quantity__gt=0) | Q(revenue_generated__gt=0)).count()
-        avg_order_value = float(total_rev / paid_orders_count) if paid_orders_count > 0 else 0.0
+        total_rev = float(
+            product_qs.aggregate(total=Coalesce(Sum("revenue_generated"), 0.0))[
+                "total"
+            ]
+        )
+        vol_sold = int(
+            product_qs.aggregate(total_qty=Coalesce(Sum("sale_quantity"), 0))[
+                "total_qty"
+            ]
+        )
+
+        paid_orders_count = product_qs.filter(
+            Q(sale_quantity__gt=0) | Q(revenue_generated__gt=0)
+        ).count()
+
+        avg_order_value = (
+            float(total_rev / paid_orders_count)
+            if paid_orders_count > 0
+            else 0.0
+        )
 
         poultry_pct, aqua_pct = 0.0, 0.0
         if total_farms_count > 0:
@@ -515,7 +527,9 @@ def get_dashboard_context(request):
 
         conversion_rate = hot_pct
 
-        # Monthly Trends
+        # ------------------------------------------------------------------
+        # 5. CHART DATA SERIES GENERATION
+        # ------------------------------------------------------------------
         month_wise_qs = list(
             product_qs.annotate(month=TruncMonth("visit__visit_date"))
             .values("month")
@@ -523,10 +537,13 @@ def get_dashboard_context(request):
             .filter(month__isnull=False)
             .order_by("month")
         )
-        month_wise_labels = [m["month"].strftime("%b %Y") for m in month_wise_qs if m.get("month")]
+        month_wise_labels = [
+            m["month"].strftime("%b %Y")
+            for m in month_wise_qs
+            if m.get("month")
+        ]
         month_wise_data = [float(m["revenue"]) for m in month_wise_qs]
 
-        # Yearly Trends
         year_wise_qs = list(
             product_qs.annotate(year=TruncYear("visit__visit_date"))
             .values("year")
@@ -534,10 +551,11 @@ def get_dashboard_context(request):
             .filter(year__isnull=False)
             .order_by("year")
         )
-        year_wise_labels = [y["year"].strftime("%Y") for y in year_wise_qs if y.get("year")]
+        year_wise_labels = [
+            y["year"].strftime("%Y") for y in year_wise_qs if y.get("year")
+        ]
         year_wise_data = [float(y["revenue"]) for y in year_wise_qs]
 
-        # Executive Performance
         exec_perf = (
             product_qs.values("visit__executive__username")
             .annotate(
@@ -547,14 +565,17 @@ def get_dashboard_context(request):
             )
             .order_by("-revenue")[:10]
         )
-        exec_labels = [e["visit__executive__username"] or "Unassigned" for e in exec_perf]
+        exec_labels = [
+            e["visit__executive__username"] or "Unassigned" for e in exec_perf
+        ]
         exec_revenue = [float(e["revenue"]) for e in exec_perf]
         exec_conv_pct = [
-            round((e["hot_items"] / e["total_items"] * 100), 1) if e["total_items"] > 0 else 0.0
+            round((e["hot_items"] / e["total_items"] * 100), 1)
+            if e["total_items"] > 0
+            else 0.0
             for e in exec_perf
         ]
 
-        # Top Products
         prod_perf = (
             product_qs.values("product_name")
             .annotate(
@@ -567,7 +588,6 @@ def get_dashboard_context(request):
         top_prod_labels = [p["product_name"] for p in prod_perf]
         top_prod_revenue = [float(p["revenue"]) for p in prod_perf]
 
-        # State / Region Data
         state_qs = (
             visit_qs.values("farm__state")
             .annotate(total_visits=Count("id"))
@@ -577,7 +597,15 @@ def get_dashboard_context(request):
         state_labels = [s["farm__state"] for s in state_qs]
         state_data = [s["total_visits"] for s in state_qs]
 
-        # Problems
+        district_qs = (
+            farm_qs.values("district")
+            .annotate(farm_count=Count("id"))
+            .exclude(Q(district__isnull=True) | Q(district=""))
+            .order_by("-farm_count")[:10]
+        )
+        chart_labels = [d["district"] for d in district_qs]
+        chart_counts = [d["farm_count"] for d in district_qs]
+
         prob_qs = (
             visit_qs.values("farm_problem")
             .annotate(frequency=Count("id"))
@@ -587,18 +615,13 @@ def get_dashboard_context(request):
         prob_labels = [p["farm_problem"] for p in prob_qs]
         prob_data = [p["frequency"] for p in prob_qs]
 
-        # District Counts for standard Bar Chart
-        district_qs = (
-            visit_qs.values("farm__district")
-            .annotate(total_visits=Count("id"))
-            .exclude(Q(farm__district__isnull=True) | Q(farm__district=""))
-            .order_by("-total_visits")[:8]
-        )
-        district_labels = [d["farm__district"] for d in district_qs]
-        district_counts = [d["total_visits"] for d in district_qs]
-
+        # ------------------------------------------------------------------
+        # 6. DEMOGRAPHICS & LIST DATA
+        # ------------------------------------------------------------------
         top_farms_table = list(
-            product_qs.values("visit__farm__farm_name", "visit__farm__owner_name")
+            product_qs.values(
+                "visit__farm__farm_name", "visit__farm__owner_name"
+            )
             .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
             .filter(revenue__gt=0)
             .order_by("-revenue")[:5]
@@ -627,7 +650,9 @@ def get_dashboard_context(request):
             potential=Coalesce(Sum("potential_quantity"), 0),
         )
 
-        recent_visits = visit_qs.select_related("farm", "executive").order_by("-visit_date")[:10]
+        recent_visits = visit_qs.select_related("farm", "executive").order_by(
+            "-visit_date"
+        )[:10]
 
         state_list = list(
             Farm.objects.exclude(Q(state__isnull=True) | Q(state=""))
@@ -645,7 +670,7 @@ def get_dashboard_context(request):
             .distinct()
         )
 
-        # Update context dictionary with synchronized JSON keys
+        # Update context dictionary with calculated values
         context.update(
             {
                 "total_revenue": total_rev,
@@ -661,42 +686,52 @@ def get_dashboard_context(request):
                 "cold_pct": cold_pct,
                 "poultry_pct": poultry_pct,
                 "aqua_pct": aqua_pct,
-                # JSON mappings to accommodate all template variants
-                "month_wise_labels_js": json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-                "month_wise_data_js": json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-                "month_labels_json": json.dumps(month_wise_labels, cls=DjangoJSONEncoder),
-                "month_data_json": json.dumps(month_wise_data, cls=DjangoJSONEncoder),
-                
-                "year_wise_labels_js": json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-                "year_wise_data_js": json.dumps(year_wise_data, cls=DjangoJSONEncoder),
-                "year_labels_json": json.dumps(year_wise_labels, cls=DjangoJSONEncoder),
-                "year_data_json": json.dumps(year_wise_data, cls=DjangoJSONEncoder),
-                
-                "exec_labels_js": json.dumps(exec_labels, cls=DjangoJSONEncoder),
-                "exec_revenue_js": json.dumps(exec_revenue, cls=DjangoJSONEncoder),
-                "exec_labels_json": json.dumps(exec_labels, cls=DjangoJSONEncoder),
-                "exec_data_json": json.dumps(exec_revenue, cls=DjangoJSONEncoder),
-                "exec_conv_pct_js": json.dumps(exec_conv_pct, cls=DjangoJSONEncoder),
-                
-                "top_prod_labels_js": json.dumps(top_prod_labels, cls=DjangoJSONEncoder),
-                "top_prod_revenue_js": json.dumps(top_prod_revenue, cls=DjangoJSONEncoder),
-                "prod_labels_json": json.dumps(top_prod_labels, cls=DjangoJSONEncoder),
-                "prod_data_json": json.dumps(top_prod_revenue, cls=DjangoJSONEncoder),
-                
-                "state_labels_js": json.dumps(state_labels, cls=DjangoJSONEncoder),
-                "state_data_js": json.dumps(state_data, cls=DjangoJSONEncoder),
-                "state_labels_json": json.dumps(state_labels, cls=DjangoJSONEncoder),
-                "state_data_json": json.dumps(state_data, cls=DjangoJSONEncoder),
-                
-                "prob_labels_js": json.dumps(prob_labels, cls=DjangoJSONEncoder),
+                "month_wise_labels_js": json.dumps(
+                    month_wise_labels, cls=DjangoJSONEncoder
+                ),
+                "month_wise_data_js": json.dumps(
+                    month_wise_data, cls=DjangoJSONEncoder
+                ),
+                "year_wise_labels_js": json.dumps(
+                    year_wise_labels, cls=DjangoJSONEncoder
+                ),
+                "year_wise_data_js": json.dumps(
+                    year_wise_data, cls=DjangoJSONEncoder
+                ),
+                "exec_labels_js": json.dumps(
+                    exec_labels, cls=DjangoJSONEncoder
+                ),
+                "exec_revenue_js": json.dumps(
+                    exec_revenue, cls=DjangoJSONEncoder
+                ),
+                "exec_conv_pct_js": json.dumps(
+                    exec_conv_pct, cls=DjangoJSONEncoder
+                ),
+                "top_prod_labels_js": json.dumps(
+                    top_prod_labels, cls=DjangoJSONEncoder
+                ),
+                "top_prod_revenue_js": json.dumps(
+                    top_prod_revenue, cls=DjangoJSONEncoder
+                ),
+                "state_labels_js": json.dumps(
+                    state_labels, cls=DjangoJSONEncoder
+                ),
+                "state_data_js": json.dumps(
+                    state_data, cls=DjangoJSONEncoder
+                ),
+                "chart_labels_js": json.dumps(
+                    chart_labels, cls=DjangoJSONEncoder
+                ),
+                "chart_counts_js": json.dumps(
+                    chart_counts, cls=DjangoJSONEncoder
+                ),
+                "prob_labels_js": json.dumps(
+                    prob_labels, cls=DjangoJSONEncoder
+                ),
                 "prob_data_js": json.dumps(prob_data, cls=DjangoJSONEncoder),
-                "problem_labels_json": json.dumps(prob_labels, cls=DjangoJSONEncoder),
-                "problem_data_json": json.dumps(prob_data, cls=DjangoJSONEncoder),
-                
-                "chart_labels_js": json.dumps(district_labels, cls=DjangoJSONEncoder),
-                "chart_counts_js": json.dumps(district_counts, cls=DjangoJSONEncoder),
-                
-                "bird_counts_js": json.dumps(bird_counts, cls=DjangoJSONEncoder),
+                "bird_counts_js": json.dumps(
+                    bird_counts, cls=DjangoJSONEncoder
+                ),
                 "pipeline_spread": pipeline_spread_agg,
                 "top_farms": top_farms_table,
                 "recent_visits": recent_visits,
@@ -710,7 +745,6 @@ def get_dashboard_context(request):
         logger.error(f"Error executing get_dashboard_context: {e}")
 
     return context
-
 
 def dashboard_view(request):
     """View handler that renders the context into the HTML template."""
@@ -735,7 +769,6 @@ def executive_analytics_view(request):
     context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
 
-
 @login_required(login_url='/crm/login/')
 @user_passes_test(lambda u: u.is_staff or u.is_superuser)
 def clear_dashboard_data(request):
@@ -755,30 +788,26 @@ def clear_dashboard_data(request):
             messages.error(request, f"Error clearing data: {str(e)}")
     return redirect('dashboard_home')
 
+# Place these at the end of backend/crm_core/views.py
 
 @login_required(login_url='/crm/login/')
-def get_dependent_filters(request):
+@user_passes_test(lambda u: u.is_staff or u.is_superuser)
+def clear_dashboard_data(request):
     """
-    AJAX endpoint for fetching dynamic district list depending on state selected in analytics.
+    Clears all farm visit, product detail, and farm records from the CRM.
+    Restricted to superusers/staff.
     """
-    state_param = request.GET.get('state', '').strip()
-    if state_param and state_param not in ['All', 'All States']:
-        districts = list(
-            Farm.objects.filter(state__iexact=state_param)
-            .exclude(Q(district__isnull=True) | Q(district=''))
-            .values_list('district', flat=True)
-            .distinct()
-            .order_by('district')
-        )
-        return JsonResponse({'districts': districts})
-    
-    all_districts = list(
-        Farm.objects.exclude(Q(district__isnull=True) | Q(district=''))
-        .values_list('district', flat=True)
-        .distinct()
-        .order_by('district')
-    )
-    return JsonResponse({'districts': all_districts})
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                VisitedProductDetail.objects.all().delete()
+                FarmVisitReport.objects.all().delete()
+                Farm.objects.all().delete()
+            messages.success(request, "Dashboard data cleared successfully!")
+        except Exception as e:
+            logger.error(f"Failed to clear dashboard data: {str(e)}")
+            messages.error(request, f"Error clearing data: {str(e)}")
+    return redirect('dashboard_home')
 
 
 @login_required(login_url='/crm/login/')
