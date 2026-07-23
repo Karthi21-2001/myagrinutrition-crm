@@ -78,28 +78,37 @@ def render_visit_form(request):
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
     if request.method == 'POST':
-        farm_name = request.POST.get('farm_name')
-        owner_name = request.POST.get('owner_name')
-        contact_number = request.POST.get('contact_number')
-        business_type = request.POST.get('business_type', 'Poultry')
-        sub_segment = request.POST.get('sub_business_type_select', '').strip()
+        # 1. Extract Form Data (Fixed key to 'sub_business_type')
+        farm_name = request.POST.get('farm_name', '').strip()
+        owner_name = request.POST.get('owner_name', '').strip()
+        contact_number = request.POST.get('contact_number', '').strip()
+        business_type = request.POST.get('business_type', 'Poultry').strip()
+        sub_segment = request.POST.get('sub_business_type', '').strip()  # FIXED: Matched HTML field name
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
-        farm_problem = request.POST.get('farm_problem')
+        farm_problem = request.POST.get('farm_problem', '').strip()
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
 
+        # Extract Coordinates
         lat = request.POST.get('latitude')
         lon = request.POST.get('longitude')
-        latitude = float(lat) if lat else None
-        longitude = float(lon) if lon else None
+        latitude = float(lat) if (lat and lat != 'null') else None
+        longitude = float(lon) if (lon and lon != 'null') else None
+
+        # Poultry / Aqua Demographics
+        chicks_count = int(request.POST.get('chicks_count') or 0)
+        grower_count = int(request.POST.get('grower_count') or 0)
+        layer_count = int(request.POST.get('layer_count') or 0)
+        culling_bird_count = int(request.POST.get('culling_bird_count') or 0)
 
         current_user = request.user if request.user.is_authenticated else None
 
         try:
             with transaction.atomic():
+                # 2. Get or Create Farm Record
                 farm_instance, created = Farm.objects.get_or_create(
                     farm_name=farm_name,
                     owner_name=owner_name,
@@ -126,13 +135,18 @@ def save_farm_visit(request):
                     farm_instance.area = area
                     farm_instance.save()
 
+                # 3. Save Farm Visit Log
                 visit_record = FarmVisitReport.objects.create(
                     farm=farm_instance,
                     executive=current_user,
-                    farm_problem=farm_problem
+                    farm_problem=farm_problem,
+                    chicks_count=chicks_count,
+                    grower_count=grower_count,
+                    layer_count=layer_count,
+                    culling_bird=culling_bird_count
                 )
 
-                # Process Sales Order Products
+                # 4. Save Confirmed Orders
                 order_products = request.POST.getlist('discussed_product[]')
                 sale_quantities = request.POST.getlist('sale_quantity[]')
                 unit_types = request.POST.getlist('unit_type[]')
@@ -160,7 +174,7 @@ def save_farm_visit(request):
                         conversion_percentage=100 if s_qty > 0 else 0
                     )
 
-                # Process Pipeline Products
+                # 5. Save Pipeline Items
                 pipeline_products = request.POST.getlist('pipeline_discussed_product[]')
                 p_quantities = request.POST.getlist('pipeline_potential_quantity[]')
                 t_quantities = request.POST.getlist('pipeline_target_quantity[]')
@@ -193,14 +207,13 @@ def save_farm_visit(request):
                     )
 
             messages.success(request, "Agri-Field visit logging record processed successfully!")
-            if request.user.is_staff or request.user.is_superuser:
-                return redirect('dashboard_home')
-
-            return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
+            
+            # Redirect to Dashboard Home so metrics are updated immediately
+            return redirect('dashboard_home')
 
         except Exception as e:
             logger.error(f"Error in save_farm_visit: {str(e)}", exc_info=True)
-            messages.error(request, f"Database transaction block failed: {str(e)}")
+            messages.error(request, f"Database transaction failed: {str(e)}")
             return render(request, 'crm_core/farm_visit_form.html', {'saved_data': request.POST})
 
     return redirect('render_visit_form')
