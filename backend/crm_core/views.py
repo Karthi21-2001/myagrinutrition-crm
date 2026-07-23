@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Count, DecimalField, F, FloatField, Q, Sum
+from django.db.models import Avg, Count, DecimalField, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -389,11 +389,8 @@ def get_dashboard_context(request):
         "exec_conv_pct_js": json.dumps([]),
         "top_prod_labels_js": json.dumps([]),
         "top_prod_revenue_js": json.dumps([]),
-        "top_prod_qty_js": json.dumps([]),
         "state_labels_js": json.dumps([]),
         "state_data_js": json.dumps([]),
-        "chart_labels_js": json.dumps([]),
-        "chart_counts_js": json.dumps([]),
         "prob_labels_js": json.dumps([]),
         "prob_data_js": json.dumps([]),
         "bird_labels_js": json.dumps(
@@ -488,7 +485,7 @@ def get_dashboard_context(request):
         active_executives = active_execs_qs.count()
 
         total_rev = float(
-            product_qs.aggregate(total=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()))[
+            product_qs.aggregate(total=Coalesce(Sum("revenue_generated"), 0.0))[
                 "total"
             ]
         )
@@ -534,7 +531,7 @@ def get_dashboard_context(request):
         month_wise_qs = list(
             product_qs.annotate(month=TruncMonth("visit__visit_date"))
             .values("month")
-            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()))
+            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
             .filter(month__isnull=False)
             .order_by("month")
         )
@@ -548,7 +545,7 @@ def get_dashboard_context(request):
         year_wise_qs = list(
             product_qs.annotate(year=TruncYear("visit__visit_date"))
             .values("year")
-            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()))
+            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
             .filter(year__isnull=False)
             .order_by("year")
         )
@@ -560,7 +557,7 @@ def get_dashboard_context(request):
         exec_perf = (
             product_qs.values("visit__executive__username")
             .annotate(
-                revenue=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()),
+                revenue=Coalesce(Sum("revenue_generated"), 0.0),
                 total_items=Count("id"),
                 hot_items=Count("id", filter=Q(process_status__iexact="Hot")),
             )
@@ -580,7 +577,7 @@ def get_dashboard_context(request):
         prod_perf = (
             product_qs.values("product_name")
             .annotate(
-                revenue=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()),
+                revenue=Coalesce(Sum("revenue_generated"), 0.0),
                 qty_sold=Coalesce(Sum("sale_quantity"), 0),
             )
             .exclude(Q(product_name__isnull=True) | Q(product_name=""))
@@ -588,7 +585,6 @@ def get_dashboard_context(request):
         )
         top_prod_labels = [p["product_name"] for p in prod_perf]
         top_prod_revenue = [float(p["revenue"]) for p in prod_perf]
-        top_prod_qty = [int(p["qty_sold"]) for p in prod_perf]
 
         state_qs = (
             visit_qs.values("farm__state")
@@ -598,15 +594,6 @@ def get_dashboard_context(request):
         )
         state_labels = [s["farm__state"] for s in state_qs]
         state_data = [s["total_visits"] for s in state_qs]
-
-        district_qs = (
-            farm_qs.values("district")
-            .annotate(farm_count=Count("id"))
-            .exclude(Q(district__isnull=True) | Q(district=""))
-            .order_by("-farm_count")[:10]
-        )
-        chart_labels = [d["district"] for d in district_qs]
-        chart_counts = [d["farm_count"] for d in district_qs]
 
         prob_qs = (
             visit_qs.values("farm_problem")
@@ -620,24 +607,14 @@ def get_dashboard_context(request):
         # ------------------------------------------------------------------
         # 6. DEMOGRAPHICS & LIST DATA
         # ------------------------------------------------------------------
-        top_farms_raw = (
+        top_farms_table = list(
             product_qs.values(
                 "visit__farm__farm_name", "visit__farm__owner_name"
             )
-            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()))
+            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
             .filter(revenue__gt=0)
             .order_by("-revenue")[:5]
         )
-        # Re-keyed to plain "name"/"owner"/"revenue" so templates can use
-        # {{ farm.name }} instead of the raw dunder lookup path.
-        top_farms_table = [
-            {
-                "name": f["visit__farm__farm_name"],
-                "owner": f["visit__farm__owner_name"],
-                "revenue": f["revenue"],
-            }
-            for f in top_farms_raw
-        ]
 
         try:
             bird_population = visit_qs.aggregate(
@@ -662,19 +639,18 @@ def get_dashboard_context(request):
             potential=Coalesce(Sum("potential_quantity"), 0),
         )
 
-        recent_visits = list(
-            visit_qs.select_related("farm", "executive").order_by(
-                "-visit_date"
-            )[:10]
-        )
-        # analytics_report.html reads visit.calculated_total, which isn't a
-        # model field — attach it here as the visit's total product revenue.
-        for rv in recent_visits:
-            rv.calculated_total = float(
-                VisitedProductDetail.objects.filter(visit=rv).aggregate(
-                    total=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField())
-                )["total"]
+        recent_visits = (
+            visit_qs.select_related("farm", "executive")
+            .prefetch_related("visited_products")
+            .annotate(
+                total_calculated_revenue=Coalesce(
+                    Sum("visited_products__revenue_generated"),
+                    0.0,
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
             )
+            .order_by("-visit_date")[:10]
+        )
 
         state_list = list(
             Farm.objects.exclude(Q(state__isnull=True) | Q(state=""))
@@ -735,20 +711,11 @@ def get_dashboard_context(request):
                 "top_prod_revenue_js": json.dumps(
                     top_prod_revenue, cls=DjangoJSONEncoder
                 ),
-                "top_prod_qty_js": json.dumps(
-                    top_prod_qty, cls=DjangoJSONEncoder
-                ),
                 "state_labels_js": json.dumps(
                     state_labels, cls=DjangoJSONEncoder
                 ),
                 "state_data_js": json.dumps(
                     state_data, cls=DjangoJSONEncoder
-                ),
-                "chart_labels_js": json.dumps(
-                    chart_labels, cls=DjangoJSONEncoder
-                ),
-                "chart_counts_js": json.dumps(
-                    chart_counts, cls=DjangoJSONEncoder
                 ),
                 "prob_labels_js": json.dumps(
                     prob_labels, cls=DjangoJSONEncoder
@@ -767,9 +734,7 @@ def get_dashboard_context(request):
         )
 
     except Exception as e:
-        logger.error(
-            f"Error executing get_dashboard_context: {e}\n{traceback.format_exc()}"
-        )
+        logger.error(f"Error executing get_dashboard_context: {e}")
 
     return context
 
@@ -816,6 +781,25 @@ def clear_dashboard_data(request):
     return redirect('dashboard_home')
 
 # Place these at the end of backend/crm_core/views.py
+
+@login_required(login_url='/crm/login/')
+@user_passes_test(lambda u: u.is_staff or u.is_superuser)
+def clear_dashboard_data(request):
+    """
+    Clears all farm visit, product detail, and farm records from the CRM.
+    Restricted to superusers/staff.
+    """
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                VisitedProductDetail.objects.all().delete()
+                FarmVisitReport.objects.all().delete()
+                Farm.objects.all().delete()
+            messages.success(request, "Dashboard data cleared successfully!")
+        except Exception as e:
+            logger.error(f"Failed to clear dashboard data: {str(e)}")
+            messages.error(request, f"Error clearing data: {str(e)}")
+    return redirect('dashboard_home')
 
 
 @login_required(login_url='/crm/login/')
