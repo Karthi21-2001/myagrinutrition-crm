@@ -570,7 +570,7 @@
     <script>
     let map, marker;
 
-    // 🔄 Sector & Sub-Sector Switching Logic
+    // Sector & Sub-Sector Switching Logic
     document.addEventListener('DOMContentLoaded', function() {
         const sectorSelect = document.getElementById('business_type_select');
         const subSectorSelect = document.getElementById('sub_business_type_select');
@@ -629,7 +629,7 @@
         dynamicSectorToggle();
     });
 
-    // 📦 Dynamic Row Multiplier: Confirmed Orders
+    // Dynamic Row Multiplier: Confirmed Orders
     document.getElementById('add-order-btn').addEventListener('click', function() {
         const container = document.getElementById('order-sheet-container');
         const newRow = document.createElement('div');
@@ -663,7 +663,7 @@
         container.appendChild(newRow);
     });
 
-    // 🚀 Dynamic Row Multiplier: Pipeline Items
+    // Dynamic Row Multiplier: Pipeline Items
     document.getElementById('add-pipeline-btn').addEventListener('click', function() {
         const container = document.getElementById('pipeline-sheet-container');
         const newRow = document.createElement('div');
@@ -709,7 +709,7 @@
         container.appendChild(newRow);
     });
 
-    // 🗑️ Row Cleaner Event Delegations
+    // Row Cleaner Event Delegations
     document.getElementById('order-sheet-container').addEventListener('click', function(e) {
         if (e.target.classList.contains('remove-order-btn') || e.target.parentElement.classList.contains('remove-order-btn')) {
             const btn = e.target.classList.contains('remove-order-btn') ? e.target : e.target.parentElement;
@@ -764,7 +764,7 @@
         }
     });
 
-    // 📍 Geolocation Engine & Automatic Address Fetcher
+    // Geolocation Engine & Automatic Address Fetcher
     document.getElementById('locateBtn').addEventListener('click', function() {
         const btn = this;
         btn.innerText = "⏳ Locating via GPS Grid...";
@@ -795,17 +795,17 @@
                         map.setView(newPos, 14);
                     }
                     
-                    // Primary Reverse Geocode Attempt via OpenStreetMap
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`)
+                    // Primary Reverse Geocode Attempt via OpenStreetMap (Forced English Output)
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=en`)
                         .then(res => res.json())
                         .then(data => {
                             btn.innerText = "✅ Location Secured";
                             
                             if (data && data.address) {
                                 const addr = data.address;
-                                const district = addr.state_district || addr.county || addr.district || addr.city || 'N/A';
-                                const area = addr.suburb || addr.village || addr.neighbourhood || addr.town || addr.city_district || 'N/A';
-                                const state = addr.state || 'N/A';
+                                const district = addr.county || addr.state_district || addr.district || '';
+                                const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.city || '';
+                                const state = addr.state || '';
 
                                 document.getElementById('district').value = district;
                                 document.getElementById('area').value = area;
@@ -813,34 +813,21 @@
                             }
                         })
                         .catch(err => {
-                            console.warn("Direct API failed, trying internal CRM API fallback:", err);
-                            // Secondary Attempt via local API fallback
-                            fetch(`/crm/api/get-location-details/?lat=${lat}&lon=${lon}`)
-                                .then(res => res.json())
-                                .then(localData => {
-                                    btn.innerText = "✅ Location Secured";
-                                    document.getElementById('district').value = localData.district || '';
-                                    document.getElementById('area').value = localData.area || '';
-                                    document.getElementById('state').value = localData.state || '';
-                                })
-                                .catch(() => {
-                                    btn.innerText = "Fetch GPS Verification Coordinate";
-                                    btn.disabled = false;
-                                    alert("Location coordinates captured, but could not auto-resolve address text. Please input manually if required.");
-                                });
+                            console.error("Reverse Geocoding Error:", err);
+                            btn.innerText = "⚠️ Location Secured (Geocoding Failed)";
                         });
                 },
                 function(error) {
-                    btn.innerText = "Fetch GPS Verification Coordinate";
                     btn.disabled = false;
-                    alert("GPS Error: " + error.message);
+                    btn.innerText = "Fetch GPS Verification Coordinate";
+                    alert("Unable to retrieve location. Please enable location permissions on your browser.");
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         } else {
-            alert("Geolocation is not supported by this device.");
-            btn.innerText = "Fetch GPS Verification Coordinate";
             btn.disabled = false;
+            btn.innerText = "Fetch GPS Verification Coordinate";
+            alert("Geolocation is not supported by your browser.");
         }
     });
     </script>
