@@ -13,13 +13,13 @@
     
     <style>
         :root {
-            --bg-main: #0f172a;       /* Power BI Dark Canvas */
-            --bg-card: #1e293b;       /* Card Tiles */
-            --text-main: #f8fafc;     /* Primary High Contrast Labels */
-            --text-muted: #94a3b8;    /* Sub-text Hierarchy Labels */
+            --bg-main: #ffffff;       /* White Canvas */
+            --bg-card: #eef7e0;       /* Light Green Card Tiles */
+            --text-main: #1e293b;     /* Dark Text for Contrast on Light BG */
+            --text-muted: #5a7047;    /* Muted Green-Gray Sub-text */
             --primary: #38bdf8;       /* Power BI Neon Indigo Blue Accent */
-            --border: #334155;        /* Grid Lines and Frame Borders */
-            --table-header: #111827;  /* Matrix Dark Header Wrapper */
+            --border: #cfe6a8;        /* Light Green Grid Lines and Frame Borders */
+            --table-header: #dcefc0;  /* Light Green Header Wrapper */
             --success: #4ade80;       /* KPI Positives / Revenue Trackers */
             --warning-bg: #334155;
             --warning-text: #f59e0b;
@@ -131,9 +131,9 @@
         }
 
         .select-filter {
-            background-color: #1e293b;
-            color: #cbd5e1;
-            border: 1px solid #475569;
+            background-color: #ffffff;
+            color: #33422a;
+            border: 1px solid #a9cf76;
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 0.85rem;
@@ -146,7 +146,7 @@
 
         .select-filter:focus, .select-filter:hover {
             border-color: var(--primary);
-            color: #fff;
+            color: #111827;
         }
         
         .action-buttons {
@@ -218,14 +218,14 @@
             margin-bottom: 30px;
         }
 
-        .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: #cbd5e1; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: #33422a; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
         /* Table Styling */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
-        th { background-color: var(--table-header); color: #cbd5e1; font-weight: 600; padding: 14px 16px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+        th { background-color: var(--table-header); color: #33422a; font-weight: 600; padding: 14px 16px; border-bottom: 2px solid var(--border); white-space: nowrap; }
         td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: var(--text-main); vertical-align: middle; }
-        tr:hover { background-color: #334155; }
+        tr:hover { background-color: #dcefc0; }
 
         /* Status Badges */
         .badge-month { background-color: #1e3a8a; color: #93c5fd; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
