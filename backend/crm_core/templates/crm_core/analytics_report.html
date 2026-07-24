@@ -55,9 +55,9 @@
             
             <form method="GET" action="" class="flex flex-wrap items-center gap-2.5 w-full md:w-auto text-xs font-semibold">
                 <select name="executive" onchange="this.form.submit()" class="bg-[var(--bg-input)] border border-[var(--border)] text-slate-200 font-bold rounded-lg px-3 py-2 cursor-pointer focus:border-[var(--border-focus)] outline-none min-w-[160px] shadow-md transition">
-                    <option value="" {% if not selected_executive or selected_executive == "ALL" %}selected{% endif %}>👥 All Executives</option>
+                    <option value="ALL" {% if selected_executive == "ALL" or not selected_executive %}selected{% endif %}>👥 All Executives</option>
                     {% for exec in executives_list %}
-                        <option value="{{ exec.username }}" {% if selected_executive == exec.username %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
+                        <option value="{{ exec.id }}" {% if selected_executive == exec.id|stringformat:"s" %}selected{% endif %}>👤 {{ exec.get_full_name|default:exec.username }}</option>
                     {% endfor %}
                 </select>
 
@@ -117,12 +117,12 @@
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md border-emerald-500/20">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Confirmed Revenue</span><i class="fa-solid fa-indian-rupee-sign text-emerald-400"></i></div>
-                <h3 id="kpiRevenue" class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|floatformat:2|default:"0.00" }}</h3>
+                <h3 id="kpiRevenue" class="text-2xl font-black text-emerald-400 mt-2">₹{{ total_revenue|default:"0" }}</h3>
                 <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ revenue_growth|default:"0%" }} Growth</span>
             </div>
             <div class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4 flex flex-col justify-between shadow-md">
                 <div class="flex justify-between items-center text-slate-400"><span class="text-[10px] font-bold uppercase tracking-wider">Avg Order Value</span><i class="fa-solid fa-calculator text-cyan-400"></i></div>
-                <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|floatformat:2|default:"0.00" }}</h3>
+                <h3 id="kpiAvgValue" class="text-2xl font-black text-white mt-2">₹{{ avg_revenue|default:"0" }}</h3>
                 <span class="text-[9px] text-emerald-400 font-bold mt-1"><i class="fa-solid fa-caret-up"></i> {{ avg_growth|default:"0%" }}</span>
             </div>
         </div>
@@ -320,30 +320,34 @@
                                 </td>
                                 <td class="p-3.5 flex flex-col">
                                     <span class="font-bold text-slate-300">
-                                        {{ visit.farm.farm_name|default:"Unnamed Farm" }}
+                                        {{ visit.farm.name|default:"Unnamed Farm" }}
                                     </span>
                                     <span class="text-[10px] text-slate-500">
-                                        Owner: {{ visit.farm.owner_name|default:"N/A" }}
+                                        Owner: {{ visit.farm_owner|default:"N/A" }}
                                     </span>
                                 </td>
                                 <td class="p-3.5 text-slate-400">
-                                    {% if visit.farm.district or visit.farm.state %}
-                                        {{ visit.farm.district }}{% if visit.farm.district and visit.farm.state %}, {% endif %}{{ visit.farm.state }}
+                                    {% if visit.district or visit.state %}
+                                        {{ visit.district }}{% if visit.district and visit.state %}, {% endif %}{{ visit.state }}
                                     {% else %}
                                         Unassigned Region
                                     {% endif %}
                                 </td>
                                 <td class="p-3.5 text-right font-bold text-cyan-400 pr-5">
-                                    ₹{{ visit.calculated_total|floatformat:2|default:"0.00" }}
+                                    ₹{{ visit.calculated_total|default:"0.00" }}
                                 </td>
                                 <td class="p-3.5 text-center">
-                                    {% if visit.farm.latitude and visit.farm.longitude %}
-                                        <a href="https://maps.google.com/?q={{ visit.farm.latitude }},{{ visit.farm.longitude }}" 
+                                    {% if visit.latitude and visit.longitude %}
+                                        <a href="https://maps.google.com/?q={{ visit.latitude }},{{ visit.longitude }}" 
                                            target="_blank" 
                                            class="text-slate-500 hover:text-cyan-400 text-sm transition"
-                                           title="View on Maps ({{ visit.farm.latitude }}, {{ visit.farm.longitude }})">
+                                           title="View on Maps ({{ visit.latitude }}, {{ visit.longitude }})">
                                             <i class="fa-solid fa-location-dot"></i>
                                         </a>
+                                    {% elif visit.latitude %}
+                                        <span class="text-slate-400 text-xs font-mono" title="Latitude">
+                                            📍 {{ visit.latitude }}
+                                        </span>
                                     {% else %}
                                         <span class="text-slate-600"><i class="fa-solid fa-location-dot"></i></span>
                                     {% endif %}
