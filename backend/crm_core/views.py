@@ -846,7 +846,7 @@ def get_dashboard_context(request):
         )
 
     except Exception as e:
-        logger.error(f"Error executing get_dashboard_context: {e}")
+        logger.error(f"Error executing get_dashboard_context: {e}", exc_info=True)
 
     return context
 
