@@ -698,15 +698,25 @@ def get_dashboard_context(request):
                 )["total"]
             )
 
-        state_list = list(
-            Farm.objects.exclude(Q(state__isnull=True) | Q(state=""))
-            .values_list("state", flat=True)
-            .distinct()
-        )
-        district_list = list(
-            Farm.objects.exclude(Q(district__isnull=True) | Q(district=""))
-            .values_list("district", flat=True)
-            .distinct()
+        raw_states = Farm.objects.exclude(
+            Q(state__isnull=True) | Q(state="")
+        ).values_list("state", flat=True)
+        seen_states = {}
+        for s in raw_states:
+            key = s.strip().lower()
+            if key and key not in seen_states:
+                seen_states[key] = s.strip()
+        state_list = sorted(seen_states.values())
+
+        raw_districts = Farm.objects.exclude(
+            Q(district__isnull=True) | Q(district="")
+        ).values_list("district", flat=True)
+        seen_districts = {}
+        for d in raw_districts:
+            key = d.strip().lower()
+            if key and key not in seen_districts:
+                seen_districts[key] = d.strip()
+        district_list = sorted(seen_districts.values())
         )
         executive_list = list(
             User.objects.filter(is_active=True)
