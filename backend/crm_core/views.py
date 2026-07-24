@@ -294,10 +294,10 @@ def export_visits_to_excel(request):
 
             ws_data.cell(row=current_row, column=11, value=v.farm_problem if (v and v.farm_problem) else "None reported")
             
-            ws_data.cell(row=current_row, column=12, value=getattr(v, 'chicks_count', 0))
-            ws_data.cell(row=current_row, column=13, value=getattr(v, 'grower_count', 0))
-            ws_data.cell(row=current_row, column=14, value=getattr(v, 'layer_count', 0))
-            ws_data.cell(row=current_row, column=15, value=getattr(v, 'culling_bird', 0))
+            ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird_count', 0) if f else 0)
 
             ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
             ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
@@ -401,11 +401,34 @@ def get_dashboard_context(request):
         "pipeline_spread": {"actual": 0, "target": 0, "potential": 0},
         "top_farms": [],
         "recent_visits": [],
+        "monthly_sales": [],
+        "chart_labels_js": json.dumps([]),
+        "chart_counts_js": json.dumps([]),
         # Options
         "state_list": [],
         "district_list": [],
         "executive_list": [],
+        "executives_list": [],
         "country_list": ["India"],
+        # analytics_report.html aliases (safe defaults)
+        "total_executives": 0,
+        "total_qty": 0,
+        "avg_revenue": 0.0,
+        "pipeline_hot": 0.0,
+        "pipeline_warm": 0.0,
+        "pipeline_cold": 0.0,
+        "month_labels_json": json.dumps([]),
+        "month_data_json": json.dumps([]),
+        "year_labels_json": json.dumps([]),
+        "year_data_json": json.dumps([]),
+        "exec_labels_json": json.dumps([]),
+        "exec_data_json": json.dumps([]),
+        "prod_labels_json": json.dumps([]),
+        "prod_data_json": json.dumps([]),
+        "state_labels_json": json.dumps([]),
+        "state_data_json": json.dumps([]),
+        "problem_labels_json": json.dumps([]),
+        "problem_data_json": json.dumps([]),
         # Retention
         "selected_state": sel_state,
         "selected_country": sel_country,
@@ -609,7 +632,8 @@ def get_dashboard_context(request):
         # ------------------------------------------------------------------
         top_farms_table = list(
             product_qs.values(
-                "visit__farm__farm_name", "visit__farm__owner_name"
+                name=F("visit__farm__farm_name"),
+                owner=F("visit__farm__owner_name"),
             )
             .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
             .filter(revenue__gt=0)
@@ -617,11 +641,11 @@ def get_dashboard_context(request):
         )
 
         try:
-            bird_population = visit_qs.aggregate(
+            bird_population = farm_qs.aggregate(
                 chicks=Coalesce(Sum("chicks_count"), 0),
                 growers=Coalesce(Sum("grower_count"), 0),
                 layers=Coalesce(Sum("layer_count"), 0),
-                culling=Coalesce(Sum("culling_bird"), 0),
+                culling=Coalesce(Sum("culling_bird_count"), 0),
             )
             bird_counts = [
                 bird_population["chicks"],
@@ -639,9 +663,47 @@ def get_dashboard_context(request):
             potential=Coalesce(Sum("potential_quantity"), 0),
         )
 
-        recent_visits = visit_qs.select_related("farm", "executive").order_by(
-            "-visit_date"
-        )[:10]
+        # Recent visits with a real per-visit revenue total (template reads
+        # visit.calculated_total, which doesn't exist as a plain model field)
+        recent_visits = (
+            visit_qs.select_related("farm", "executive")
+            .prefetch_related("visited_products")
+            .annotate(
+                calculated_total=Coalesce(
+                    Sum("visited_products__revenue_generated"), 0.0
+                )
+            )
+            .order_by("-visit_date")[:10]
+        )
+
+        # Farms-per-district breakdown, used by the "Regional Farm Penetration
+        # Density" chart on the main dashboard (canvas id="districtChart")
+        district_qs = (
+            farm_qs.values("district")
+            .annotate(farm_count=Count("id"))
+            .exclude(Q(district__isnull=True) | Q(district=""))
+            .order_by("-farm_count")[:8]
+        )
+        chart_labels = [d["district"] for d in district_qs]
+        chart_counts = [d["farm_count"] for d in district_qs]
+
+        # Monthly sales matrix table (executive / region / qty / revenue)
+        monthly_sales = list(
+            product_qs.annotate(month=TruncMonth("visit__visit_date"))
+            .values(
+                "month",
+                "visit__executive__username",
+                "visit__farm__state",
+                "visit__farm__district",
+                "visit__farm__area",
+            )
+            .annotate(
+                total_qty=Coalesce(Sum("sale_quantity"), 0),
+                total_revenue=Coalesce(Sum("revenue_generated"), 0.0),
+            )
+            .filter(month__isnull=False)
+            .order_by("-month")[:25]
+        )
 
         state_list = list(
             Farm.objects.exclude(Q(state__isnull=True) | Q(state=""))
@@ -721,6 +783,65 @@ def get_dashboard_context(request):
                 "state_list": state_list,
                 "district_list": district_list,
                 "executive_list": executive_list,
+                # Used by dashboard.html's districtChart canvas
+                "chart_labels_js": json.dumps(
+                    chart_labels, cls=DjangoJSONEncoder
+                ),
+                "chart_counts_js": json.dumps(
+                    chart_counts, cls=DjangoJSONEncoder
+                ),
+                "monthly_sales": monthly_sales,
+                # ---- Aliases: analytics_report.html was built against a
+                # different naming convention than the one this function
+                # actually produces. Rather than rename everything above
+                # (and risk breaking dashboard.html, which uses the *_js
+                # names correctly), we mirror the values under the names
+                # analytics_report.html reads.
+                "total_executives": active_executives,
+                "total_qty": vol_sold,
+                "avg_revenue": round(avg_order_value, 2),
+                "pipeline_hot": hot_pct,
+                "pipeline_warm": warm_pct,
+                "pipeline_cold": cold_pct,
+                "month_labels_json": json.dumps(
+                    month_wise_labels, cls=DjangoJSONEncoder
+                ),
+                "month_data_json": json.dumps(
+                    month_wise_data, cls=DjangoJSONEncoder
+                ),
+                "year_labels_json": json.dumps(
+                    year_wise_labels, cls=DjangoJSONEncoder
+                ),
+                "year_data_json": json.dumps(
+                    year_wise_data, cls=DjangoJSONEncoder
+                ),
+                "exec_labels_json": json.dumps(
+                    exec_labels, cls=DjangoJSONEncoder
+                ),
+                "exec_data_json": json.dumps(
+                    exec_revenue, cls=DjangoJSONEncoder
+                ),
+                "prod_labels_json": json.dumps(
+                    top_prod_labels, cls=DjangoJSONEncoder
+                ),
+                "prod_data_json": json.dumps(
+                    top_prod_revenue, cls=DjangoJSONEncoder
+                ),
+                "state_labels_json": json.dumps(
+                    state_labels, cls=DjangoJSONEncoder
+                ),
+                "state_data_json": json.dumps(
+                    state_data, cls=DjangoJSONEncoder
+                ),
+                "problem_labels_json": json.dumps(
+                    prob_labels, cls=DjangoJSONEncoder
+                ),
+                "problem_data_json": json.dumps(
+                    prob_data, cls=DjangoJSONEncoder
+                ),
+                "executives_list": User.objects.filter(
+                    is_active=True
+                ).order_by("username"),
             }
         )
 
