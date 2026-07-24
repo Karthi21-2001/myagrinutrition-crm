@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title> MY AGRINUTRITION </title>
+    <title>MY AGRINUTRITION</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -48,6 +48,48 @@
             margin-bottom: 25px;
             border-bottom: 1px solid var(--border);
             padding-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        /* Brand & Logo Styling */
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            height: 62px;
+            width: 62px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .brand-title {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #565a35;
+            letter-spacing: 0.01em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .brand-tagline {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.66rem;
+            font-weight: 600;
+            color: #74765a;
+            letter-spacing: 0.19em;
+            text-transform: uppercase;
+            margin-top: 6px;
+            margin-left: 2px;
         }
 
         h2 { 
@@ -57,7 +99,7 @@
             letter-spacing: -0.02em; 
         }
 
-        /* 🎛️ Active Dropdown Filter Toolbar Configuration Layout Grid */
+        /* Filter Toolbar Grid */
         .filter-toolbar-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -178,14 +220,14 @@
 
         .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: #cbd5e1; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
-        /* Structured Matrix Layout Rules */
+        /* Table Styling */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
         th { background-color: var(--table-header); color: #cbd5e1; font-weight: 600; padding: 14px 16px; border-bottom: 2px solid var(--border); white-space: nowrap; }
         td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: var(--text-main); vertical-align: middle; }
         tr:hover { background-color: #334155; }
 
-        /* Dynamic Status Badges styling */
+        /* Status Badges */
         .badge-month { background-color: #1e3a8a; color: #93c5fd; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
         .badge-user { background-color: #4c1d95; color: #ddd6fe; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
         .status-pill { background: #0369a1; color: #e0f2fe; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; display: inline-block; }
@@ -202,9 +244,24 @@
         
         <div class="header-section">
             <div>
-                <h2>MY AGRINUTRITION</h2>
+                <!-- Brand Header with Integrated SVG Logo -->
+                <div class="brand-container">
+                    <svg class="brand-icon" viewBox="0 0 823 822" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 532.0,201.0 C 530.0,202.0 583.5,249.8 603.0,280.0 C 622.5,310.2 640.7,348.2 649.0,382.0 C 657.3,415.8 657.7,450.8 653.0,483.0 C 648.3,515.2 635.7,548.3 621.0,575.0 C 606.3,601.7 583.5,625.5 565.0,643.0 C 546.5,660.5 531.7,669.7 510.0,680.0 C 488.3,690.3 460.3,700.3 435.0,705.0 C 409.7,709.7 382.5,710.2 358.0,708.0 C 333.5,705.8 312.7,701.8 288.0,692.0 C 263.3,682.2 232.7,666.2 210.0,649.0 C 187.3,631.8 167.5,610.3 152.0,589.0 C 136.5,567.7 114.3,516.5 117.0,521.0 C 119.7,525.5 146.0,588.7 168.0,616.0 C 190.0,643.3 227.3,669.7 249.0,685.0 C 270.7,700.3 279.7,701.7 298.0,708.0 C 316.3,714.3 331.3,721.3 359.0,723.0 C 386.7,724.7 430.2,726.2 464.0,718.0 C 497.8,709.8 538.3,687.8 562.0,674.0 C 585.7,660.2 593.2,649.0 606.0,635.0 C 618.8,621.0 629.8,605.3 639.0,590.0 C 648.2,574.7 655.0,561.0 661.0,543.0 C 667.0,525.0 674.3,510.7 675.0,482.0 C 675.7,453.3 675.0,405.7 665.0,371.0 C 655.0,336.3 637.2,302.3 615.0,274.0 C 592.8,245.7 534.0,200.0 532.0,201.0 Z M 265.0,174.0 C 259.0,177.7 200.3,210.2 178.0,228.0 C 155.7,245.8 143.8,263.0 131.0,281.0 C 118.2,299.0 109.8,309.8 101.0,336.0 C 92.2,362.2 81.2,410.3 78.0,438.0 C 74.8,465.7 78.2,480.5 82.0,502.0 C 85.8,523.5 89.2,542.3 101.0,567.0 C 112.8,591.7 136.0,628.7 153.0,650.0 C 170.0,671.3 185.5,682.3 203.0,695.0 C 220.5,707.7 232.5,716.8 258.0,726.0 C 283.5,735.2 327.3,746.7 356.0,750.0 C 384.7,753.3 406.7,750.0 430.0,746.0 C 453.3,742.0 480.2,731.8 496.0,726.0 C 511.8,720.2 529.8,710.0 525.0,711.0 C 520.2,712.0 486.2,727.2 467.0,732.0 C 447.8,736.8 430.2,739.3 410.0,740.0 C 389.8,740.7 368.2,740.2 346.0,736.0 C 323.8,731.8 297.5,723.7 277.0,715.0 C 256.5,706.3 240.0,696.3 223.0,684.0 C 206.0,671.7 191.7,661.7 175.0,641.0 C 158.3,620.3 135.7,590.3 123.0,560.0 C 110.3,529.7 102.5,486.3 99.0,459.0 C 95.5,431.7 99.2,415.7 102.0,396.0 C 104.8,376.3 104.5,365.8 116.0,341.0 C 127.5,316.2 154.7,269.5 171.0,247.0 C 187.3,224.5 198.3,218.2 214.0,206.0 C 229.7,193.8 271.0,170.3 265.0,174.0 Z" fill="#555b3b" />
+    <path d="M 631.0,332.0 C 624.3,311.3 613.8,298.3 614.0,300.0 C 614.2,301.7 627.0,324.8 632.0,342.0 C 637.0,359.2 642.5,381.7 644.0,403.0 C 645.5,424.3 644.7,448.5 641.0,470.0 C 637.3,491.5 629.8,513.7 622.0,532.0 C 614.2,550.3 604.7,565.3 594.0,580.0 C 583.3,594.7 575.8,605.7 558.0,620.0 C 540.2,634.3 508.5,655.3 487.0,666.0 C 465.5,676.7 446.5,680.2 429.0,684.0 C 411.5,687.8 398.7,688.8 382.0,689.0 C 365.3,689.2 346.5,688.0 329.0,685.0 C 311.5,682.0 294.7,677.8 277.0,671.0 C 259.3,664.2 238.3,653.3 223.0,644.0 C 207.7,634.7 201.7,633.0 185.0,615.0 C 168.3,597.0 128.2,540.2 123.0,536.0 C 117.8,531.8 141.7,573.2 154.0,590.0 C 166.3,606.8 176.7,621.0 197.0,637.0 C 217.3,653.0 255.0,675.3 276.0,686.0 C 297.0,696.7 306.0,697.3 323.0,701.0 C 340.0,704.7 358.7,707.7 378.0,708.0 C 397.3,708.3 420.8,706.2 439.0,703.0 C 457.2,699.8 465.5,699.7 487.0,689.0 C 508.5,678.3 548.0,654.7 568.0,639.0 C 588.0,623.3 596.0,610.5 607.0,595.0 C 618.0,579.5 626.5,565.0 634.0,546.0 C 641.5,527.0 648.7,501.3 652.0,481.0 C 655.3,460.7 657.5,448.8 654.0,424.0 C 650.5,399.2 637.7,352.7 631.0,332.0 Z M 165.0,231.0 C 135.3,256.3 110.5,288.5 93.0,323.0 C 75.5,357.5 65.3,408.5 60.0,438.0 C 54.7,467.5 58.3,478.7 61.0,500.0 C 63.7,521.3 63.5,537.8 76.0,566.0 C 88.5,594.2 109.8,639.5 136.0,669.0 C 162.2,698.5 208.0,727.3 233.0,743.0 C 258.0,758.7 265.5,757.8 286.0,763.0 C 306.5,768.2 324.3,775.3 356.0,774.0 C 387.7,772.7 440.2,767.5 476.0,755.0 C 511.8,742.5 544.2,721.8 571.0,699.0 C 597.8,676.2 635.5,621.7 637.0,618.0 C 638.5,614.3 603.0,659.0 580.0,677.0 C 557.0,695.0 524.7,714.2 499.0,726.0 C 473.3,737.8 452.2,744.0 426.0,748.0 C 399.8,752.0 369.3,753.2 342.0,750.0 C 314.7,746.8 287.0,739.3 262.0,729.0 C 237.0,718.7 213.3,704.8 192.0,688.0 C 170.7,671.2 150.2,650.2 134.0,628.0 C 117.8,605.8 104.2,577.8 95.0,555.0 C 85.8,532.2 82.0,511.5 79.0,491.0 C 76.0,470.5 72.8,459.5 77.0,432.0 C 81.2,404.5 88.3,359.2 104.0,326.0 C 119.7,292.8 143.2,258.8 171.0,233.0 C 198.8,207.2 272.0,171.3 271.0,171.0 C 270.0,170.7 194.7,205.7 165.0,231.0 Z" fill="#6f744e" />
+    <path d="M 412.0,301.0 C 408.8,308.5 421.7,320.3 429.0,330.0 C 436.3,339.7 447.7,351.3 456.0,359.0 C 464.3,366.7 470.7,370.8 479.0,376.0 C 487.3,381.2 495.7,386.0 506.0,390.0 C 516.3,394.0 530.7,398.0 541.0,400.0 C 551.3,402.0 559.2,402.2 568.0,402.0 C 576.8,401.8 584.5,401.3 594.0,399.0 C 603.5,396.7 628.7,396.0 625.0,388.0 C 621.3,380.0 590.0,361.0 572.0,351.0 C 554.0,341.0 523.5,331.7 517.0,328.0 C 510.5,324.3 525.0,327.2 533.0,329.0 C 541.0,330.8 550.5,332.2 565.0,339.0 C 579.5,345.8 612.5,368.5 620.0,370.0 C 627.5,371.5 614.5,355.7 610.0,348.0 C 605.5,340.3 599.5,331.3 593.0,324.0 C 586.5,316.7 578.7,309.7 571.0,304.0 C 563.3,298.3 556.8,294.0 547.0,290.0 C 537.2,286.0 523.3,281.8 512.0,280.0 C 500.7,278.2 489.7,278.2 479.0,279.0 C 468.3,279.8 459.2,281.3 448.0,285.0 C 436.8,288.7 415.2,293.5 412.0,301.0 Z" fill="#80af4c" />
+    <path d="M 769.0,195.0 C 763.3,192.7 752.7,202.8 744.0,209.0 C 735.3,215.2 725.3,223.0 717.0,232.0 C 708.7,241.0 700.0,252.7 694.0,263.0 C 688.0,273.3 684.0,283.7 681.0,294.0 C 678.0,304.3 676.7,316.3 676.0,325.0 C 675.3,333.7 675.7,337.8 677.0,346.0 C 678.3,354.2 681.3,366.2 684.0,374.0 C 686.7,381.8 689.7,399.7 693.0,393.0 C 696.3,386.3 700.3,348.5 704.0,334.0 C 707.7,319.5 711.7,312.8 715.0,306.0 C 718.3,299.2 725.2,286.2 724.0,293.0 C 722.8,299.8 711.5,328.2 708.0,347.0 C 704.5,365.8 699.3,399.5 703.0,406.0 C 706.7,412.5 722.5,392.7 730.0,386.0 C 737.5,379.3 742.7,373.0 748.0,366.0 C 753.3,359.0 757.5,353.0 762.0,344.0 C 766.5,335.0 771.8,322.3 775.0,312.0 C 778.2,301.7 779.8,292.0 781.0,282.0 C 782.2,272.0 782.5,261.8 782.0,252.0 C 781.5,242.2 780.2,232.5 778.0,223.0 C 775.8,213.5 774.7,197.3 769.0,195.0 Z" fill="#80af4c" />
+    <path d="M 256.0,86.0 C 251.0,96.0 271.5,118.5 280.0,132.0 C 288.5,145.5 296.7,155.7 307.0,167.0 C 317.3,178.3 329.2,189.8 342.0,200.0 C 354.8,210.2 370.3,220.3 384.0,228.0 C 397.7,235.7 408.0,240.7 424.0,246.0 C 440.0,251.3 461.7,257.3 480.0,260.0 C 498.3,262.7 517.5,262.8 534.0,262.0 C 550.5,261.2 584.2,266.8 579.0,255.0 C 573.8,243.2 522.5,205.8 503.0,191.0 C 483.5,176.2 477.3,174.0 462.0,166.0 C 446.7,158.0 413.5,145.3 411.0,143.0 C 408.5,140.7 433.0,147.0 447.0,152.0 C 461.0,157.0 473.5,160.2 495.0,173.0 C 516.5,185.8 564.3,225.0 576.0,229.0 C 587.7,233.0 571.0,209.3 565.0,197.0 C 559.0,184.7 548.5,166.7 540.0,155.0 C 531.5,143.3 524.3,136.0 514.0,127.0 C 503.7,118.0 492.2,108.8 478.0,101.0 C 463.8,93.2 445.7,85.2 429.0,80.0 C 412.3,74.8 397.8,71.3 378.0,70.0 C 358.2,68.7 330.3,69.3 310.0,72.0 C 289.7,74.7 261.0,76.0 256.0,86.0 Z" fill="#80af4c" />
+    <path d="M 643.0,51.0 C 636.8,50.7 630.7,62.2 624.0,72.0 C 617.3,81.8 608.0,98.2 603.0,110.0 C 598.0,121.8 595.7,131.3 594.0,143.0 C 592.3,154.7 592.3,169.8 593.0,180.0 C 593.7,190.2 595.8,196.7 598.0,204.0 C 600.2,211.3 602.2,216.8 606.0,224.0 C 609.8,231.2 616.0,240.7 621.0,247.0 C 626.0,253.3 634.8,267.0 636.0,262.0 C 637.2,257.0 629.3,231.2 628.0,217.0 C 626.7,202.8 627.5,187.3 628.0,177.0 C 628.5,166.7 630.2,158.7 631.0,155.0 C 631.8,151.3 632.7,148.2 633.0,155.0 C 633.3,161.8 632.5,185.3 633.0,196.0 C 633.5,206.7 633.2,206.5 636.0,219.0 C 638.8,231.5 644.7,266.7 650.0,271.0 C 655.3,275.3 662.8,254.7 668.0,245.0 C 673.2,235.3 678.0,222.5 681.0,213.0 C 684.0,203.5 685.0,197.5 686.0,188.0 C 687.0,178.5 687.5,166.0 687.0,156.0 C 686.5,146.0 685.3,137.8 683.0,128.0 C 680.7,118.2 676.7,106.0 673.0,97.0 C 669.3,88.0 666.0,81.7 661.0,74.0 C 656.0,66.3 649.2,51.3 643.0,51.0 Z" fill="#80af4c" />
+</svg>
+                    <div class="brand-text">
+                        <div class="brand-title">My Agrinutrition</div>
+                        <div class="brand-tagline">Feel The Nature By Living</div>
+                    </div>
+                </div>
                 <p style="color: var(--text-muted); margin-top: 4px;">Live Management Performance & Pipeline Telemetry</p>
                 
+                <!-- Filter Section -->
                 <div class="filter-toolbar-grid">
                     
                     <div class="filter-group">
@@ -238,11 +295,13 @@
                     </div>
 
                     <div class="filter-group">
-                        <label class="filter-label">👤 Executive</label>
-                        <select id="filter-executive" class="select-filter" onchange="applyLiveFilters()">
+                        <label class="filter-label">👤 EXECUTIVE</label>
+                        <select id="filter-executive" name="executive" class="select-filter" onchange="applyLiveFilters()">
                             <option value="">All Executives</option>
-                            {% for exec in executive_list %}
-                                <option value="{{ exec }}" {% if selected_executive == exec %}selected{% endif %}>{{ exec }}</option>
+                            {% for name in executive_list %}
+                                <option value="{{ name }}" {% if sel_executive == name %}selected{% endif %}>
+                                    {{ name }}
+                                </option>
                             {% endfor %}
                         </select>
                     </div>
@@ -270,10 +329,14 @@
                         <label class="filter-label">⏳ Year</label>
                         <select id="filter-year" class="select-filter" onchange="applyLiveFilters()">
                             <option value="">All Years</option>
-                            <option value="2025" {% if selected_year == "2025" %}selected{% endif %}>2025</option>
-                            <option value="2026" {% if selected_year == "2026" %}selected{% endif %}>2026</option>
+                            {% for year in year_list %}
+                                <option value="{{ year }}" {% if selected_year == year|stringformat:"s" %}selected{% endif %}>
+                                    {{ year }}
+                                </option>
+                            {% endfor %}
                         </select>
                     </div>
+
                 </div>
             </div>
             
@@ -285,6 +348,7 @@
             </div>
         </div>
 
+        <!-- Metric KPI Cards -->
         <div class="metrics-grid">
             <div class="kpi-card" style="border-top: 4px solid var(--primary);">
                 <div class="kpi-title">Total Registered Farms</div>
@@ -308,6 +372,7 @@
             </div>
         </div>
 
+        <!-- Chart and Dispatch Feed -->
         <div class="analytics-row">
             <div class="card" style="margin-bottom: 0;">
                 <div class="card-title">📈 Regional Farm Penetration Density (Top Districts)</div>
@@ -341,7 +406,7 @@
                                 </td>
                                 <td>{{ visit.farm.district }}</td>
                                 <td>
-                                    {% for detail in visit.visited_products.all %}
+                                    {% for detail in visit.products.all %}
                                         <span class="status-pill" style="margin-bottom: 3px;">{{ detail.product_name }}</span>
                                         {% if detail.sale_quantity > 0 %}
                                             <div style="font-size: 0.85rem; font-weight: 600; color: var(--success); margin-bottom: 6px;">
@@ -366,6 +431,7 @@
             </div>
         </div>
 
+        <!-- Monthly Report Table -->
         <div class="card">
             <div class="card-title">📅 Monthly Sales Report (User & Regional Hierarchy Matrix)</div>
             <div class="table-wrapper">
@@ -406,8 +472,12 @@
 
     </div>
 
+    <!-- Pass JSON Data Safely to JS -->
+    {{ chart_labels_js|json_script:"chart-labels-data" }}
+    {{ chart_counts_js|json_script:"chart-counts-data" }}
+
     <script>
-        // Synchronize and update browser address bar queries seamlessly on value updates
+        // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
             const country = document.getElementById('filter-country').value;
@@ -433,43 +503,52 @@
             const stateSel = document.getElementById('filter-state');
             const districtSel = document.getElementById('filter-district');
 
-            stateSel.addEventListener('change', function() {
-                const selectedState = this.value;
-                if (!selectedState) return;
+            if (stateSel) {
+                stateSel.addEventListener('change', function() {
+                    const selectedState = this.value;
+                    if (!selectedState) return;
 
-                fetch(`/crm/get-dependent-filters/?state=${encodeURIComponent(selectedState)}`, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.districts) {
-                        const currentDistrict = districtSel.value;
-                        districtSel.innerHTML = '<option value="">All Districts</option>';
-                        data.districts.forEach(d => {
-                            const opt = document.createElement('option');
-                            opt.value = d;
-                            opt.textContent = d;
-                            if (d === currentDistrict) opt.selected = true;
-                            districtSel.appendChild(opt);
-                        });
-                    }
-                })
-                .catch(err => console.error("Filter cascade failed:", err));
-            });
+                    fetch(`/crm/get-dependent-filters/?state=${encodeURIComponent(selectedState)}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.districts) {
+                            const currentDistrict = districtSel.value;
+                            districtSel.innerHTML = '<option value="">All Districts</option>';
+                            data.districts.forEach(d => {
+                                const opt = document.createElement('option');
+                                opt.value = d;
+                                opt.textContent = d;
+                                if (d === currentDistrict) opt.selected = true;
+                                districtSel.appendChild(opt);
+                            });
+                        }
+                    })
+                    .catch(err => console.error("Filter cascade failed:", err));
+                });
+            }
 
-            // Chart render logic with fallback guards
+            // Safe parsing of chart scripts
             const canvasElem = document.getElementById('districtChart');
             if (!canvasElem) return;
 
-            const ctx = canvasElem.getContext('2d');
-            
-            // Safe JSON parse handling
-            let rawLabels = {{ chart_labels_js|safe|default:"[]" }};
-            let rawData = {{ chart_counts_js|safe|default:"[]" }};
+            let rawLabels = [];
+            let rawData = [];
+
+            try {
+                const labelsElem = document.getElementById('chart-labels-data');
+                const countsElem = document.getElementById('chart-counts-data');
+                if (labelsElem) rawLabels = JSON.parse(labelsElem.textContent);
+                if (countsElem) rawData = JSON.parse(countsElem.textContent);
+            } catch (e) {
+                console.warn("Chart data parse error:", e);
+            }
 
             const finalizedLabels = (Array.isArray(rawLabels) && rawLabels.includes("No Data Available")) ? [] : rawLabels;
             const finalizedData = (Array.isArray(rawLabels) && rawLabels.includes("No Data Available")) ? [] : rawData;
 
+            const ctx = canvasElem.getContext('2d');
             new Chart(ctx, {
                 type: 'bar',
                 data: {
