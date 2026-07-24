@@ -698,6 +698,13 @@ def get_dashboard_context(request):
                 )["total"]
             )
 
+        # --------------------------------------------------------------
+        # Dedup fix: .distinct() only removes EXACT string matches, so
+        # values differing only by casing/whitespace (e.g. "Tamil Nadu"
+        # vs "tamil nadu ") were showing up as separate dropdown entries.
+        # We now normalize (strip + lowercase) for comparison while
+        # keeping the first-seen original casing for display.
+        # --------------------------------------------------------------
         raw_states = Farm.objects.exclude(
             Q(state__isnull=True) | Q(state="")
         ).values_list("state", flat=True)
@@ -717,7 +724,7 @@ def get_dashboard_context(request):
             if key and key not in seen_districts:
                 seen_districts[key] = d.strip()
         district_list = sorted(seen_districts.values())
-        )
+
         executive_list = list(
             User.objects.filter(is_active=True)
             .values_list("username", flat=True)
