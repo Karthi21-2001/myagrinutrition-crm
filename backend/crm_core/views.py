@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Count, DecimalField, F, Q, Sum
+from django.db.models import Avg, Count, DecimalField, F, FloatField, Q, Sum
 from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -508,7 +508,7 @@ def get_dashboard_context(request):
         active_executives = active_execs_qs.count()
 
         total_rev = float(
-            product_qs.aggregate(total=Coalesce(Sum("revenue_generated"), 0.0))[
+            product_qs.aggregate(total=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0))[
                 "total"
             ]
         )
@@ -554,7 +554,7 @@ def get_dashboard_context(request):
         month_wise_qs = list(
             product_qs.annotate(month=TruncMonth("visit__visit_date"))
             .values("month")
-            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
+            .annotate(revenue=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0))
             .filter(month__isnull=False)
             .order_by("month")
         )
@@ -568,7 +568,7 @@ def get_dashboard_context(request):
         year_wise_qs = list(
             product_qs.annotate(year=TruncYear("visit__visit_date"))
             .values("year")
-            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
+            .annotate(revenue=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0))
             .filter(year__isnull=False)
             .order_by("year")
         )
@@ -580,7 +580,7 @@ def get_dashboard_context(request):
         exec_perf = (
             product_qs.values("visit__executive__username")
             .annotate(
-                revenue=Coalesce(Sum("revenue_generated"), 0.0),
+                revenue=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0),
                 total_items=Count("id"),
                 hot_items=Count("id", filter=Q(process_status__iexact="Hot")),
             )
@@ -600,7 +600,7 @@ def get_dashboard_context(request):
         prod_perf = (
             product_qs.values("product_name")
             .annotate(
-                revenue=Coalesce(Sum("revenue_generated"), 0.0),
+                revenue=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0),
                 qty_sold=Coalesce(Sum("sale_quantity"), 0),
             )
             .exclude(Q(product_name__isnull=True) | Q(product_name=""))
@@ -635,7 +635,7 @@ def get_dashboard_context(request):
                 name=F("visit__farm__farm_name"),
                 owner=F("visit__farm__owner_name"),
             )
-            .annotate(revenue=Coalesce(Sum("revenue_generated"), 0.0))
+            .annotate(revenue=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0))
             .filter(revenue__gt=0)
             .order_by("-revenue")[:5]
         )
@@ -699,7 +699,7 @@ def get_dashboard_context(request):
             )
             .annotate(
                 total_qty=Coalesce(Sum("sale_quantity"), 0),
-                total_revenue=Coalesce(Sum("revenue_generated"), 0.0),
+                total_revenue=Coalesce(Sum("revenue_generated", output_field=FloatField()), 0.0),
             )
             .filter(month__isnull=False)
             .order_by("-month")[:25]
