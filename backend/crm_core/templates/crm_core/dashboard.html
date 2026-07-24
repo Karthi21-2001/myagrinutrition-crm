@@ -545,33 +545,10 @@
                 console.warn("Chart data parse error:", e);
             }
 
-            // Defensive guard: only accept real arrays. If either value ever
-            // comes through as a string (e.g. mis-serialized upstream),
-            // treat it as no data rather than plotting one bar per character.
-            const isValidArray = Array.isArray(rawLabels) && Array.isArray(rawData);
-            const hasRealData = isValidArray
-                && rawLabels.length > 0
-                && !rawLabels.includes("No Data Available");
-
-            const finalizedLabels = hasRealData ? rawLabels : [];
-            const finalizedData = hasRealData ? rawData : [];
-
-            if (!hasRealData) {
-                canvasElem.style.display = 'none';
-                const emptyMsg = document.createElement('div');
-                emptyMsg.style.cssText = 'display:flex;align-items:center;justify-content:center;height:280px;color:var(--text-muted);font-size:0.9rem;font-weight:500;';
-                emptyMsg.textContent = 'No district data recorded yet';
-                canvasElem.parentElement.appendChild(emptyMsg);
-                return;
-            }
+            const finalizedLabels = (Array.isArray(rawLabels) && rawLabels.includes("No Data Available")) ? [] : rawLabels;
+            const finalizedData = (Array.isArray(rawLabels) && rawLabels.includes("No Data Available")) ? [] : rawData;
 
             const ctx = canvasElem.getContext('2d');
-
-            // Green gradient fill to match the dashboard's white/green theme
-            const barGradient = ctx.createLinearGradient(0, 0, 0, 280);
-            barGradient.addColorStop(0, '#80af4c');
-            barGradient.addColorStop(1, '#b7d989');
-
             new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -579,41 +556,24 @@
                     datasets: [{
                         label: 'Farms Registered per District',
                         data: finalizedData,
-                        backgroundColor: barGradient,
-                        hoverBackgroundColor: '#6f9e3c',
+                        backgroundColor: '#38bdf8', 
                         borderWidth: 0,
-                        borderRadius: 8,
-                        maxBarThickness: 46
+                        borderRadius: 6
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#1e293b',
-                            titleColor: '#f8fafc',
-                            bodyColor: '#eef7e0',
-                            padding: 10,
-                            cornerRadius: 6,
-                            displayColors: false,
-                            callbacks: {
-                                label: (item) => `${item.parsed.y} farm${item.parsed.y === 1 ? '' : 's'}`
-                            }
-                        }
-                    },
+                    plugins: { legend: { display: false } },
                     scales: {
                         y: { 
-                            beginAtZero: true,
-                            ticks: { precision: 0, color: '#5a7047', font: { family: 'Inter' } },
-                            grid: { color: '#e3f0cc' },
-                            border: { display: false }
+                            beginAtZero: true, 
+                            grid: { color: '#334155' },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter' } }
                         },
                         x: { 
                             grid: { display: false },
-                            border: { display: false },
-                            ticks: { color: '#33422a', font: { family: 'Inter', weight: 600 } }
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', weight: 500 } }
                         }
                     }
                 }
