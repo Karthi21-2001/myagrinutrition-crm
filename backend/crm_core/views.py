@@ -725,8 +725,19 @@ def get_dashboard_context(request):
                 seen_districts[key] = d.strip()
         district_list = sorted(seen_districts.values())
 
+        # --------------------------------------------------------------
+        # FIX: Executive dropdown was previously built from ALL active
+        # users (User.objects.filter(is_active=True)), which included
+        # admin/staff accounts like "my_admin" alongside real field
+        # executives. We now explicitly exclude staff and superuser
+        # accounts so only genuine executives appear in the filter.
+        # --------------------------------------------------------------
         executive_list = list(
-            User.objects.filter(is_active=True)
+            User.objects.filter(
+                is_active=True,
+                is_staff=False,
+                is_superuser=False,
+            )
             .values_list("username", flat=True)
             .distinct()
         )
