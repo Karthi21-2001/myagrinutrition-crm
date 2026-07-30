@@ -75,6 +75,22 @@ def render_visit_form(request):
     return render(request, 'crm_core/farm_visit_form.html')
 
 
+def _to_int(val):
+    """Safely coerce a POSTed form value to int, defaulting to 0."""
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _to_float(val):
+    """Safely coerce a POSTed form value to float, defaulting to 0.0."""
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
     if request.method == 'POST':
@@ -82,7 +98,13 @@ def save_farm_visit(request):
         owner_name = request.POST.get('owner_name')
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
-        sub_segment = request.POST.get('sub_business_type_select', '').strip()
+
+        # FIX: the form field's `name` attribute is `sub_business_type`
+        # (the old key `sub_business_type_select` was actually the
+        # element's `id`, not its POST name, so this always returned
+        # '' and Sub-Segment was saved blank for every visit).
+        sub_segment = request.POST.get('sub_business_type', '').strip()
+
         district = request.POST.get('district', '').strip()
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
@@ -95,6 +117,22 @@ def save_farm_visit(request):
         lon = request.POST.get('longitude')
         latitude = float(lat) if lat else None
         longitude = float(lon) if lon else None
+
+        # FIX: these Poultry Shed Population Inventory fields were being
+        # submitted by the form (chicks_count, grower_count, layer_count,
+        # culling_bird_count) but were never read from request.POST or
+        # saved onto the Farm record anywhere in this view, so every
+        # visit was persisted with counts stuck at 0.
+        chicks_count = _to_int(request.POST.get('chicks_count'))
+        grower_count = _to_int(request.POST.get('grower_count'))
+        layer_count = _to_int(request.POST.get('layer_count'))
+        culling_bird_count = _to_int(request.POST.get('culling_bird_count'))
+
+        # Aqua Pond Tracking Inventory fields (captured for completeness;
+        # only persisted if the Farm model has matching fields).
+        pond_acre = _to_float(request.POST.get('pond_acre'))
+        pond_doc = _to_int(request.POST.get('pond_doc'))
+        fish_variety = request.POST.get('fish_variety', '').strip()
 
         current_user = request.user if request.user.is_authenticated else None
 
@@ -113,6 +151,10 @@ def save_farm_visit(request):
                         'area': area,
                         'latitude': latitude,
                         'longitude': longitude,
+                        'chicks_count': chicks_count,
+                        'grower_count': grower_count,
+                        'layer_count': layer_count,
+                        'culling_bird_count': culling_bird_count,
                     }
                 )
 
@@ -124,6 +166,10 @@ def save_farm_visit(request):
                     farm_instance.state = state
                     farm_instance.district = district
                     farm_instance.area = area
+                    farm_instance.chicks_count = chicks_count
+                    farm_instance.grower_count = grower_count
+                    farm_instance.layer_count = layer_count
+                    farm_instance.culling_bird_count = culling_bird_count
                     farm_instance.save()
 
                 visit_record = FarmVisitReport.objects.create(
