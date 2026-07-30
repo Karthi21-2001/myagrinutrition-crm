@@ -11,11 +11,11 @@
     
     <style>
         :root {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
-            --bg-input: #0f172a;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
             --primary: #3b82f6;
             --primary-hover: #2563eb;
             --success: #10b981;
@@ -24,7 +24,7 @@
             --accent-pipeline-hover: #4f46e5;
             --danger: #ef4444;
             --danger-hover: #dc2626;
-            --border: #334155;
+            --border: #e2e8f0;
             --border-focus: #60a5fa;
         }
 
@@ -54,7 +54,7 @@
             font-size: 1.8rem;
             font-weight: 700;
             margin-bottom: 5px;
-            color: #ffffff;
+            color: #0f172a;
         }
 
         p {
@@ -131,7 +131,7 @@
             width: 100%;
             padding: 10px 14px;
             background-color: var(--bg-input);
-            color: #ffffff;
+            color: var(--text-main);
             border: 1px solid var(--border);
             border-radius: 8px;
             font-family: inherit;
@@ -151,7 +151,7 @@
 
         /* Location Section Specifics */
         .location-box {
-            background-color: rgba(15, 23, 42, 0.6);
+            background-color: rgba(148, 163, 184, 0.08);
             border: 1px dashed var(--border);
             border-radius: 8px;
             padding: 16px;
@@ -220,7 +220,7 @@
 
         /* Dynamic Grid Items styling */
         .grid-item-row {
-            background-color: rgba(15, 23, 42, 0.4);
+            background-color: rgba(148, 163, 184, 0.08);
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 16px;
@@ -350,7 +350,7 @@
             {% csrf_token %}
 
             <div class="card">
-                <div class="card-title" style="color: #60a5fa;">📋 General Farm Profile</div>
+                <div class="card-title" style="color: #2563eb;">📋 General Farm Profile</div>
                 
                 <div class="form-group-spacing">
                     <label>Farm Name</label>
@@ -407,7 +407,7 @@
             </div>
 
             <div class="card">
-                <div class="card-title" style="color: #fbbf24;">🔍 Field Diagnostic Metrics</div>
+                <div class="card-title" style="color: #d97706;">🔍 Field Diagnostic Metrics</div>
                 
                 <div class="form-group-spacing">
                     <label>Business Sector Segment</label>
@@ -431,7 +431,7 @@
             </div>
 
             <div id="poultry-section" class="card" style="border-color: rgba(251, 191, 36, 0.3);">
-                <div class="card-title" style="color: #fcd34d;">
+                <div class="card-title" style="color: #b45309;">
                     <span>🐥 Poultry Population Inventory</span>
                 </div>
                 <div class="poultry-grid">
@@ -455,7 +455,7 @@
             </div>
 
             <div id="aqua-section" class="card" style="border-color: rgba(56, 189, 248, 0.3); display: none;">
-                <div class="card-title" style="color: #38bdf8;">
+                <div class="card-title" style="color: #0284c7;">
                     <span>🐟 Aqua Pond Tracking Inventory</span>
                 </div>
                 <div class="aqua-grid">
@@ -475,7 +475,7 @@
             </div>
 
             <div class="card" style="border-color: rgba(99, 102, 241, 0.4);">
-                <div class="card-title" style="color: #a5b4fc;">
+                <div class="card-title" style="color: #4f46e5;">
                     <span>🚀 Pipeline Projections</span>
                     <button type="button" id="add-pipeline-btn" class="btn-action btn-pipeline" style="padding: 6px 12px; font-size: 0.8rem;">
                         ➕ Add Item
@@ -524,7 +524,7 @@
             </div>
 
             <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
-                <div class="card-title" style="color: #6ee7b7;">
+                <div class="card-title" style="color: #059669;">
                     <span>📦 Orders</span>
                     <button type="button" id="add-order-btn" class="btn-action btn-success" style="padding: 6px 12px; font-size: 0.8rem;">
                         ➕ Add Order
