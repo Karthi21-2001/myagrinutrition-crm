@@ -299,7 +299,7 @@
                         <select id="filter-executive" name="executive" class="select-filter" onchange="applyLiveFilters()">
                             <option value="">All Executives</option>
                             {% for name in executive_list %}
-                                <option value="{{ name }}" {% if sel_executive == name %}selected{% endif %}>
+                                <option value="{{ name }}" {% if selected_executive == name %}selected{% endif %}>
                                     {{ name }}
                                 </option>
                             {% endfor %}
