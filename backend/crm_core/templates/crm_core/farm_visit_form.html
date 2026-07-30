@@ -484,7 +484,7 @@
                     <div class="grid-item-row pipeline-grid">
                         <div>
                             <span class="grid-label">Product Name</span>
-                            <input type="text" name="pipeline_discussed_product[]" placeholder="Growth Booster">
+                            <select name="pipeline_discussed_product[]" class="product-select"></select>
                         </div>
                         <div>
                             <span class="grid-label">Poten. Qty</span>
@@ -533,7 +533,7 @@
                     <div class="grid-item-row order-grid">
                         <div>
                             <span class="grid-label">Product Name</span>
-                            <input type="text" name="discussed_product[]" placeholder="BioShield V2">
+                            <select name="discussed_product[]" class="product-select"></select>
                         </div>
                         <div>
                             <span class="grid-label">Quantity</span>
@@ -614,6 +614,91 @@
         return rawValue.trim();
     }
 
+    // ==========================================================
+    // PRODUCT LISTS PER SECTOR
+    // ----------------------------------------------------------
+    // Drives the "Product Name" dropdown in both the Pipeline
+    // Projections and Orders sections. Swaps automatically whenever
+    // the Business Sector Segment (Poultry / Aqua) changes.
+    // ==========================================================
+    const PRODUCT_LISTS = {
+        Poultry: [
+            "Alpha Engrow NGP®",
+            "Bio-Org+® FD Cluster",
+            "Bio-Org+® FD Ultra",
+            "Bio-Org+® WS",
+            "Bio-Org+® Gel",
+            "Calvin® D3+ Liquid",
+            "Calvin® D3+ Dry",
+            "Dr. Yes® WS",
+            "Dr. Yes® FD",
+            "ElectroMet Rx® FD",
+            "ElectroMet Rx® Liquid",
+            "ElectroMet Rx® Gel",
+            "Herbipro® OLP Dry",
+            "Herbipro® OLP Liquid",
+            "Hazyfix® Penta Dry",
+            "Hazyfix® Optima Dry",
+            "Hazyfix® NT Dry",
+            "Triangle Chick Program",
+            "Immunofight®",
+            "Wet-Lock®",
+            "EstroMax®",
+            "OrgoMax® GIT Liquid",
+            "Bio-Matt® Presto",
+            "Bio-Matt® Nurture"
+        ],
+        Aqua: [
+            "ATTRACTA",
+            "Bio-Org+ Aqua",
+            "Blue-Vital M25+",
+            "Dr. Yes",
+            "Licy-Ban",
+            "Herbipro OLP Aqua",
+            "ElectroMet Rx Aqua",
+            "Stocky-Min",
+            "Hazyfix Aqua"
+        ]
+    };
+
+    // Fills a single <select class="product-select"> with the
+    // product list for the currently selected sector, preserving
+    // its previous selection when that product still exists in the
+    // new list.
+    function populateProductSelect(selectEl, sector) {
+        const previousValue = selectEl.value;
+        const products = PRODUCT_LISTS[sector] || [];
+
+        selectEl.innerHTML = '';
+
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = '-- Select Product --';
+        selectEl.appendChild(placeholderOpt);
+
+        products.forEach(function(productName) {
+            const opt = document.createElement('option');
+            opt.value = productName;
+            opt.textContent = productName;
+            selectEl.appendChild(opt);
+        });
+
+        if (products.includes(previousValue)) {
+            selectEl.value = previousValue;
+        } else {
+            selectEl.value = '';
+        }
+    }
+
+    // Refreshes every product dropdown currently on the page (both
+    // the Pipeline Projections and Orders sections) for the given
+    // sector.
+    function refreshAllProductSelects(sector) {
+        document.querySelectorAll('select.product-select').forEach(function(sel) {
+            populateProductSelect(sel, sector);
+        });
+    }
+
     // Sector & Sub-Sector Switching Logic
     document.addEventListener('DOMContentLoaded', function() {
         const sectorSelect = document.getElementById('business_type_select');
@@ -660,6 +745,10 @@
                 toggleInputs(poultrySection, false);
                 toggleInputs(aquaSection, true);
             }
+
+            // Swap the Product Name dropdown options to match the
+            // newly selected sector.
+            refreshAllProductSelects(selectedSector);
         }
 
         function toggleInputs(container, isDisabled) {
@@ -682,7 +771,7 @@
         newRow.innerHTML = `
             <div>
                 <span class="grid-label">Product Name</span>
-                <input type="text" name="discussed_product[]" placeholder="BioShield V2">
+                <select name="discussed_product[]" class="product-select"></select>
             </div>
             <div>
                 <span class="grid-label">Quantity</span>
@@ -705,6 +794,9 @@
             </div>
         `;
         container.appendChild(newRow);
+
+        const currentSector = document.getElementById('business_type_select').value;
+        populateProductSelect(newRow.querySelector('select.product-select'), currentSector);
     });
 
     // Dynamic Row Multiplier: Pipeline Items
@@ -716,7 +808,7 @@
         newRow.innerHTML = `
             <div>
                 <span class="grid-label">Product Name</span>
-                <input type="text" name="pipeline_discussed_product[]" placeholder="Growth Booster">
+                <select name="pipeline_discussed_product[]" class="product-select"></select>
             </div>
             <div>
                 <span class="grid-label">Poten. Qty</span>
@@ -751,6 +843,9 @@
             </div>
         `;
         container.appendChild(newRow);
+
+        const currentSector = document.getElementById('business_type_select').value;
+        populateProductSelect(newRow.querySelector('select.product-select'), currentSector);
     });
 
     // Row Cleaner Event Delegations
@@ -762,7 +857,7 @@
                 btn.closest('.grid-item-row').remove();
             } else {
                 const lastRow = container.querySelector('.grid-item-row');
-                lastRow.querySelector('input[name="discussed_product[]"]').value = '';
+                lastRow.querySelector('select[name="discussed_product[]"]').value = '';
                 lastRow.querySelector('input[name="sale_quantity[]"]').value = '0';
                 lastRow.querySelector('input[name="primary_price[]"]').value = '0.00';
                 lastRow.querySelector('select[name="unit_type[]"]').value = 'KG';
@@ -778,7 +873,7 @@
                 btn.closest('.grid-item-row').remove();
             } else {
                 const lastRow = container.querySelector('.grid-item-row');
-                lastRow.querySelector('input[name="pipeline_discussed_product[]"]').value = '';
+                lastRow.querySelector('select[name="pipeline_discussed_product[]"]').value = '';
                 lastRow.querySelector('input[name="pipeline_potential_quantity[]"]').value = '0';
                 lastRow.querySelector('input[name="pipeline_target_quantity[]"]').value = '0';
                 lastRow.querySelector('select[name="pipeline_unit_type[]"]').value = 'KG';
