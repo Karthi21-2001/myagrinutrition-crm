@@ -21,7 +21,6 @@ from openpyxl.utils import get_column_letter
 
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
-from .taluk_district_map import normalize_district
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -88,12 +87,6 @@ def save_farm_visit(request):
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
-
-        # Normalize taluk/mandal names (e.g. "Rasipuram") to their real
-        # parent district (e.g. "Namakkal") before saving, since the
-        # geolocation lookup on the frontend can return either depending
-        # on OpenStreetMap's tagging for a given point.
-        district = normalize_district(district)
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
@@ -916,26 +909,13 @@ def get_location_details(request):
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
         headers = {'User-Agent': 'AgriNutritionCRM/1.0'}
         res = requests.get(url, headers=headers, timeout=5)
-
+        
         if res.status_code == 200:
             data = res.json()
             address = data.get('address', {})
-
-            # Nominatim's state_district often returns a taluk/mandal name
-            # (e.g. "Rasipuram") instead of the real parent district
-            # (e.g. "Namakkal") for Tamil Nadu/Andhra Pradesh points.
-            # Normalize it through our lookup table before returning it
-            # to the frontend, so it gets saved correctly on submit.
-            raw_district = (
-                address.get('state_district')
-                or address.get('county')
-                or address.get('district', '')
-            )
-            clean_district = normalize_district(raw_district)
-
             return JsonResponse({
                 'state': address.get('state', ''),
-                'district': clean_district,
+                'district': address.get('state_district') or address.get('county') or address.get('district', ''),
                 'area': address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
             })
         return JsonResponse({'error': 'Failed to fetch location data.'}, status=500)
