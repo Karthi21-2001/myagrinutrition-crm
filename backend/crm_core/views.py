@@ -26,6 +26,83 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+# ==========================================================
+# DISTRICT NORMALIZATION MAP (backend mirror)
+# ------------------------------------------------------------
+# WHY THIS EXISTS: the reverse-geocode fix in the frontend form
+# (farm_visit_form.html) only normalizes taluk/block/village names
+# into real districts for NEW visits logged after that fix shipped.
+# Farms saved before that still have raw taluk values sitting in
+# Farm.district (Mohanur, Musiri, Rasipuram, Thottiyam, Tiruchengode,
+# Kilvelur, Manachanallur, Agiripalle, Gannavaram, Nuzvid, Unguturu,
+# etc). Those raw values were showing up as extra entries in the
+# District filter dropdown alongside the real districts they belong
+# to (Namakkal, Tiruchirappalli, ...).
+#
+# This mirrors the frontend's TALUK_TO_DISTRICT map. Keep both lists
+# in sync when you add new mappings.
+# ==========================================================
+TALUK_TO_DISTRICT = {
+    "mohanur": "Namakkal",
+    "musiri": "Tiruchirappalli",
+    "rasipuram": "Namakkal",
+    "thottiyam": "Tiruchirappalli",
+    "tiruchengode": "Namakkal",
+    "kilvelur": "Nagapattinam",
+    "manachanallur": "Tiruchirappalli",
+    "agiripalle": "Krishna",
+    "gannavaram": "NTR",
+    "nuzvid": "Eluru",
+    "unguturu": "Eluru",
+    # Add more taluk/block/village -> district mappings as you spot
+    # new noisy values appearing in the District filter dropdown.
+}
+
+# Reverse index: normalized district name (lowercased) -> every raw
+# taluk/block value on record that should be treated as that district.
+_DISTRICT_TO_RAW_TALUKS = {}
+for _taluk, _district in TALUK_TO_DISTRICT.items():
+    _DISTRICT_TO_RAW_TALUKS.setdefault(_district.lower(), set()).add(_taluk)
+
+
+def normalize_district(raw_value):
+    """Map a raw district/taluk/village string to its real district
+    name. Unknown values are returned trimmed but otherwise untouched,
+    so nothing gets silently dropped — it just won't be merged into a
+    parent district until a mapping is added above.
+    """
+    if not raw_value:
+        return ''
+    key = raw_value.strip().lower()
+    return TALUK_TO_DISTRICT.get(key, raw_value.strip())
+
+
+def district_filter_values(selected_district):
+    """Given a normalized district name picked from the dropdown
+    (e.g. "Namakkal"), return every raw string already sitting in the
+    database that should match it — the district name itself plus any
+    taluk/block names that map to it (e.g. "Mohanur", "Rasipuram",
+    "Tiruchengode"). Needed because older records were saved with the
+    raw taluk value before the normalization fix existed.
+    """
+    key = selected_district.strip().lower()
+    values = {key}
+    values |= _DISTRICT_TO_RAW_TALUKS.get(key, set())
+    return values
+
+
+def build_district_q(field_path, selected_district):
+    """Build a Q object matching any raw value (district or taluk)
+    that normalizes to `selected_district`, for the given ORM field
+    lookup path (e.g. "district", "farm__district",
+    "visit__farm__district").
+    """
+    q = Q()
+    for val in district_filter_values(selected_district):
+        q |= Q(**{f"{field_path}__iexact": val})
+    return q
+
+
 # ==========================================
 # 🔐 EXECUTIVE AUTHENTICATION CONTROLLERS
 # ==========================================
@@ -117,7 +194,10 @@ def save_farm_visit(request):
         # '' and Sub-Segment was saved blank for every visit).
         sub_segment = request.POST.get('sub_business_type', '').strip()
 
-        district = request.POST.get('district', '').strip()
+        # Normalize here too as a backend safety net (the reverse-geocode
+        # widget already normalizes taluk/block names client-side, but
+        # this covers direct POSTs and keeps behavior correct either way).
+        district = normalize_district(request.POST.get('district', ''))
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
@@ -310,7 +390,7 @@ def export_visits_to_excel(request):
     if state_filter and state_filter not in ['All', 'All States']:
         export_filters &= Q(farm__state__iexact=state_filter)
     if district_filter and district_filter not in ['All', 'All Districts']:
-        export_filters &= Q(farm__district__iexact=district_filter)
+        export_filters &= build_district_q('farm__district', district_filter)
     if executive_filter and executive_filter not in ['All', 'All Executives']:
         export_filters &= Q(executive__username__iexact=executive_filter)
 
@@ -372,7 +452,7 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=7, value=f.business_type if f else "")
             ws_data.cell(row=current_row, column=8, value=f.sub_segment if (f and f.sub_segment) else "")
             ws_data.cell(row=current_row, column=9, value=f.state if f else "")
-            ws_data.cell(row=current_row, column=10, value=f.district if f else "")
+            ws_data.cell(row=current_row, column=10, value=normalize_district(f.district) if f else "")
             ws_data.cell(row=current_row, column=11, value=f.area if f else "")
 
             ws_data.cell(row=current_row, column=12, value=v.farm_problem if (v and v.farm_problem) else "None reported")
@@ -521,9 +601,9 @@ def get_dashboard_context(request):
             product_filters &= Q(visit__farm__state__iexact=sel_state)
 
         if sel_district and sel_district not in ["All", "All Districts", ""]:
-            farm_filters &= Q(district__iexact=sel_district)
-            visit_filters &= Q(farm__district__iexact=sel_district)
-            product_filters &= Q(visit__farm__district__iexact=sel_district)
+            farm_filters &= build_district_q('district', sel_district)
+            visit_filters &= build_district_q('farm__district', sel_district)
+            product_filters &= build_district_q('visit__farm__district', sel_district)
 
         if sel_executive and sel_executive not in ["All", "All Executives", ""]:
             farm_filters &= Q(executive__username__iexact=sel_executive)
@@ -709,10 +789,17 @@ def get_dashboard_context(request):
             farm_qs.values("district")
             .annotate(farm_count=Count("id"))
             .exclude(Q(district__isnull=True) | Q(district=""))
-            .order_by("-farm_count")[:10]
         )
-        chart_labels = [d["district"] for d in district_qs]
-        chart_counts = [d["farm_count"] for d in district_qs]
+        # Normalize raw taluk/village values into their parent district
+        # before aggregating, so e.g. "Mohanur" and "Rasipuram" counts
+        # merge into the "Namakkal" bar instead of showing separately.
+        district_counts = {}
+        for d in district_qs:
+            normalized = normalize_district(d["district"])
+            district_counts[normalized] = district_counts.get(normalized, 0) + d["farm_count"]
+        sorted_districts = sorted(district_counts.items(), key=lambda kv: kv[1], reverse=True)[:10]
+        chart_labels = [name for name, _ in sorted_districts]
+        chart_counts = [count for _, count in sorted_districts]
 
         prob_qs = (
             visit_qs.values("farm_problem")
@@ -804,9 +891,14 @@ def get_dashboard_context(request):
         ).values_list("district", flat=True)
         seen_districts = {}
         for d in raw_districts:
-            key = d.strip().lower()
+            # Normalize taluk/block/village values (e.g. "Mohanur",
+            # "Rasipuram") into their real district ("Namakkal") before
+            # dedup, so the dropdown only ever shows real district names —
+            # not the taluks that sit inside them.
+            normalized = normalize_district(d)
+            key = normalized.strip().lower()
             if key and key not in seen_districts:
-                seen_districts[key] = d.strip()
+                seen_districts[key] = normalized
         district_list = sorted(seen_districts.values())
 
         # --------------------------------------------------------------
@@ -996,9 +1088,10 @@ def get_location_details(request):
         if res.status_code == 200:
             data = res.json()
             address = data.get('address', {})
+            raw_district = address.get('state_district') or address.get('county') or address.get('district', '')
             return JsonResponse({
                 'state': address.get('state', ''),
-                'district': address.get('state_district') or address.get('county') or address.get('district', ''),
+                'district': normalize_district(raw_district),
                 'area': address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
             })
         return JsonResponse({'error': 'Failed to fetch location data.'}, status=500)
