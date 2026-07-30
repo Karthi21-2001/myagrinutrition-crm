@@ -91,6 +91,18 @@ def _to_float(val):
         return 0.0
 
 
+def _to_date_or_none(val):
+    """Safely coerce a POSTed HTML <input type="date"> value
+    (expected format YYYY-MM-DD) to a date object, or None if blank
+    or unparsable. Kept permissive here — Django's DateField will do
+    the authoritative validation/casting on save.
+    """
+    val = (val or '').strip()
+    if not val:
+        return None
+    return val
+
+
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
     if request.method == 'POST':
@@ -109,6 +121,12 @@ def save_farm_visit(request):
         area = request.POST.get('area', '').strip()
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
+
+        # Planned follow-up date captured on the "Next Visit Date"
+        # field in the form. Stored on the visit record it was logged
+        # from, since it's a per-visit follow-up plan rather than a
+        # permanent attribute of the farm itself.
+        next_visit_date = _to_date_or_none(request.POST.get('next_visit_date'))
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
@@ -172,10 +190,14 @@ def save_farm_visit(request):
                     farm_instance.culling_bird_count = culling_bird_count
                     farm_instance.save()
 
+                # NOTE: requires a `next_visit_date = models.DateField(null=True, blank=True)`
+                # field on the FarmVisitReport model — add it there if it
+                # doesn't already exist, then makemigrations/migrate.
                 visit_record = FarmVisitReport.objects.create(
                     farm=farm_instance,
                     executive=current_user,
-                    farm_problem=farm_problem
+                    farm_problem=farm_problem,
+                    next_visit_date=next_visit_date
                 )
 
                 # Process Sales Order Products
@@ -302,8 +324,8 @@ def export_visits_to_excel(request):
     )
 
     headers = [
-        'Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number', 
-        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb', 
+        'Visit Date', 'Next Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number',
+        'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb',
         'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
         'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
         'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
@@ -328,35 +350,36 @@ def export_visits_to_excel(request):
 
         for p in product_loop_list:
             ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
-            ws_data.cell(row=current_row, column=2, value=v.executive.username if v and v.executive else "")
-            ws_data.cell(row=current_row, column=3, value=f.farm_name if f else "")
-            ws_data.cell(row=current_row, column=4, value=f.owner_name if f else "")
-            ws_data.cell(row=current_row, column=5, value=f.contact_number if f else "")
-            ws_data.cell(row=current_row, column=6, value=f.business_type if f else "")
-            ws_data.cell(row=current_row, column=7, value=f.sub_segment if (f and f.sub_segment) else "") 
-            ws_data.cell(row=current_row, column=8, value=f.state if f else "")
-            ws_data.cell(row=current_row, column=9, value=f.district if f else "")
-            ws_data.cell(row=current_row, column=10, value=f.area if f else "")
+            ws_data.cell(row=current_row, column=2, value=v.next_visit_date.strftime("%Y-%m-%d") if (v and v.next_visit_date) else "")
+            ws_data.cell(row=current_row, column=3, value=v.executive.username if v and v.executive else "")
+            ws_data.cell(row=current_row, column=4, value=f.farm_name if f else "")
+            ws_data.cell(row=current_row, column=5, value=f.owner_name if f else "")
+            ws_data.cell(row=current_row, column=6, value=f.contact_number if f else "")
+            ws_data.cell(row=current_row, column=7, value=f.business_type if f else "")
+            ws_data.cell(row=current_row, column=8, value=f.sub_segment if (f and f.sub_segment) else "")
+            ws_data.cell(row=current_row, column=9, value=f.state if f else "")
+            ws_data.cell(row=current_row, column=10, value=f.district if f else "")
+            ws_data.cell(row=current_row, column=11, value=f.area if f else "")
 
-            ws_data.cell(row=current_row, column=11, value=v.farm_problem if (v and v.farm_problem) else "None reported")
-            
-            ws_data.cell(row=current_row, column=12, value=getattr(f, 'chicks_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=13, value=getattr(f, 'grower_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=14, value=getattr(f, 'layer_count', 0) if f else 0)
-            ws_data.cell(row=current_row, column=15, value=getattr(f, 'culling_bird_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=12, value=v.farm_problem if (v and v.farm_problem) else "None reported")
 
-            ws_data.cell(row=current_row, column=16, value=p.product_name if p else "General Consult")
-            ws_data.cell(row=current_row, column=17, value=p.sale_quantity if p else 0)
-            ws_data.cell(row=current_row, column=18, value=float(p.primary_price) if p else 0.0)
-            ws_data.cell(row=current_row, column=19, value=float(p.revenue_generated) if p else 0.0)
+            ws_data.cell(row=current_row, column=13, value=getattr(f, 'chicks_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=14, value=getattr(f, 'grower_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=15, value=getattr(f, 'layer_count', 0) if f else 0)
+            ws_data.cell(row=current_row, column=16, value=getattr(f, 'culling_bird_count', 0) if f else 0)
 
-            ws_data.cell(row=current_row, column=20, value=p.potential_quantity if p else 0)
-            ws_data.cell(row=current_row, column=21, value=p.target_quantity if p else 0)
-            ws_data.cell(row=current_row, column=22, value=p.unit_type if p else "N/A")
-            ws_data.cell(row=current_row, column=23, value=p.process_status if p else "N/A")
-            ws_data.cell(row=current_row, column=24, value=f"{p.conversion_percentage}%" if p else "0%")
+            ws_data.cell(row=current_row, column=17, value=p.product_name if p else "General Consult")
+            ws_data.cell(row=current_row, column=18, value=p.sale_quantity if p else 0)
+            ws_data.cell(row=current_row, column=19, value=float(p.primary_price) if p else 0.0)
+            ws_data.cell(row=current_row, column=20, value=float(p.revenue_generated) if p else 0.0)
 
-            gps_cell = ws_data.cell(row=current_row, column=25)
+            ws_data.cell(row=current_row, column=21, value=p.potential_quantity if p else 0)
+            ws_data.cell(row=current_row, column=22, value=p.target_quantity if p else 0)
+            ws_data.cell(row=current_row, column=23, value=p.unit_type if p else "N/A")
+            ws_data.cell(row=current_row, column=24, value=p.process_status if p else "N/A")
+            ws_data.cell(row=current_row, column=25, value=f"{p.conversion_percentage}%" if p else "0%")
+
+            gps_cell = ws_data.cell(row=current_row, column=26)
             if f and f.latitude and f.longitude:
                 gps_cell.value = "View on Map"
                 gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
@@ -365,10 +388,10 @@ def export_visits_to_excel(request):
                 gps_cell.value = "No GPS Data"
                 gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-            for c_idx in range(1, 26):
+            for c_idx in range(1, 27):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
-                if c_idx in [12, 13, 14, 15, 17, 20, 21, 24]: 
+                if c_idx in [13, 14, 15, 16, 18, 21, 22, 25]:
                     cell_item.alignment = Alignment(horizontal="center")
 
             current_row += 1
