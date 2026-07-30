@@ -344,11 +344,6 @@
             <div>
                 <p><strong>Executive:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
             </div>
-            {% if request.user.is_staff or request.user.is_superuser %}
-            <a href="/crm/export/excel/" class="export-btn">
-                📊 Export Data to Excel
-            </a>
-            {% endif %}
         </div>
 
         <form id="farmForm" method="POST" action="/crm/save-visit/" novalidate>
