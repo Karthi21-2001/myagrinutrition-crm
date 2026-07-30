@@ -410,6 +410,7 @@ def get_dashboard_context(request):
         "state_list": [],
         "district_list": [],
         "executive_list": [],
+        "year_list": [],
         "country_list": ["India"],
         # Retention
         "selected_state": sel_state,
@@ -726,6 +727,23 @@ def get_dashboard_context(request):
         district_list = sorted(seen_districts.values())
 
         # --------------------------------------------------------------
+        # FIX: Year dropdown was previously missing entirely — the
+        # template loops over `year_list`, but the view never built or
+        # returned it, so only the static "All Years" option ever showed.
+        # We derive distinct years straight from FarmVisitReport.visit_date
+        # (auto-stamped when an executive logs a visit — there is no
+        # manual date field in the form), newest year first.
+        # --------------------------------------------------------------
+        raw_years = (
+            FarmVisitReport.objects.exclude(visit_date__isnull=True)
+            .annotate(y=TruncYear("visit_date"))
+            .values_list("y", flat=True)
+            .distinct()
+            .order_by("-y")
+        )
+        year_list = [y.year for y in raw_years if y]
+
+        # --------------------------------------------------------------
         # FIX: Executive dropdown was previously built from ALL active
         # users (User.objects.filter(is_active=True)), which included
         # admin/staff accounts like "my_admin" alongside real field
@@ -813,6 +831,7 @@ def get_dashboard_context(request):
                 "state_list": state_list,
                 "district_list": district_list,
                 "executive_list": executive_list,
+                "year_list": year_list,
             }
         )
 
