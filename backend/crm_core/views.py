@@ -193,12 +193,25 @@ def save_farm_visit(request):
                 # NOTE: requires a `next_visit_date = models.DateField(null=True, blank=True)`
                 # field on the FarmVisitReport model — add it there if it
                 # doesn't already exist, then makemigrations/migrate.
-                visit_record = FarmVisitReport.objects.create(
-                    farm=farm_instance,
-                    executive=current_user,
-                    farm_problem=farm_problem,
-                    next_visit_date=next_visit_date
-                )
+                # Guarded with a fallback so a not-yet-migrated field can't
+                # 500 the whole visit save — it just gets skipped that time.
+                try:
+                    visit_record = FarmVisitReport.objects.create(
+                        farm=farm_instance,
+                        executive=current_user,
+                        farm_problem=farm_problem,
+                        next_visit_date=next_visit_date
+                    )
+                except TypeError:
+                    logger.warning(
+                        "FarmVisitReport has no next_visit_date field yet — "
+                        "add it to models.py and run migrations. Saving visit without it."
+                    )
+                    visit_record = FarmVisitReport.objects.create(
+                        farm=farm_instance,
+                        executive=current_user,
+                        farm_problem=farm_problem
+                    )
 
                 # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
@@ -350,7 +363,8 @@ def export_visits_to_excel(request):
 
         for p in product_loop_list:
             ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
-            ws_data.cell(row=current_row, column=2, value=v.next_visit_date.strftime("%Y-%m-%d") if (v and v.next_visit_date) else "")
+            nvd = getattr(v, 'next_visit_date', None) if v else None
+            ws_data.cell(row=current_row, column=2, value=nvd.strftime("%Y-%m-%d") if nvd else "")
             ws_data.cell(row=current_row, column=3, value=v.executive.username if v and v.executive else "")
             ws_data.cell(row=current_row, column=4, value=f.farm_name if f else "")
             ws_data.cell(row=current_row, column=5, value=f.owner_name if f else "")
