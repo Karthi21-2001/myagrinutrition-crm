@@ -570,6 +570,50 @@
     <script>
     let map, marker;
 
+    // ==========================================================
+    // DISTRICT NORMALIZATION MAP
+    // ----------------------------------------------------------
+    // WHY THIS EXISTS: Nominatim's reverse-geocode response does not
+    // return a consistent admin level for every coordinate. For some
+    // points `county` holds the real district; for others it's a
+    // taluk/block name; for rural points it can fall through to a
+    // town/village name. Saving that raw value directly is why the
+    // District filter dropdown on the dashboard showed a mix of real
+    // districts (e.g. Namakkal) alongside taluks/villages that sit
+    // *inside* those districts (Mohanur, Musiri, Rasipuram, Thottiyam,
+    // Tiruchengode, Kilvelur, Manachanallur, Agiripalle, Gannavaram,
+    // Nuzvid, Unguturu, etc).
+    //
+    // This mirrors crm_core/district_data.py (TALUK_TO_DISTRICT) on
+    // the backend. Keep both lists in sync when you add new mappings.
+    // ==========================================================
+    const TALUK_TO_DISTRICT = {
+        "mohanur": "Namakkal",
+        "musiri": "Tiruchirappalli",
+        "rasipuram": "Namakkal",
+        "thottiyam": "Tiruchirappalli",
+        "tiruchengode": "Namakkal",
+        "kilvelur": "Nagapattinam",
+        "manachanallur": "Tiruchirappalli",
+        "agiripalle": "Krishna",
+        "gannavaram": "NTR",
+        "nuzvid": "Eluru",
+        "unguturu": "Eluru"
+        // Add more taluk/block/village -> district mappings as you spot
+        // new noisy values appearing in the District filter dropdown.
+    };
+
+    function normalizeDistrict(rawValue) {
+        if (!rawValue) return '';
+        const key = rawValue.trim().toLowerCase();
+        if (TALUK_TO_DISTRICT[key]) {
+            return TALUK_TO_DISTRICT[key];
+        }
+        // Unknown value: keep it (trimmed) instead of dropping data,
+        // so it's visible in the dropdown and a mapping can be added.
+        return rawValue.trim();
+    }
+
     // Sector & Sub-Sector Switching Logic
     document.addEventListener('DOMContentLoaded', function() {
         const sectorSelect = document.getElementById('business_type_select');
@@ -803,7 +847,13 @@
                             
                             if (data && data.address) {
                                 const addr = data.address;
-                                const district = addr.county || addr.state_district || addr.district || '';
+                                // FIX: county/state_district/district can each return
+                                // a different admin granularity depending on the
+                                // coordinate (real district vs taluk vs village).
+                                // Normalize whichever one comes back so only real
+                                // district names ever reach the input/dropdown.
+                                const rawDistrict = addr.county || addr.state_district || addr.district || '';
+                                const district = normalizeDistrict(rawDistrict);
                                 const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.city || '';
                                 const state = addr.state || '';
 
