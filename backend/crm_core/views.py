@@ -394,8 +394,8 @@ def get_dashboard_context(request):
         "top_prod_qty_js": json.dumps([]),
         "state_labels_js": json.dumps([]),
         "state_data_js": json.dumps([]),
-        "chart_labels_js": json.dumps([]),
-        "chart_counts_js": json.dumps([]),
+        "chart_labels_js": [],
+        "chart_counts_js": [],
         "prob_labels_js": json.dumps([]),
         "prob_data_js": json.dumps([]),
         "bird_labels_js": json.dumps(
@@ -812,12 +812,19 @@ def get_dashboard_context(request):
                 "state_data_js": json.dumps(
                     state_data, cls=DjangoJSONEncoder
                 ),
-                "chart_labels_js": json.dumps(
-                    chart_labels, cls=DjangoJSONEncoder
-                ),
-                "chart_counts_js": json.dumps(
-                    chart_counts, cls=DjangoJSONEncoder
-                ),
+                # NOTE: these two are intentionally NOT pre-dumped with
+                # json.dumps() like the other *_js keys above/below. The
+                # dashboard.html template renders them through Django's
+                # {{ chart_labels_js|json_script:"..." }} filter, which
+                # already calls json.dumps() internally. Pre-dumping here
+                # AND running it through json_script double-encodes the
+                # list into a JSON string-of-a-string; JSON.parse() on the
+                # JS side then only unwraps the outer layer and hands back
+                # a plain string, which Chart.js iterates character-by-
+                # character -- producing one bar per letter instead of
+                # one bar per district. Keep these as raw Python lists.
+                "chart_labels_js": chart_labels,
+                "chart_counts_js": chart_counts,
                 "prob_labels_js": json.dumps(
                     prob_labels, cls=DjangoJSONEncoder
                 ),
