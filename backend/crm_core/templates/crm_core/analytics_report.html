@@ -38,6 +38,32 @@
             filter: none;
             cursor: pointer;
         }
+
+        /*
+         * Chart horizontal-scroll fix
+         * ----------------------------------------------------------------
+         * Problem: when a Chart.js canvas has very few data points (e.g. a
+         * single month), Chart.js stretches that one point across the full
+         * width of its container, leaving a lonely dot/bar in a sea of
+         * empty space.
+         *
+         * Fix: wrap the canvas in a scroll container. We give the inner
+         * wrapper an explicit pixel width sized to (point-count x per-item
+         * width) via setChartWidth() in the script below. If that computed
+         * width is narrower than the card, it falls back to 100% width (so
+         * it still looks filled with 1-2 points). If it's wider (lots of
+         * data), the outer wrapper scrolls horizontally instead of
+         * squeezing everything into unreadable slivers.
+         */
+        .chart-scroll-wrapper {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+        .chart-scroll-inner {
+            height: 100%;
+            min-width: 100%;
+        }
     </style>
 </head>
 <body class="min-h-full flex flex-col antialiased custom-scrollbar pb-12">
@@ -139,9 +165,11 @@
                         <span class="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 border border-green-200 rounded-md">Monthly Ledger</span>
                     </div>
                 </div>
-                <div class="relative flex-1 min-h-0 mt-4 flex items-center justify-center">
-                    <canvas id="monthWiseTrendChart"></canvas>
-                    <div id="noDataMonth" class="hidden absolute text-slate-500 text-xs font-semibold">No monthly data recorded</div>
+                <div id="monthWiseTrendChartContainer" class="relative flex-1 min-h-0 mt-4 chart-scroll-wrapper custom-scrollbar">
+                    <div id="monthWiseTrendChartWrapper" class="chart-scroll-inner">
+                        <canvas id="monthWiseTrendChart"></canvas>
+                    </div>
+                    <div id="noDataMonth" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">No monthly data recorded</div>
                 </div>
             </div>
 
@@ -155,9 +183,11 @@
                         <span class="text-[10px] text-lime-700 font-bold bg-lime-50 px-2 py-0.5 border border-lime-200 rounded-md">Yearly Ledger</span>
                     </div>
                 </div>
-                <div class="relative flex-1 min-h-0 mt-4 flex items-center justify-center">
-                    <canvas id="yearWiseTrendChart"></canvas>
-                    <div id="noDataYear" class="hidden absolute text-slate-500 text-xs font-semibold">No yearly data recorded</div>
+                <div id="yearWiseTrendChartContainer" class="relative flex-1 min-h-0 mt-4 chart-scroll-wrapper custom-scrollbar">
+                    <div id="yearWiseTrendChartWrapper" class="chart-scroll-inner">
+                        <canvas id="yearWiseTrendChart"></canvas>
+                    </div>
+                    <div id="noDataYear" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">No yearly data recorded</div>
                 </div>
             </div>
         </div>
@@ -169,9 +199,11 @@
                     <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-0.5">Revenue By Executive</h3>
                     <p class="text-[10px] text-slate-500">Performance breakdown across primary product orders</p>
                 </div>
-                <div class="relative flex-1 min-h-0 mt-4 flex items-center justify-center">
-                    <canvas id="execRevBarChart"></canvas>
-                    <div id="noDataExec" class="hidden absolute text-slate-500 text-xs font-semibold">No executive data recorded</div>
+                <div id="execRevBarChartContainer" class="relative flex-1 min-h-0 mt-4 chart-scroll-wrapper custom-scrollbar">
+                    <div id="execRevBarChartWrapper" class="chart-scroll-inner">
+                        <canvas id="execRevBarChart"></canvas>
+                    </div>
+                    <div id="noDataExec" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">No executive data recorded</div>
                 </div>
             </div>
 
@@ -180,6 +212,8 @@
                     <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-0.5">Product Allocation (Order Volume)</h3>
                     <p class="text-[10px] text-slate-500">Distribution ratio of standard units booked in fields</p>
                 </div>
+                <!-- Donut chart is proportion-based, not point-count-based, so it keeps its
+                     original centered layout (no horizontal scroll needed here). -->
                 <div class="relative flex-1 min-h-0 flex items-center justify-center mt-2">
                     <canvas id="prodSalesDonut"></canvas>
                     <div id="noDataProd" class="hidden absolute text-slate-500 text-xs font-semibold">No product data recorded</div>
@@ -215,9 +249,11 @@
                     <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider mb-0.5">Visits by State</h3>
                     <p class="text-[10px] text-slate-500">Geographic footprints across core territories</p>
                 </div>
-                <div class="relative flex-1 w-full min-h-0 flex items-center justify-center mt-2">
-                    <canvas id="stateVisitsChart"></canvas>
-                    <div id="noDataState" class="hidden absolute text-slate-500 text-xs font-semibold">No state visit data</div>
+                <div id="stateVisitsChartContainer" class="relative flex-1 w-full min-h-0 mt-2 chart-scroll-wrapper custom-scrollbar">
+                    <div id="stateVisitsChartWrapper" class="chart-scroll-inner">
+                        <canvas id="stateVisitsChart"></canvas>
+                    </div>
+                    <div id="noDataState" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">No state visit data</div>
                 </div>
             </div>
 
@@ -297,9 +333,11 @@
                 <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200 animate-pulse">Live Sync Active</span>
             </div>
             
-            <div class="overflow-x-auto custom-scrollbar text-xs">
+            <!-- Table already scrolls (overflow-x-auto) both horizontally and,
+                 since it now sits in a max-height wrapper, vertically too -->
+            <div class="overflow-x-auto overflow-y-auto max-h-[480px] custom-scrollbar text-xs">
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-[var(--bg-input)] font-bold text-slate-500 uppercase tracking-wider text-[10px] border-b border-[var(--border)]">
+                    <thead class="bg-[var(--bg-input)] font-bold text-slate-500 uppercase tracking-wider text-[10px] border-b border-[var(--border)] sticky top-0 z-10">
                         <tr>
                             <th class="p-3.5 pl-5">Date Logged</th>
                             <th class="p-3.5">Executive Name</th>
@@ -414,10 +452,31 @@
                 }
             };
 
+            /*
+             * setChartWidth
+             * ------------------------------------------------------------
+             * Sizes the scrollable inner wrapper for a chart based on how
+             * many data points it has. With few points the wrapper stays
+             * at 100% of the card (no scrollbar, chart looks filled).
+             * Once point-count * perItem exceeds the card width, the
+             * wrapper grows past the card and chart-scroll-wrapper's
+             * overflow-x:auto kicks in, giving a horizontal scrollbar
+             * instead of squeezing everything down to illegible slivers.
+             */
+            const setChartWidth = (wrapperId, containerId, count, perItem = 90) => {
+                const wrapper = document.getElementById(wrapperId);
+                const container = document.getElementById(containerId);
+                if (!wrapper || !container) return;
+                const minWidth = container.clientWidth;
+                const needed = count * perItem;
+                wrapper.style.width = (needed > minWidth ? needed : minWidth) + 'px';
+            };
+
             const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
 
             // 1. Month Trend Chart
             renderOrHide('monthWiseTrendChart', 'noDataMonth', monthData.length > 0, () => {
+                setChartWidth('monthWiseTrendChartWrapper', 'monthWiseTrendChartContainer', monthLabels.length, 100);
                 const ctxMonth = document.getElementById('monthWiseTrendChart').getContext('2d');
                 const gradMonth = ctxMonth.createLinearGradient(0, 0, 0, 250);
                 gradMonth.addColorStop(0, 'rgba(22, 163, 74, 0.22)');
@@ -445,6 +504,7 @@
 
             // 2. Year Trend Chart
             renderOrHide('yearWiseTrendChart', 'noDataYear', yearData.length > 0, () => {
+                setChartWidth('yearWiseTrendChartWrapper', 'yearWiseTrendChartContainer', yearLabels.length, 100);
                 const ctxYear = document.getElementById('yearWiseTrendChart').getContext('2d');
                 const gradYear = ctxYear.createLinearGradient(0, 0, 0, 250);
                 gradYear.addColorStop(0, 'rgba(101, 163, 13, 0.22)');
@@ -472,6 +532,7 @@
 
             // 3. Exec Bar Chart
             renderOrHide('execRevBarChart', 'noDataExec', execData.length > 0, () => {
+                setChartWidth('execRevBarChartWrapper', 'execRevBarChartContainer', execLabels.length, 90);
                 new Chart(document.getElementById('execRevBarChart').getContext('2d'), {
                     type: 'bar',
                     data: { 
@@ -480,7 +541,7 @@
                             data: execData, 
                             backgroundColor: '#4d7c0f', 
                             borderRadius: 4, 
-                            barThickness: 10 
+                            barThickness: 32 
                         }] 
                     },
                     options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val.toLocaleString('en-IN') } } } }
@@ -505,6 +566,7 @@
 
             // 5. State Visits Bar Chart
             renderOrHide('stateVisitsChart', 'noDataState', stateData.length > 0, () => {
+                setChartWidth('stateVisitsChartWrapper', 'stateVisitsChartContainer', stateLabels.length, 90);
                 new Chart(document.getElementById('stateVisitsChart').getContext('2d'), {
                     type: 'bar',
                     data: {
@@ -513,7 +575,7 @@
                             data: stateData,
                             backgroundColor: '#65a30d',
                             borderRadius: 4,
-                            barThickness: 10
+                            barThickness: 32
                         }]
                     },
                     options: { ...baseOptions, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } }
@@ -534,6 +596,16 @@
                     },
                     options: { ...baseOptions, cutout: '70%' }
                 });
+            });
+
+            // Recompute chart widths on window resize so a card that was
+            // scrollable at a narrow viewport can settle back to filled
+            // width on a wider one, and vice versa.
+            window.addEventListener('resize', () => {
+                setChartWidth('monthWiseTrendChartWrapper', 'monthWiseTrendChartContainer', monthLabels.length, 100);
+                setChartWidth('yearWiseTrendChartWrapper', 'yearWiseTrendChartContainer', yearLabels.length, 100);
+                setChartWidth('execRevBarChartWrapper', 'execRevBarChartContainer', execLabels.length, 90);
+                setChartWidth('stateVisitsChartWrapper', 'stateVisitsChartContainer', stateLabels.length, 90);
             });
         });
     </script>
