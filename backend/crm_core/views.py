@@ -700,11 +700,11 @@ def get_dashboard_context(request):
         )
         active_executives = active_execs_qs.count()
 
-        total_rev = float(
+        total_rev = round(float(
             product_qs.aggregate(total=Coalesce(Sum("revenue_generated"), 0.0, output_field=FloatField()))[
                 "total"
             ]
-        )
+        ), 2)
         vol_sold = int(
             product_qs.aggregate(total_qty=Coalesce(Sum("sale_quantity"), 0))[
                 "total_qty"
@@ -716,7 +716,7 @@ def get_dashboard_context(request):
         ).count()
 
         avg_order_value = (
-            float(total_rev / paid_orders_count)
+            round(float(total_rev / paid_orders_count), 2)
             if paid_orders_count > 0
             else 0.0
         )
