@@ -5,6 +5,8 @@ import openpyxl
 import requests
 import traceback
 
+from functools import wraps
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -101,6 +103,30 @@ def build_district_q(field_path, selected_district):
     for val in district_filter_values(selected_district):
         q |= Q(**{f"{field_path}__iexact": val})
     return q
+
+
+def staff_required(view_func):
+    """Restrict a view to staff/superuser (admin) accounts only.
+
+    Field executives are NOT staff — this is what actually keeps them
+    off the dashboard, analytics, and Excel export pages even if they
+    type the URL directly or bookmark it (login_required alone isn't
+    enough, since it only checks that *someone* is logged in).
+
+    - Anonymous users are sent to the login page.
+    - Authenticated non-staff users (executives) are sent back to
+      their visit-logging form, not an access-denied page — from
+      their point of view the CRM only ever has one screen.
+    - Staff/superusers pass through untouched.
+    """
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login_user')
+        if not (request.user.is_staff or request.user.is_superuser):
+            return redirect('render_visit_form')
+        return view_func(request, *args, **kwargs)
+    return _wrapped
 
 
 # ==========================================
@@ -371,6 +397,7 @@ def save_farm_visit(request):
 # 📥 EXCEL EXPORT ENGINE
 # ==========================================
 
+@staff_required
 @csrf_exempt
 def export_visits_to_excel(request):
     start_date_str = request.GET.get('start_date', '').strip()
@@ -1024,31 +1051,31 @@ def get_dashboard_context(request):
 
     return context
 
+@staff_required
 def dashboard_view(request):
     """View handler that renders the context into the HTML template."""
     context = get_dashboard_context(request)
     return render(request, 'dashboard.html', context)
 
 
-@login_required(login_url='/crm/login/')
+@staff_required
 def dashboard_home(request):
     context = get_dashboard_context(request)
     return render(request, 'crm_core/dashboard.html', context)
 
 
-@login_required(login_url='/crm/login/')
+@staff_required
 def dashboard_analytics(request):
     context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
 
 
-@login_required(login_url='/crm/login/')
+@staff_required
 def executive_analytics_view(request):
     context = get_dashboard_context(request)
     return render(request, 'crm_core/analytics_report.html', context)
 
-@login_required(login_url='/crm/login/')
-@user_passes_test(lambda u: u.is_staff or u.is_superuser)
+@staff_required
 def clear_dashboard_data(request):
     """
     Clears all farm visit, product detail, and farm records from the CRM.
@@ -1065,6 +1092,7 @@ def clear_dashboard_data(request):
             logger.error(f"Failed to clear dashboard data: {str(e)}")
             messages.error(request, f"Error clearing data: {str(e)}")
     return redirect('dashboard_home')
+
 
 # Place these at the end of backend/crm_core/views.py
 
