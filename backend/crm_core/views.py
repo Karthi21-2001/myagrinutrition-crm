@@ -5,7 +5,7 @@ import openpyxl
 import requests
 import traceback
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 
 from django.contrib import messages
@@ -28,6 +28,31 @@ from .models import Farm, FarmVisitReport, VisitedProductDetail
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+def _model_has_field(model, field_name):
+    return any(f.name == field_name for f in model._meta.get_fields())
+
+
+# Computed once at import time (not per-request) so we know definitively
+# whether FarmVisitReport.next_visit_date exists, instead of discovering
+# it via a caught TypeError on every single visit save. If this is False,
+# every visit will keep saving with no follow-up date and the "Next Visit
+# Date" export column will stay empty until the field is added below and
+# migrated:
+#
+#   # in FarmVisitReport (models.py)
+#   next_visit_date = models.DateField(null=True, blank=True)
+#
+# then: python manage.py makemigrations && python manage.py migrate
+_HAS_NEXT_VISIT_DATE_FIELD = _model_has_field(FarmVisitReport, 'next_visit_date')
+if not _HAS_NEXT_VISIT_DATE_FIELD:
+    logger.error(
+        "FarmVisitReport has no 'next_visit_date' field — every visit is "
+        "being saved WITHOUT a follow-up date. Add "
+        "`next_visit_date = models.DateField(null=True, blank=True)` to "
+        "FarmVisitReport in models.py, then run makemigrations/migrate."
+    )
 
 
 # ==========================================================
@@ -199,13 +224,16 @@ def _to_float(val):
 def _to_date_or_none(val):
     """Safely coerce a POSTed HTML <input type="date"> value
     (expected format YYYY-MM-DD) to a date object, or None if blank
-    or unparsable. Kept permissive here — Django's DateField will do
-    the authoritative validation/casting on save.
+    or unparsable.
     """
     val = (val or '').strip()
     if not val:
         return None
-    return val
+    try:
+        return datetime.strptime(val, '%Y-%m-%d').date()
+    except ValueError:
+        logger.warning(f"Unparsable next_visit_date value from form: {val!r}")
+        return None
 
 
 @login_required(login_url='/crm/login/')
@@ -298,28 +326,18 @@ def save_farm_visit(request):
                     farm_instance.culling_bird_count = culling_bird_count
                     farm_instance.save()
 
-                # NOTE: requires a `next_visit_date = models.DateField(null=True, blank=True)`
-                # field on the FarmVisitReport model — add it there if it
-                # doesn't already exist, then makemigrations/migrate.
-                # Guarded with a fallback so a not-yet-migrated field can't
-                # 500 the whole visit save — it just gets skipped that time.
-                try:
-                    visit_record = FarmVisitReport.objects.create(
-                        farm=farm_instance,
-                        executive=current_user,
-                        farm_problem=farm_problem,
-                        next_visit_date=next_visit_date
-                    )
-                except TypeError:
-                    logger.warning(
-                        "FarmVisitReport has no next_visit_date field yet — "
-                        "add it to models.py and run migrations. Saving visit without it."
-                    )
-                    visit_record = FarmVisitReport.objects.create(
-                        farm=farm_instance,
-                        executive=current_user,
-                        farm_problem=farm_problem
-                    )
+                # See _HAS_NEXT_VISIT_DATE_FIELD at module load — if the
+                # model field is missing, we log it loudly there (once,
+                # at startup) instead of silently discovering it here on
+                # every single visit save.
+                visit_kwargs = dict(
+                    farm=farm_instance,
+                    executive=current_user,
+                    farm_problem=farm_problem,
+                )
+                if _HAS_NEXT_VISIT_DATE_FIELD:
+                    visit_kwargs['next_visit_date'] = next_visit_date
+                visit_record = FarmVisitReport.objects.create(**visit_kwargs)
 
                 # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
