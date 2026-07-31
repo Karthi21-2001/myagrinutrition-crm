@@ -208,6 +208,38 @@ def _to_date_or_none(val):
     return val
 
 
+# --------------------------------------------------------------------
+# DIAGNOSTIC HELPER: does FarmVisitReport actually have a
+# next_visit_date field right now, according to the DB schema Django
+# knows about?
+#
+# WHY THIS EXISTS: the previous code relied on catching a TypeError
+# from FarmVisitReport.objects.create(next_visit_date=...) to detect
+# a missing field. That works when the field is entirely absent from
+# models.py, but if the field WAS added to models.py without running
+# `makemigrations` / `migrate`, Django will instead raise an
+# OperationalError / ProgrammingError (from the DB driver) at .save()
+# time — a different exception that a bare `except TypeError` does
+# NOT catch, and it can occur out here in the outer view instead of
+# being contained inside the guarded FarmVisitReport.objects.create()
+# call. Checking the model's real fields up front makes the cause
+# explicit in the logs instead of surfacing as an ambiguous 500 or a
+# swallowed exception.
+# --------------------------------------------------------------------
+def _model_has_field(model_cls, field_name):
+    return field_name in {f.name for f in model_cls._meta.get_fields()}
+
+_NEXT_VISIT_DATE_FIELD_EXISTS = _model_has_field(FarmVisitReport, 'next_visit_date')
+if not _NEXT_VISIT_DATE_FIELD_EXISTS:
+    logger.warning(
+        "STARTUP CHECK: FarmVisitReport model has NO 'next_visit_date' "
+        "field. Add `next_visit_date = models.DateField(null=True, "
+        "blank=True)` to models.py, then run "
+        "`python manage.py makemigrations && python manage.py migrate`. "
+        "Until then every visit will save with Next Visit Date empty."
+    )
+
+
 @login_required(login_url='/crm/login/')
 def save_farm_visit(request):
     if request.method == 'POST':
@@ -231,10 +263,23 @@ def save_farm_visit(request):
         farm_problem = request.POST.get('farm_problem')
 
         # Planned follow-up date captured on the "Next Visit Date"
-        # field in the form. Stored on the visit record it was logged
-        # from, since it's a per-visit follow-up plan rather than a
-        # permanent attribute of the farm itself.
-        next_visit_date = _to_date_or_none(request.POST.get('next_visit_date'))
+        # field in the form (name="next_visit_date" in
+        # farm_visit_form.html). Stored on the visit record it was
+        # logged from, since it's a per-visit follow-up plan rather
+        # than a permanent attribute of the farm itself.
+        raw_next_visit_date = request.POST.get('next_visit_date')
+        next_visit_date = _to_date_or_none(raw_next_visit_date)
+
+        # DIAGNOSTIC LOG: shows exactly what arrived from the browser
+        # for this field on every submit. If this line shows a real
+        # date but the Excel export is still blank, the bug is on the
+        # save/model side, not the form. If this line shows an empty
+        # string/None, the executive simply didn't fill the field in.
+        logger.info(
+            "save_farm_visit: raw next_visit_date POST value=%r -> parsed=%r "
+            "(model field present=%s)",
+            raw_next_visit_date, next_visit_date, _NEXT_VISIT_DATE_FIELD_EXISTS
+        )
 
         if not state or state.lower() in ['state', 'unknown state', '']:
             state = 'Tamil Nadu'
@@ -301,8 +346,16 @@ def save_farm_visit(request):
                 # NOTE: requires a `next_visit_date = models.DateField(null=True, blank=True)`
                 # field on the FarmVisitReport model — add it there if it
                 # doesn't already exist, then makemigrations/migrate.
-                # Guarded with a fallback so a not-yet-migrated field can't
-                # 500 the whole visit save — it just gets skipped that time.
+                #
+                # UPDATED GUARD: previously this only caught TypeError,
+                # which fires when the field is entirely absent from the
+                # model class. If the field exists on the model but the
+                # migration hasn't been applied to the actual database
+                # yet, Django/your DB driver typically raises an
+                # OperationalError or ProgrammingError instead — those
+                # are now also caught here so a half-finished migration
+                # can't 500 the whole visit save. It still just gets
+                # skipped that time, with a loud warning in the logs.
                 try:
                     visit_record = FarmVisitReport.objects.create(
                         farm=farm_instance,
@@ -310,16 +363,24 @@ def save_farm_visit(request):
                         farm_problem=farm_problem,
                         next_visit_date=next_visit_date
                     )
-                except TypeError:
-                    logger.warning(
-                        "FarmVisitReport has no next_visit_date field yet — "
-                        "add it to models.py and run migrations. Saving visit without it."
-                    )
-                    visit_record = FarmVisitReport.objects.create(
-                        farm=farm_instance,
-                        executive=current_user,
-                        farm_problem=farm_problem
-                    )
+                except (TypeError, Exception) as field_err:
+                    # Only swallow errors that look like the missing-field
+                    # case; anything else should still surface normally.
+                    err_name = type(field_err).__name__
+                    if err_name in ('TypeError', 'OperationalError', 'ProgrammingError', 'FieldError'):
+                        logger.warning(
+                            "FarmVisitReport.next_visit_date could not be saved "
+                            "(%s: %s). Add/migrate the field in models.py. "
+                            "Saving visit without it.",
+                            err_name, field_err
+                        )
+                        visit_record = FarmVisitReport.objects.create(
+                            farm=farm_instance,
+                            executive=current_user,
+                            farm_problem=farm_problem
+                        )
+                    else:
+                        raise
 
                 # Process Sales Order Products
                 order_products = request.POST.getlist('discussed_product[]')
