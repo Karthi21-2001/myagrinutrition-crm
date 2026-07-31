@@ -431,45 +431,6 @@
             </div>
         </div>
 
-        <!-- Monthly Report Table -->
-        <div class="card">
-            <div class="card-title">📅 Monthly Sales Report (User & Regional Hierarchy Matrix)</div>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Month</th>
-                            <th>Field Executive</th>
-                            <th>State</th>
-                            <th>District</th>
-                            <th>Assigned Area / Block</th>
-                            <th class="text-right">Total Quantity Sold</th>
-                            <th class="text-right">Total Revenue Generated</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in monthly_sales %}
-                        <tr>
-                            <td><span class="badge-month">{{ row.month|date:"F Y" }}</span></td>
-                            <td><span class="badge-user">{{ row.visit__executive__username|default:"Unknown User" }}</span></td>
-                            <td>{{ row.visit__farm__state|default:"N/A" }}</td>
-                            <td><strong>{{ row.visit__farm__district }}</strong></td>
-                            <td>{{ row.visit__farm__area }}</td>
-                            <td class="text-right" style="font-weight: 500;">{{ row.total_qty }}</td>
-                            <td class="text-right revenue-cell">Rs {{ row.total_revenue|floatformat:2 }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
-                                No structural monthly matrix records found. File active product sales orders inside your visit forms to populate rows here.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
     </div>
 
     <!-- Pass JSON Data Safely to JS -->
