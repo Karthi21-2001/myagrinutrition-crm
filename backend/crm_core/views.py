@@ -838,8 +838,22 @@ def get_dashboard_context(request):
         # without lat/lng are skipped here; the template counts and warns
         # about them separately via a banner rather than silently omitting
         # them.
+        #
+        # NOTE: this is built from visit_qs (not farm_qs). farm_qs only
+        # ever applies state/district/executive/sector — it never gained
+        # month/year/start_date/end_date filtering, so date-range picks
+        # from the dashboard toolbar silently had no effect on the map.
+        # visit_qs already has every filter applied (including the date
+        # range), so pulling the distinct set of farms referenced by
+        # those visits makes the map respect the same filters as the
+        # rest of the dashboard. Every Farm row is created alongside its
+        # first FarmVisitReport (see save_farm_visit's get_or_create), so
+        # this is equivalent to farm_qs whenever no date/month/year
+        # filter narrows visit_qs below farm_qs.
+        map_farm_ids = visit_qs.values_list("farm_id", flat=True).distinct()
         farm_locations = list(
-            farm_qs.exclude(Q(latitude__isnull=True) | Q(longitude__isnull=True))
+            Farm.objects.filter(id__in=map_farm_ids)
+            .exclude(Q(latitude__isnull=True) | Q(longitude__isnull=True))
             .values(
                 "farm_name",
                 "owner_name",
