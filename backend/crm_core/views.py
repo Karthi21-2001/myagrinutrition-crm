@@ -5,6 +5,7 @@ import openpyxl
 import requests
 import traceback
 
+from datetime import timedelta
 from functools import wraps
 
 from django.contrib import messages
@@ -13,10 +14,11 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Count, DecimalField, F, FloatField, Q, Sum
+from django.db.models import Avg, Count, DecimalField, F, FloatField, Max, Q, Sum
 from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
@@ -587,6 +589,8 @@ def get_dashboard_context(request):
         "chart_labels_js": [],
         "chart_counts_js": [],
         "farm_locations_js": [],
+        "stale_farms": [],
+        "stale_farms_count": 0,
         "prob_labels_js": json.dumps([]),
         "prob_data_js": json.dumps([]),
         "bird_labels_js": json.dumps(
@@ -855,6 +859,7 @@ def get_dashboard_context(request):
             Farm.objects.filter(id__in=map_farm_ids)
             .exclude(Q(latitude__isnull=True) | Q(longitude__isnull=True))
             .values(
+                "id",
                 "farm_name",
                 "owner_name",
                 "district",
@@ -864,18 +869,84 @@ def get_dashboard_context(request):
                 "longitude",
             )
         )
-        farm_locations_data = [
-            {
-                "name": f["farm_name"],
-                "owner": f["owner_name"],
-                "district": normalize_district(f["district"]),
-                "state": f["state"],
-                "business_type": f["business_type"],
-                "lat": float(f["latitude"]),
-                "lng": float(f["longitude"]),
-            }
-            for f in farm_locations
-        ]
+
+        # ------------------------------------------------------------------
+        # 5c. VISIT STALENESS ("coverage gap") CALCULATION
+        # ------------------------------------------------------------------
+        # This is deliberately computed from ALL of a farm's visit history
+        # (not visit_qs / not scoped to month/year/date-range filters) —
+        # "days since last visit" is a real-world fact about the farm, and
+        # scoping it to the currently selected date range would make a
+        # farm visited yesterday show as "stale" just because the person
+        # happens to be looking at last month's data. State/district/
+        # executive/sector filters still apply (via farm_qs) since those
+        # narrow *which farms* are in view, not *when* they're compared.
+        STALE_THRESHOLD_DAYS = 30
+        now = timezone.now()
+
+        last_visit_map = {
+            row["farm_id"]: row["last_visit"]
+            for row in FarmVisitReport.objects.values("farm_id").annotate(
+                last_visit=Max("visit_date")
+            )
+        }
+
+        def _days_since(farm_id):
+            last_visit = last_visit_map.get(farm_id)
+            if not last_visit:
+                return None  # never visited
+            return (now - last_visit).days
+
+        farm_locations_data = []
+        for f in farm_locations:
+            days_since = _days_since(f["id"])
+            farm_locations_data.append(
+                {
+                    "name": f["farm_name"],
+                    "owner": f["owner_name"],
+                    "district": normalize_district(f["district"]),
+                    "state": f["state"],
+                    "business_type": f["business_type"],
+                    "lat": float(f["latitude"]),
+                    "lng": float(f["longitude"]),
+                    "stale": days_since is None or days_since >= STALE_THRESHOLD_DAYS,
+                    "days_since_visit": days_since,
+                }
+            )
+
+        # Standalone "coverage gap" list — every farm in the current
+        # state/district/executive/sector scope (farm_qs) that hasn't
+        # been visited in STALE_THRESHOLD_DAYS+ days, or has never been
+        # visited at all. Not restricted to farms with GPS coordinates,
+        # since this list is meant to drive follow-up action even before
+        # a farm has a pin on the map.
+        stale_farms_raw = []
+        for f in farm_qs.values(
+            "id", "farm_name", "owner_name", "district", "state",
+            "business_type", "executive__username",
+        ):
+            days_since = _days_since(f["id"])
+            if days_since is None or days_since >= STALE_THRESHOLD_DAYS:
+                stale_farms_raw.append(
+                    {
+                        "name": f["farm_name"],
+                        "owner": f["owner_name"],
+                        "district": normalize_district(f["district"]),
+                        "state": f["state"],
+                        "business_type": f["business_type"],
+                        "executive": f["executive__username"] or "Unassigned",
+                        "days_since_visit": days_since,
+                    }
+                )
+
+        # Sort worst-first: never-visited farms (None) float to the top,
+        # then longest-overdue first.
+        stale_farms_raw.sort(
+            key=lambda x: (x["days_since_visit"] is not None, x["days_since_visit"] or 0),
+            reverse=False,
+        )
+        stale_farms_count = len(stale_farms_raw)
+        stale_farms_table = stale_farms_raw[:25]
 
         prob_qs = (
             visit_qs.values("farm_problem")
@@ -1082,6 +1153,8 @@ def get_dashboard_context(request):
                 # dicts, NOT json.dumps()'d, or the map JS will try to
                 # JSON.parse() an already-stringified value and fail.
                 "farm_locations_js": farm_locations_data,
+                "stale_farms": stale_farms_table,
+                "stale_farms_count": stale_farms_count,
                 "prob_labels_js": json.dumps(
                     prob_labels, cls=DjangoJSONEncoder
                 ),
