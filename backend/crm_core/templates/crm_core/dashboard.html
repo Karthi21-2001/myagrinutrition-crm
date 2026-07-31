@@ -388,6 +388,21 @@
                         </select>
                     </div>
 
+                    <!-- Sector filter: wires into `sector` GET param already
+                         read/handled server-side in get_dashboard_context()
+                         (sel_sector / farm_filters / visit_filters /
+                         product_filters). Values match Farm.business_type
+                         ("Poultry" / "Aqua") since the backend filters with
+                         business_type__icontains=sel_sector. -->
+                    <div class="filter-group">
+                        <label class="filter-label">🏭 Sector</label>
+                        <select id="filter-sector" class="select-filter" onchange="applyLiveFilters()">
+                            <option value="">All Sectors</option>
+                            <option value="Poultry" {% if selected_sector == "Poultry" %}selected{% endif %}>🐓 Poultry Sector</option>
+                            <option value="Aqua" {% if selected_sector == "Aqua" %}selected{% endif %}>🐟 Aqua Sector</option>
+                        </select>
+                    </div>
+
                     <div class="filter-group">
                         <label class="filter-label">📅 Month</label>
                         <select id="filter-month" class="select-filter" onchange="applyLiveFilters()">
@@ -605,6 +620,7 @@
             const country = document.getElementById('filter-country').value;
             const district = document.getElementById('filter-district').value;
             const executive = document.getElementById('filter-executive').value;
+            const sector = document.getElementById('filter-sector').value;
             const month = document.getElementById('filter-month').value;
             const year = document.getElementById('filter-year').value;
             const startDate = document.getElementById('filter-start-date').value;
@@ -621,6 +637,7 @@
             if (country) url.searchParams.set('country', country); else url.searchParams.delete('country');
             if (district) url.searchParams.set('district', district); else url.searchParams.delete('district');
             if (executive) url.searchParams.set('executive', executive); else url.searchParams.delete('executive');
+            if (sector) url.searchParams.set('sector', sector); else url.searchParams.delete('sector');
             if (month) url.searchParams.set('month', month); else url.searchParams.delete('month');
             if (year) url.searchParams.set('year', year); else url.searchParams.delete('year');
             if (startDate) url.searchParams.set('start_date', startDate); else url.searchParams.delete('start_date');
