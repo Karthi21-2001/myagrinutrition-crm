@@ -586,6 +586,7 @@ def get_dashboard_context(request):
         "state_data_js": json.dumps([]),
         "chart_labels_js": [],
         "chart_counts_js": [],
+        "farm_locations_js": [],
         "prob_labels_js": json.dumps([]),
         "prob_data_js": json.dumps([]),
         "bird_labels_js": json.dumps(
@@ -828,6 +829,40 @@ def get_dashboard_context(request):
         chart_labels = [name for name, _ in sorted_districts]
         chart_counts = [count for _, count in sorted_districts]
 
+        # ------------------------------------------------------------------
+        # 5b. FARM COVERAGE MAP DATA
+        # ------------------------------------------------------------------
+        # Feeds the Leaflet coverage map on dashboard.html — one entry per
+        # farm that has GPS coordinates on file (captured at visit-logging
+        # time in save_farm_visit / the reverse-geocode widget). Farms
+        # without lat/lng are skipped here; the template counts and warns
+        # about them separately via a banner rather than silently omitting
+        # them.
+        farm_locations = list(
+            farm_qs.exclude(Q(latitude__isnull=True) | Q(longitude__isnull=True))
+            .values(
+                "farm_name",
+                "owner_name",
+                "district",
+                "state",
+                "business_type",
+                "latitude",
+                "longitude",
+            )
+        )
+        farm_locations_data = [
+            {
+                "name": f["farm_name"],
+                "owner": f["owner_name"],
+                "district": normalize_district(f["district"]),
+                "state": f["state"],
+                "business_type": f["business_type"],
+                "lat": float(f["latitude"]),
+                "lng": float(f["longitude"]),
+            }
+            for f in farm_locations
+        ]
+
         prob_qs = (
             visit_qs.values("farm_problem")
             .annotate(frequency=Count("id"))
@@ -1027,6 +1062,12 @@ def get_dashboard_context(request):
                 # one bar per district. Keep these as raw Python lists.
                 "chart_labels_js": chart_labels,
                 "chart_counts_js": chart_counts,
+                # Same rule applies here — dashboard.html renders this
+                # through {{ farm_locations_js|json_script:"..." }}, which
+                # already serializes it. Keep it as a raw Python list of
+                # dicts, NOT json.dumps()'d, or the map JS will try to
+                # JSON.parse() an already-stringified value and fail.
+                "farm_locations_js": farm_locations_data,
                 "prob_labels_js": json.dumps(
                     prob_labels, cls=DjangoJSONEncoder
                 ),
