@@ -45,6 +45,12 @@ def _model_has_field(model, field_name):
 #   next_visit_date = models.DateField(null=True, blank=True)
 #
 # then: python manage.py makemigrations && python manage.py migrate
+#
+# NOTE: as of the models.py fix, FarmVisitReport.next_visit_date now
+# exists, so this evaluates to True and this whole guard becomes a
+# no-op safety net going forward. It's left in place deliberately —
+# harmless once the field exists, and it protects against a future
+# deploy where migrations haven't been run yet on a given environment.
 _HAS_NEXT_VISIT_DATE_FIELD = _model_has_field(FarmVisitReport, 'next_visit_date')
 if not _HAS_NEXT_VISIT_DATE_FIELD:
     logger.error(
