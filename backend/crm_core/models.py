@@ -94,7 +94,18 @@ class FarmVisitReport(models.Model):
         related_name='filed_visit_reports'
     )
     farm_problem = models.TextField(blank=True, null=True)
-    
+
+    # Planned follow-up date captured on the "Next Visit Date" field in
+    # farm_visit_form.html and saved via save_farm_visit() in views.py.
+    # Added to fix the export/dashboard showing this column permanently
+    # empty — the view was already trying to save it, but the field
+    # didn't exist on this model yet.
+    next_visit_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Planned date for the follow-up visit to this farm."
+    )
+
     # Aligned with the exact field lookup criteria filtering dashboard telemetry
     visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
     created_at = models.DateTimeField(auto_now_add=True)
