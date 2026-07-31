@@ -94,18 +94,6 @@ class FarmVisitReport(models.Model):
         related_name='filed_visit_reports'
     )
     farm_problem = models.TextField(blank=True, null=True)
-
-    # ADDED: planned follow-up date captured on the "Next Visit Date"
-    # field in farm_visit_form.html (name="next_visit_date") and read
-    # in views.py's save_farm_visit(). This was missing entirely,
-    # which is why every visit saved with Next Visit Date blank in
-    # the Excel export regardless of what the executive entered.
-    # null=True/blank=True because it's an optional field on the form.
-    next_visit_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="Planned follow-up visit date, set by the executive at logging time."
-    )
     
     # Aligned with the exact field lookup criteria filtering dashboard telemetry
     visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
