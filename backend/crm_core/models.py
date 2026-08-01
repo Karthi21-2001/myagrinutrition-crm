@@ -94,6 +94,9 @@ class FarmVisitReport(models.Model):
         related_name='filed_visit_reports'
     )
     farm_problem = models.TextField(blank=True, null=True)
+
+    # Auto-inserted by patch_models.py
+    next_visit_date = models.DateField(null=True, blank=True)
     
     # Aligned with the exact field lookup criteria filtering dashboard telemetry
     visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
