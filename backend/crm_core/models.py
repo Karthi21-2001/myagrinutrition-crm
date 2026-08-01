@@ -94,18 +94,7 @@ class FarmVisitReport(models.Model):
         related_name='filed_visit_reports'
     )
     farm_problem = models.TextField(blank=True, null=True)
-
-    # FIX: this field was missing entirely, which is why "Next Visit Date"
-    # entered on the form never made it into the Excel export — the create()
-    # call in save_farm_visit was raising TypeError on this exact keyword
-    # argument, and that error was being silently swallowed by a fallback
-    # that saved the visit without it.
-    next_visit_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="Planned follow-up visit date for this farm."
-    )
-
+    
     # Aligned with the exact field lookup criteria filtering dashboard telemetry
     visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
     created_at = models.DateTimeField(auto_now_add=True)
