@@ -1,166 +1,982 @@
-from django.db import models
-from django.conf import settings
-
-
-class Farm(models.Model):
-    """
-    Tracks foundational details of the farm, owner structural data, 
-    geographical breakdown matrices, and livestock inventory telemetry.
-    """
-    BUSINESS_TYPE_CHOICES = [
-        ('Poultry', 'Poultry Sector'),
-        ('Aqua', 'Aqua Sector'),
-        ('General', 'General Agriculture'),
-    ]
-
-    executive = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='assigned_farms',
-        help_text="The field executive assigned to manage this farm account."
-    )
-    farm_name = models.CharField(max_length=255)
-    owner_name = models.CharField(max_length=255)
-    contact_number = models.CharField(max_length=20, blank=True, null=True)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Logging Form</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    business_type = models.CharField(
-        max_length=50, 
-        choices=BUSINESS_TYPE_CHOICES, 
-        default='General'
-    )
-    sub_segment = models.CharField(
-        max_length=100, 
-        blank=True, 
-        null=True,
-        help_text="Specific operational sub-classification or industry segment."
-    )
-    
-    # Poultry Shed Population Inventory Tracking Metrics
-    chicks_count = models.IntegerField(default=0, verbose_name="Chicks Population")
-    grower_count = models.IntegerField(default=0, verbose_name="Grower Population")
-    layer_count = models.IntegerField(default=0, verbose_name="Layer Population")
-    culling_bird_count = models.IntegerField(default=0, verbose_name="Culling Bird Population")
-    
-    # Hierarchical Regional Parameters for Dashboard Analytics
-    country = models.CharField(max_length=100, default="India")
-    state = models.CharField(max_length=100, default="State")
-    district = models.CharField(max_length=100, blank=True, default='')
-    area = models.CharField(max_length=255, blank=True, default='', help_text="Block or Assigned Area")
-    
-    # Geolocation mapping coordinates mapped to FloatField for backend processing alignment
-    latitude = models.FloatField(null=True, blank=True)
-    longitude = models.FloatField(null=True, blank=True)
-    
-    # Unified tracking timestamp field name across tables
-    visit_date = models.DateTimeField(auto_now_add=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    <style>
+        :root {
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --success-hover: #059669;
+            --accent-pipeline: #6366f1;
+            --accent-pipeline-hover: #4f46e5;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --border: #e2e8f0;
+            --border-focus: #60a5fa;
+        }
 
-    class Meta:
-        verbose_name = "Farm Profile"
-        verbose_name_plural = "Farm Profiles"
-        ordering = ['-created_at']
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    @property
-    def visiting_count(self):
-        """Calculates total historical visit reports logged for this profile."""
-        return self.visits.count()
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
 
-    @property
-    def total_birds(self):
-        """Calculates total capacity across all sheds dynamically."""
-        return self.chicks_count + self.grower_count + self.layer_count + self.culling_bird_count
+        .container {
+            width: 100%;
+            max-width: 850px;
+            background-color: transparent;
+        }
 
-    def __str__(self):
-        return f"{self.farm_name} - {self.owner_name} ({self.get_business_type_display()})"
+        h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            color: #0f172a;
+        }
 
+        p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
 
-class FarmVisitReport(models.Model):
-    """
-    Logs each specific field visit activity event instance. Serves as the 
-    parent record grouping the ordered products together.
-    """
-    farm = models.ForeignKey(
-        Farm, 
-        on_delete=models.CASCADE, 
-        related_name='visits'
-    )
-    executive = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        related_name='filed_visit_reports'
-    )
-    farm_problem = models.TextField(blank=True, null=True)
+        .header-container {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 25px;
+            gap: 15px;
+            background-color: var(--bg-card);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
 
-    # FIX: this field was missing entirely, which is why "Next Visit Date"
-    # entered on the form never made it into the Excel export — the create()
-    # call in save_farm_visit was raising TypeError on this exact keyword
-    # argument, and that error was being silently swallowed by a fallback
-    # that saved the visit without it.
-    next_visit_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="Planned follow-up visit date for this farm."
-    )
+        .export-btn {
+            background-color: #0284c7; 
+            color: white; 
+            padding: 10px 18px; 
+            border-radius: 8px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            font-size: 0.875rem;
+            transition: background 0.2s ease;
+            white-space: nowrap;
+        }
 
-    # Aligned with the exact field lookup criteria filtering dashboard telemetry
-    visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
-    created_at = models.DateTimeField(auto_now_add=True)
+        .export-btn:hover {
+            background-color: #0369a1;
+        }
 
-    class Meta:
-        verbose_name = "Field Visit Report"
-        verbose_name_plural = "Field Visit Reports"
-        ordering = ['-created_at']
+        /* Card Layouts */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
 
-    def __str__(self):
-        return f"Visit to {self.farm.farm_name} on {self.visit_date.strftime('%Y-%m-%d') if self.visit_date else ''}"
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
 
+        /* Form elements */
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
 
-class VisitedProductDetail(models.Model):
-    """
-    Holds individual product items booked or tracked during field visits, 
-    including advanced conversion percentage and line-item revenue records.
-    """
-    PROCESS_CHOICES = [
-        ('Cold', '❄️ Cold'),
-        ('Warm', '🔥 Warm'),
-        ('Hot', '💥 Hot'),
-    ]
+        .form-group-spacing {
+            margin-bottom: 16px;
+        }
 
-    # Explicit related_name='visited_products' matches prefetch_related lookups
-    visit = models.ForeignKey(
-        FarmVisitReport, 
-        on_delete=models.CASCADE, 
-        related_name='visited_products'
-    )
-    product_name = models.CharField(max_length=255)
-    
-    # Live Input Tracking Attributes
-    potential_quantity = models.IntegerField(default=0, blank=True)
-    target_quantity = models.IntegerField(default=0, blank=True)
-    sale_quantity = models.IntegerField(default=0)
-    unit_type = models.CharField(max_length=50, default='KG', help_text="Bags, Liters, KG etc.")
-    
-    # Financial data structures supporting custom pipeline metrics
-    primary_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    revenue_generated = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    
-    # Pipeline conversion components
-    process_status = models.CharField(max_length=50, choices=PROCESS_CHOICES, default='Warm')
-    conversion_percentage = models.IntegerField(default=0)  # Value between 0 and 100
+        input[type="text"],
+        input[type="tel"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            outline: none;
+        }
 
-    class Meta:
-        verbose_name = "Visited Product Detail"
-        verbose_name_plural = "Visited Product Details"
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
 
-    def save(self, *args, **kwargs):
-        """Automatically updates line item metrics if price and quantity match up."""
-        if self.primary_price and self.sale_quantity:
-            self.revenue_generated = self.primary_price * self.sale_quantity
-        super().save(*args, **kwargs)
+        textarea {
+            resize: vertical;
+        }
 
-    def __str__(self):
-        return f"{self.product_name} ({self.sale_quantity} {self.unit_type}) - Visit #{self.visit.id}"
+        /* Location Section Specifics */
+        .location-box {
+            background-color: rgba(148, 163, 184, 0.08);
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+            font-family: inherit;
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-primary:disabled { background-color: #475569; cursor: not-allowed; }
+
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-success:hover { background-color: var(--success-hover); }
+
+        .btn-pipeline { background-color: var(--accent-pipeline); color: white; }
+        .btn-pipeline:hover { background-color: var(--accent-pipeline-hover); }
+
+        .btn-danger { background-color: var(--danger); color: white; padding: 10px 12px; }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+
+        #map-container {
+            display: none;
+            margin: 15px 0;
+        }
+        #map {
+            height: 250px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .map-link {
+            display: inline-block;
+            margin-top: 8px;
+            color: var(--border-focus);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        .map-link:hover {
+            text-decoration: underline;
+        }
+
+        .auto-input {
+            background-color: rgba(16, 185, 129, 0.05) !important;
+            border-color: rgba(16, 185, 129, 0.3) !important;
+            color: #34d399 !important;
+            font-weight: 500;
+        }
+
+        /* Dynamic Grid Items styling */
+        .grid-item-row {
+            background-color: rgba(148, 163, 184, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .pipeline-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1.2fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .order-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        /* Poultry & Aqua Grid Layout Configurations */
+        .poultry-grid, .aqua-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .aqua-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .grid-label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .submit-btn-container {
+            margin-top: 30px;
+            margin-bottom: 50px;
+        }
+
+        .btn-submit {
+            background-color: var(--success);
+            color: white;
+            width: 100%;
+            font-size: 1.1rem;
+            font-weight: 700;
+            padding: 14px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+        }
+        .btn-submit:hover {
+            background-color: var(--success-hover);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 950px) {
+            .pipeline-grid, .order-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .pipeline-grid div:first-child,
+            .order-grid div:first-child {
+                grid-column: span 2;
+            }
+            .pipeline-grid div:last-child,
+            .order-grid div:last-child {
+                grid-column: span 2;
+                text-align: right;
+            }
+            .btn-danger {
+                width: 100%;
+            }
+            .poultry-grid, .aqua-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .export-btn {
+                width: 100%;
+                text-align: center;
+            }
+            .pipeline-grid, .order-grid {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .pipeline-grid div:first-child, .order-grid div:first-child {
+                grid-column: auto;
+            }
+            .pipeline-grid div:last-child, .order-grid div:last-child {
+                grid-column: auto;
+            }
+            .poultry-grid, .aqua-grid {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            #map {
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>MY AGRINUTRITION FIELD VISITING LOG</h2>
+        
+        <div class="header-container">
+            <div>
+                <p><strong>Executive:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
+            </div>
+        </div>
+
+        <form id="farmForm" method="POST" action="/crm/save-visit/" novalidate>
+            {% csrf_token %}
+
+            <div class="card">
+                <div class="card-title" style="color: #2563eb;">📋 General Farm Profile</div>
+                
+                <div class="form-group-spacing">
+                    <label>Farm Name</label>
+                    <input type="text" name="farm_name" required placeholder="e.g., Green Valley Rice Farm">
+                </div>
+
+                <div class="form-group-spacing">
+                    <label>Owner Name (Farmer)</label>
+                    <input type="text" name="owner_name" required placeholder="e.g., Rajesh Kumar">
+                </div>
+
+                <div class="form-group-spacing">
+                    <label>Contact Number</label>
+                    <input type="tel" name="contact_number" required placeholder="e.g., +91 98765 43210">
+                </div>
+
+                <div>
+                    <label>Next Visit Date</label>
+                    <input type="date" name="next_visit_date">
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title" style="color: var(--primary);">📍 Geospatial Metrics</div>
+                
+                <button type="button" id="locateBtn" class="btn-action btn-primary btn-block">
+                    Fetch GPS Verification Coordinate
+                </button>
+                
+                <input type="hidden" id="lat" name="latitude">
+                <input type="hidden" id="lon" name="longitude">
+
+                <div id="map-container">
+                    <div id="map"></div>
+                    <a id="externalMapLink" class="map-link" target="_blank" href="#">🗺️ Open Live Route in Google Maps</a>
+                </div>
+
+                <div class="location-box">
+                    <div class="form-group-spacing">
+                        <label style="color: var(--text-muted);">Automated District</label>
+                        <input type="text" id="district" class="auto-input" name="district" readonly required placeholder="Awaiting location access...">
+                    </div>
+
+                    <div class="form-group-spacing">
+                        <label style="color: var(--text-muted);">Automated Area</label>
+                        <input type="text" id="area" class="auto-input" name="area" readonly required placeholder="Awaiting location access...">
+                    </div>
+
+                    <div>
+                        <label style="color: var(--text-muted);">Automated State</label>
+                        <input type="text" id="state" class="auto-input" name="state" readonly required placeholder="Awaiting location access...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title" style="color: #d97706;">🔍 Field Diagnostic Metrics</div>
+                
+                <div class="form-group-spacing">
+                    <label>Business Sector Segment</label>
+                    <select name="business_type" id="business_type_select">
+                        <option value="Poultry" selected>🐓 Poultry Sector</option>
+                        <option value="Aqua">🐟 Aqua Sector</option>
+                    </select>
+                </div>
+
+                <div class="form-group-spacing">
+                    <label>Sub-Sector Segment</label>
+                    <select name="sub_business_type" id="sub_business_type_select">
+                        <!-- Options generated dynamically via JS -->
+                    </select>
+                </div>
+
+                <div>
+                    <label>Farm Problem Observed</label>
+                    <textarea name="farm_problem" required rows="4" placeholder="Describe clinical symptoms, pest counts, dynamic weather stressors, or crop development indicators..."></textarea>
+                </div>
+            </div>
+
+            <div id="poultry-section" class="card" style="border-color: rgba(251, 191, 36, 0.3);">
+                <div class="card-title" style="color: #b45309;">
+                    <span>🐥 Poultry Population Inventory</span>
+                </div>
+                <div class="poultry-grid">
+                    <div>
+                        <span class="grid-label">Chicks Count</span>
+                        <input type="number" name="chicks_count" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Grower Count</span>
+                        <input type="number" name="grower_count" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Layer Count</span>
+                        <input type="number" name="layer_count" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Culling Bird</span>
+                        <input type="number" name="culling_bird_count" value="0" min="0">
+                    </div>
+                </div>
+            </div>
+
+            <div id="aqua-section" class="card" style="border-color: rgba(56, 189, 248, 0.3); display: none;">
+                <div class="card-title" style="color: #0284c7;">
+                    <span>🐟 Aqua Pond Tracking Inventory</span>
+                </div>
+                <div class="aqua-grid">
+                    <div>
+                        <span class="grid-label">Acre (Pond Size)</span>
+                        <input type="number" step="0.01" name="pond_acre" value="0.00" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">DOC (Days of Culture)</span>
+                        <input type="number" name="pond_doc" value="0" min="0">
+                    </div>
+                    <div>
+                        <span class="grid-label">Fish Variety</span>
+                        <input type="text" name="fish_variety" placeholder="e.g., Catla, Tilapia, Shrimp">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="border-color: rgba(99, 102, 241, 0.4);">
+                <div class="card-title" style="color: #4f46e5;">
+                    <span>🚀 Pipeline Projections</span>
+                    <button type="button" id="add-pipeline-btn" class="btn-action btn-pipeline" style="padding: 6px 12px; font-size: 0.8rem;">
+                        ➕ Add Item
+                    </button>
+                </div>
+
+                <div id="pipeline-sheet-container">
+                    <div class="grid-item-row pipeline-grid">
+                        <div>
+                            <span class="grid-label">Product Name</span>
+                            <select name="pipeline_discussed_product[]" class="product-select"></select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Poten. Qty</span>
+                            <input type="number" name="pipeline_potential_quantity[]" value="0" min="0">
+                        </div>
+                        <div>
+                            <span class="grid-label">Target Qty</span>
+                            <input type="number" name="pipeline_target_quantity[]" value="0" min="0">
+                        </div>
+                        <div>
+                            <span class="grid-label">Units</span>
+                            <select name="pipeline_unit_type[]">
+                                <option value="KG">KG</option>
+                                <option value="Litre">Litre</option>
+                                <option value="Gram">Gram</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Process Stage</span>
+                            <select name="pipeline_process_status[]">
+                                <option value="Cold">❄️ Cold</option>
+                                <option value="Warm" selected>🔥 Warm</option>
+                                <option value="Hot">💥 Hot</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Conv (%)</span>
+                            <input type="number" name="pipeline_conversion_percentage[]" value="0" min="0" max="100">
+                        </div>
+                        <div>
+                            <button type="button" class="btn-action btn-danger remove-pipeline-btn">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="border-color: rgba(16, 185, 129, 0.4);">
+                <div class="card-title" style="color: #059669;">
+                    <span>📦 Orders</span>
+                    <button type="button" id="add-order-btn" class="btn-action btn-success" style="padding: 6px 12px; font-size: 0.8rem;">
+                        ➕ Add Order
+                    </button>
+                </div>
+
+                <div id="order-sheet-container">
+                    <div class="grid-item-row order-grid">
+                        <div>
+                            <span class="grid-label">Product Name</span>
+                            <select name="discussed_product[]" class="product-select"></select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Quantity</span>
+                            <input type="number" name="sale_quantity[]" value="0" min="0">
+                        </div>
+                        <div>
+                            <span class="grid-label">Units</span>
+                            <select name="unit_type[]">
+                                <option value="KG">KG</option>
+                                <option value="Litre">Litre</option>
+                                <option value="Gram">Gram</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="grid-label">Rate (Price)</span>
+                            <input type="number" step="0.01" name="primary_price[]" value="0.00">
+                        </div>
+                        <div>
+                            <button type="button" class="btn-action btn-danger remove-order-btn">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="submit-btn-container">
+                <button type="submit" class="btn-action btn-submit">
+                    Submit Field Report & Open Analytics
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+    let map, marker;
+
+    // ==========================================================
+    // DISTRICT NORMALIZATION MAP
+    // ----------------------------------------------------------
+    // WHY THIS EXISTS: Nominatim's reverse-geocode response does not
+    // return a consistent admin level for every coordinate. For some
+    // points `county` holds the real district; for others it's a
+    // taluk/block name; for rural points it can fall through to a
+    // town/village name. Saving that raw value directly is why the
+    // District filter dropdown on the dashboard showed a mix of real
+    // districts (e.g. Namakkal) alongside taluks/villages that sit
+    // *inside* those districts (Mohanur, Musiri, Rasipuram, Thottiyam,
+    // Tiruchengode, Kilvelur, Manachanallur, Agiripalle, Gannavaram,
+    // Nuzvid, Unguturu, etc).
+    //
+    // This mirrors crm_core/district_data.py (TALUK_TO_DISTRICT) on
+    // the backend. Keep both lists in sync when you add new mappings.
+    // ==========================================================
+    const TALUK_TO_DISTRICT = {
+        "mohanur": "Namakkal",
+        "musiri": "Tiruchirappalli",
+        "rasipuram": "Namakkal",
+        "thottiyam": "Tiruchirappalli",
+        "tiruchengode": "Namakkal",
+        "kilvelur": "Nagapattinam",
+        "manachanallur": "Tiruchirappalli",
+        "agiripalle": "Krishna",
+        "gannavaram": "NTR",
+        "nuzvid": "Eluru",
+        "unguturu": "Eluru"
+        // Add more taluk/block/village -> district mappings as you spot
+        // new noisy values appearing in the District filter dropdown.
+    };
+
+    function normalizeDistrict(rawValue) {
+        if (!rawValue) return '';
+        const key = rawValue.trim().toLowerCase();
+        if (TALUK_TO_DISTRICT[key]) {
+            return TALUK_TO_DISTRICT[key];
+        }
+        // Unknown value: keep it (trimmed) instead of dropping data,
+        // so it's visible in the dropdown and a mapping can be added.
+        return rawValue.trim();
+    }
+
+    // ==========================================================
+    // PRODUCT LISTS PER SECTOR
+    // ----------------------------------------------------------
+    // Drives the "Product Name" dropdown in both the Pipeline
+    // Projections and Orders sections. Swaps automatically whenever
+    // the Business Sector Segment (Poultry / Aqua) changes.
+    // ==========================================================
+    const PRODUCT_LISTS = {
+        Poultry: [
+            "Alpha Engrow NGP®",
+            "Bio-Org+® FD Cluster",
+            "Bio-Org+® FD Ultra",
+            "Bio-Org+® WS",
+            "Bio-Org+® Gel",
+            "Calvin® D3+ Liquid",
+            "Calvin® D3+ Dry",
+            "Dr. Yes® WS",
+            "Dr. Yes® FD",
+            "ElectroMet Rx® FD",
+            "ElectroMet Rx® Liquid",
+            "ElectroMet Rx® Gel",
+            "Herbipro® OLP Dry",
+            "Herbipro® OLP Liquid",
+            "Hazyfix® Penta Dry",
+            "Hazyfix® Optima Dry",
+            "Hazyfix® NT Dry",
+            "Triangle Chick Program",
+            "Immunofight®",
+            "Wet-Lock®",
+            "EstroMax®",
+            "OrgoMax® GIT Liquid",
+            "Bio-Matt® Presto",
+            "Bio-Matt® Nurture"
+        ],
+        Aqua: [
+            "Attracta",
+            "Bio-Org+ Aqua",
+            "Blue-Vital M25+",
+            "Dr. Yes",
+            "Licy-Ban",
+            "Herbipro OLP Aqua",
+            "ElectroMet Rx Aqua",
+            "Stocky-Min",
+            "Hazyfix Aqua"
+        ]
+    };
+
+    // Fills a single <select class="product-select"> with the
+    // product list for the currently selected sector, preserving
+    // its previous selection when that product still exists in the
+    // new list.
+    function populateProductSelect(selectEl, sector) {
+        const previousValue = selectEl.value;
+        const products = PRODUCT_LISTS[sector] || [];
+
+        selectEl.innerHTML = '';
+
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = '-- Select Product --';
+        selectEl.appendChild(placeholderOpt);
+
+        products.forEach(function(productName) {
+            const opt = document.createElement('option');
+            opt.value = productName;
+            opt.textContent = productName;
+            selectEl.appendChild(opt);
+        });
+
+        if (products.includes(previousValue)) {
+            selectEl.value = previousValue;
+        } else {
+            selectEl.value = '';
+        }
+    }
+
+    // Refreshes every product dropdown currently on the page (both
+    // the Pipeline Projections and Orders sections) for the given
+    // sector.
+    function refreshAllProductSelects(sector) {
+        document.querySelectorAll('select.product-select').forEach(function(sel) {
+            populateProductSelect(sel, sector);
+        });
+    }
+
+    // Sector & Sub-Sector Switching Logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const sectorSelect = document.getElementById('business_type_select');
+        const subSectorSelect = document.getElementById('sub_business_type_select');
+        const poultrySection = document.getElementById('poultry-section');
+        const aquaSection = document.getElementById('aqua-section');
+
+        const subSectorMap = {
+            Poultry: [
+                { value: 'Broiler', text: '🐤 Broiler' },
+                { value: 'Hatcheries', text: '🥚 Hatcheries' },
+                { value: 'Feedmill', text: '🏭 Feedmill' },
+                { value: 'Layer', text: '🐔 Layer' }
+            ],
+            Aqua: [
+                { value: 'Shrimp', text: '🦐 Shrimp' },
+                { value: 'Fish', text: '🐟 Fish' },
+                { value: 'Feedmill', text: '🏭 Feedmill' },
+                { value: 'Hatcheries', text: '🧬 Hatcheries' }
+            ]
+        };
+
+        function dynamicSectorToggle() {
+            const selectedSector = sectorSelect.value;
+            subSectorSelect.innerHTML = '';
+            
+            if (subSectorMap[selectedSector]) {
+                subSectorMap[selectedSector].forEach(optionData => {
+                    const opt = document.createElement('option');
+                    opt.value = optionData.value;
+                    opt.textContent = optionData.text;
+                    subSectorSelect.appendChild(opt);
+                });
+            }
+
+            if (selectedSector === 'Aqua') {
+                poultrySection.style.display = 'none';
+                aquaSection.style.display = 'block';
+                toggleInputs(poultrySection, true);
+                toggleInputs(aquaSection, false);
+            } else {
+                poultrySection.style.display = 'block';
+                aquaSection.style.display = 'none';
+                toggleInputs(poultrySection, false);
+                toggleInputs(aquaSection, true);
+            }
+
+            // Swap the Product Name dropdown options to match the
+            // newly selected sector.
+            refreshAllProductSelects(selectedSector);
+        }
+
+        function toggleInputs(container, isDisabled) {
+            const inputs = container.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => {
+                input.disabled = isDisabled;
+            });
+        }
+
+        sectorSelect.addEventListener('change', dynamicSectorToggle);
+        dynamicSectorToggle();
+    });
+
+    // Dynamic Row Multiplier: Confirmed Orders
+    document.getElementById('add-order-btn').addEventListener('click', function() {
+        const container = document.getElementById('order-sheet-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'grid-item-row order-grid';
+        
+        newRow.innerHTML = `
+            <div>
+                <span class="grid-label">Product Name</span>
+                <select name="discussed_product[]" class="product-select"></select>
+            </div>
+            <div>
+                <span class="grid-label">Quantity</span>
+                <input type="number" name="sale_quantity[]" value="0" min="0">
+            </div>
+            <div>
+                <span class="grid-label">Units</span>
+                <select name="unit_type[]">
+                    <option value="KG">KG</option>
+                    <option value="Litre">Litre</option>
+                    <option value="Gram">Gram</option>
+                </select>
+            </div>
+            <div>
+                <span class="grid-label">Rate (Price)</span>
+                <input type="number" step="0.01" name="primary_price[]" value="0.00">
+            </div>
+            <div>
+                <button type="button" class="btn-action btn-danger remove-order-btn">🗑️</button>
+            </div>
+        `;
+        container.appendChild(newRow);
+
+        const currentSector = document.getElementById('business_type_select').value;
+        populateProductSelect(newRow.querySelector('select.product-select'), currentSector);
+    });
+
+    // Dynamic Row Multiplier: Pipeline Items
+    document.getElementById('add-pipeline-btn').addEventListener('click', function() {
+        const container = document.getElementById('pipeline-sheet-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'grid-item-row pipeline-grid';
+        
+        newRow.innerHTML = `
+            <div>
+                <span class="grid-label">Product Name</span>
+                <select name="pipeline_discussed_product[]" class="product-select"></select>
+            </div>
+            <div>
+                <span class="grid-label">Poten. Qty</span>
+                <input type="number" name="pipeline_potential_quantity[]" value="0" min="0">
+            </div>
+            <div>
+                <span class="grid-label">Target Qty</span>
+                <input type="number" name="pipeline_target_quantity[]" value="0" min="0">
+            </div>
+            <div>
+                <span class="grid-label">Units</span>
+                <select name="pipeline_unit_type[]">
+                    <option value="KG">KG</option>
+                    <option value="Litre">Litre</option>
+                    <option value="Gram">Gram</option>
+                </select>
+            </div>
+            <div>
+                <span class="grid-label">Process Stage</span>
+                <select name="pipeline_process_status[]">
+                    <option value="Cold">❄️ Cold</option>
+                    <option value="Warm" selected>🔥 Warm</option>
+                    <option value="Hot">💥 Hot</option>
+                </select>
+            </div>
+            <div>
+                <span class="grid-label">Conv (%)</span>
+                <input type="number" name="pipeline_conversion_percentage[]" value="0" min="0" max="100">
+            </div>
+            <div>
+                <button type="button" class="btn-action btn-danger remove-pipeline-btn">🗑️</button>
+            </div>
+        `;
+        container.appendChild(newRow);
+
+        const currentSector = document.getElementById('business_type_select').value;
+        populateProductSelect(newRow.querySelector('select.product-select'), currentSector);
+    });
+
+    // Row Cleaner Event Delegations
+    document.getElementById('order-sheet-container').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-order-btn') || e.target.parentElement.classList.contains('remove-order-btn')) {
+            const btn = e.target.classList.contains('remove-order-btn') ? e.target : e.target.parentElement;
+            const container = document.getElementById('order-sheet-container');
+            if (container.getElementsByClassName('grid-item-row').length > 1) {
+                btn.closest('.grid-item-row').remove();
+            } else {
+                const lastRow = container.querySelector('.grid-item-row');
+                lastRow.querySelector('select[name="discussed_product[]"]').value = '';
+                lastRow.querySelector('input[name="sale_quantity[]"]').value = '0';
+                lastRow.querySelector('input[name="primary_price[]"]').value = '0.00';
+                lastRow.querySelector('select[name="unit_type[]"]').value = 'KG';
+            }
+        }
+    });
+
+    document.getElementById('pipeline-sheet-container').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-pipeline-btn') || e.target.parentElement.classList.contains('remove-pipeline-btn')) {
+            const btn = e.target.classList.contains('remove-pipeline-btn') ? e.target : e.target.parentElement;
+            const container = document.getElementById('pipeline-sheet-container');
+            if (container.getElementsByClassName('grid-item-row').length > 1) {
+                btn.closest('.grid-item-row').remove();
+            } else {
+                const lastRow = container.querySelector('.grid-item-row');
+                lastRow.querySelector('select[name="pipeline_discussed_product[]"]').value = '';
+                lastRow.querySelector('input[name="pipeline_potential_quantity[]"]').value = '0';
+                lastRow.querySelector('input[name="pipeline_target_quantity[]"]').value = '0';
+                lastRow.querySelector('select[name="pipeline_unit_type[]"]').value = 'KG';
+                lastRow.querySelector('select[name="pipeline_process_status[]"]').value = 'Warm';
+                lastRow.querySelector('input[name="pipeline_conversion_percentage[]"]').value = '0';
+            }
+        }
+    });
+
+    // Mandatory Field Verification
+    document.getElementById('farmForm').addEventListener('submit', function(e) {
+        const requiredInputs = this.querySelectorAll('[required]:not([disabled])');
+        let valid = true;
+        
+        requiredInputs.forEach(input => {
+            if (!input.value.trim()) {
+                valid = false;
+                input.style.setProperty('border-color', '#ef4444', 'important');
+            } else {
+                input.style.setProperty('border-color', '', '');
+            }
+        });
+        
+        if (!valid) {
+            e.preventDefault();
+            alert("Please fill out all mandatory fields before logging data.");
+        }
+    });
+
+    // Geolocation Engine & Automatic Address Fetcher
+    document.getElementById('locateBtn').addEventListener('click', function() {
+        const btn = this;
+        btn.innerText = "⏳ Locating via GPS Grid...";
+        btn.disabled = true;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    document.getElementById('lat').value = lat;
+                    document.getElementById('lon').value = lon;
+                    document.getElementById('map-container').style.display = 'block';
+                    
+                    document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+                    
+                    // Render Map
+                    if (!map) {
+                        map = L.map('map').setView([lat, lon], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '© OpenStreetMap'
+                        }).addTo(map);
+                        marker = L.marker([lat, lon]).addTo(map);
+                    } else {
+                        const newPos = new L.LatLng(lat, lon);
+                        marker.setLatLng(newPos);
+                        map.setView(newPos, 14);
+                    }
+                    
+                    // Primary Reverse Geocode Attempt via OpenStreetMap (Forced English Output)
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=en`)
+                        .then(res => res.json())
+                        .then(data => {
+                            btn.innerText = "✅ Location Secured";
+                            
+                            if (data && data.address) {
+                                const addr = data.address;
+                                // FIX: county/state_district/district can each return
+                                // a different admin granularity depending on the
+                                // coordinate (real district vs taluk vs village).
+                                // Normalize whichever one comes back so only real
+                                // district names ever reach the input/dropdown.
+                                const rawDistrict = addr.county || addr.state_district || addr.district || '';
+                                const district = normalizeDistrict(rawDistrict);
+                                const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.city || '';
+                                const state = addr.state || '';
+
+                                document.getElementById('district').value = district;
+                                document.getElementById('area').value = area;
+                                document.getElementById('state').value = state;
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Reverse Geocoding Error:", err);
+                            btn.innerText = "⚠️ Location Secured (Geocoding Failed)";
+                        });
+                },
+                function(error) {
+                    btn.disabled = false;
+                    btn.innerText = "Fetch GPS Verification Coordinate";
+                    alert("Unable to retrieve location. Please enable location permissions on your browser.");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        } else {
+            btn.disabled = false;
+            btn.innerText = "Fetch GPS Verification Coordinate";
+            alert("Geolocation is not supported by your browser.");
+        }
+    });
+    </script>
+</body>
+</html>
