@@ -95,11 +95,6 @@ class FarmVisitReport(models.Model):
     )
     farm_problem = models.TextField(blank=True, null=True)
 
-<<<<<<< HEAD
-    # Auto-inserted by patch_models.py
-    next_visit_date = models.DateField(null=True, blank=True)
-    
-=======
     # FIX: this field was missing entirely, which is why
     # save_farm_visit()'s next_visit_date=... create() call always hit
     # its TypeError fallback and silently dropped the value, and why
@@ -110,7 +105,6 @@ class FarmVisitReport(models.Model):
         help_text="Planned follow-up date captured on the visit-logging form."
     )
 
->>>>>>> cecbed230ac15d1432b02a5e362fc6565ba979c5
     # Aligned with the exact field lookup criteria filtering dashboard telemetry
     visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
     created_at = models.DateTimeField(auto_now_add=True)
