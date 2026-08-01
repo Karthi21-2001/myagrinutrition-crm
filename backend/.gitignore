@@ -1,2 +1,18 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-*
+asgiref/
+asgiref-*.dist-info/
+django-*.dist-info/
+dj_database_url/
+dj_database_url-*.dist-info/
+sqlparse/
+sqlparse-*.dist-info/
+tzdata/
+tzdata-*.dist-info/
+bin/
+Lib/
+Scripts/
+pyvenv.cfg
+__pycache__/
+*.pyc
+*.bak
+.env
+db.sqlite3
