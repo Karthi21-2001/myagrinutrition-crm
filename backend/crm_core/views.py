@@ -471,9 +471,28 @@ def export_visits_to_excel(request):
         product_loop_list = products if products.exists() else [None]
 
         for p in product_loop_list:
-            ws_data.cell(row=current_row, column=1, value=v.visit_date.strftime("%Y-%m-%d %H:%M") if v and v.visit_date else "")
+            # FIX (IST bug): visit_date is stored in UTC (USE_TZ=True).
+            # Calling .strftime() directly on it printed the raw UTC
+            # value instead of converting to the local TIME_ZONE
+            # ('Asia/Kolkata'). timezone.localtime() does that
+            # conversion, which is what template date filters do
+            # automatically but raw Python code must do explicitly.
+            ws_data.cell(
+                row=current_row,
+                column=1,
+                value=timezone.localtime(v.visit_date).strftime("%Y-%m-%d %H:%M") if v and v.visit_date else ""
+            )
+
+            # FIX (Next Visit Date blank in export): this was already
+            # correctly reading getattr(v, 'next_visit_date', None) —
+            # the blank cells were caused by the field not existing on
+            # FarmVisitReport yet (see save_farm_visit's try/except
+            # TypeError fallback), not by this line. Once
+            # next_visit_date is added to models.py and migrated, new
+            # visits will populate here automatically.
             nvd = getattr(v, 'next_visit_date', None) if v else None
             ws_data.cell(row=current_row, column=2, value=nvd.strftime("%Y-%m-%d") if nvd else "")
+
             ws_data.cell(row=current_row, column=3, value=v.executive.username if v and v.executive else "")
             ws_data.cell(row=current_row, column=4, value=f.farm_name if f else "")
             ws_data.cell(row=current_row, column=5, value=f.owner_name if f else "")
@@ -1240,7 +1259,7 @@ def get_location_details(request):
         url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
         headers = {'User-Agent': 'AgriNutritionCRM/1.0'}
         res = requests.get(url, headers=headers, timeout=5)
-        
+
         if res.status_code == 200:
             data = res.json()
             address = data.get('address', {})
