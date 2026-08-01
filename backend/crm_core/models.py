@@ -94,15 +94,6 @@ class FarmVisitReport(models.Model):
         related_name='filed_visit_reports'
     )
     farm_problem = models.TextField(blank=True, null=True)
-
-    # Planned follow-up date captured from the "Next Visit Date" field on
-    # the visit-logging form (farm_visit_form.html -> save_farm_visit).
-    # Previously missing from this model, which is why _HAS_NEXT_VISIT_DATE_FIELD
-    # in views.py evaluated to False and every visit was saved with no
-    # follow-up date — the Excel export's "Next Visit Date" column was
-    # blank for every row as a result. Nullable since older visits logged
-    # before this field existed have no value to backfill.
-    next_visit_date = models.DateField(null=True, blank=True)
     
     # Aligned with the exact field lookup criteria filtering dashboard telemetry
     visit_date = models.DateTimeField(auto_now_add=True, help_text="Date the visit occurred.")
