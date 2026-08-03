@@ -149,6 +149,19 @@
             resize: vertical;
         }
 
+        /* Remove number input spinner arrows (Chrome, Safari, Edge) —
+           user wants plain simple entry, no increment/decrement steppers */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* Remove number input spinner arrows (Firefox) */
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
         /* Location Section Specifics */
         .location-box {
             background-color: rgba(148, 163, 184, 0.08);
