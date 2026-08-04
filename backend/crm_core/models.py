@@ -81,6 +81,12 @@ class FarmVisitReport(models.Model):
     Logs each specific field visit activity event instance. Serves as the 
     parent record grouping the ordered products together.
     """
+    STATUS_CHOICES = [
+        ('Completed', 'Completed'),
+        ('Follow-up Required', 'Follow-up Required'),
+        ('No Response', 'No Response'),
+    ]
+
     farm = models.ForeignKey(
         Farm, 
         on_delete=models.CASCADE, 
@@ -94,6 +100,13 @@ class FarmVisitReport(models.Model):
         related_name='filed_visit_reports'
     )
     farm_problem = models.TextField(blank=True, null=True)
+
+    visit_status = models.CharField(
+        max_length=50,
+        choices=STATUS_CHOICES,
+        default='Completed',
+        help_text="Outcome status of this visit."
+    )
 
     # FIX: this field was missing entirely, which is why
     # save_farm_visit()'s next_visit_date=... create() call always hit
@@ -163,3 +176,46 @@ class VisitedProductDetail(models.Model):
 
     def __str__(self):
         return f"{self.product_name} ({self.sale_quantity} {self.unit_type}) - Visit #{self.visit.id}"
+
+
+class WhatsAppGroup(models.Model):
+    """A WhatsApp group the CRM can send notifications to."""
+    name = models.CharField(max_length=100, unique=True)           # internal label
+    whatsapp_group_title = models.CharField(max_length=150)        # EXACT title as shown in WhatsApp
+    area = models.CharField(max_length=100, blank=True, null=True)
+    team = models.CharField(max_length=100, blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "WhatsApp Group"
+        verbose_name_plural = "WhatsApp Groups"
+
+    def __str__(self):
+        return f"{self.name} ({self.whatsapp_group_title})"
+
+
+class SalesExecutiveProfile(models.Model):
+    """
+    Extends the existing User model with CRM-specific identity fields
+    (employee ID, area, team, WhatsApp routing) instead of duplicating
+    the executive record that Farm/FarmVisitReport already point to.
+    """
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sales_profile"
+    )
+    employee_id = models.CharField(max_length=50, unique=True)  # e.g. MurugesanMYA070
+    area = models.CharField(max_length=100, blank=True, null=True)
+    team = models.CharField(max_length=100, blank=True, null=True)
+    whatsapp_group = models.ForeignKey(
+        WhatsAppGroup, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="executives"
+    )
+
+    class Meta:
+        verbose_name = "Sales Executive Profile"
+        verbose_name_plural = "Sales Executive Profiles"
+
+    def __str__(self):
+        return f"{self.user.get_full_name() or self.user.username} ({self.employee_id})"
