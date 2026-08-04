@@ -196,9 +196,12 @@
             display: inline-flex;
             align-items: center;
             transition: all 0.2s;
+            border: none;
+            cursor: pointer;
         }
         .btn-primary { background-color: #2563eb; color: white; border: none; }
         .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-primary:disabled { background-color: #93c5fd; cursor: not-allowed; }
         .btn-secondary { background-color: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); }
         .btn-secondary:hover { background-color: #334155; }
         .btn-danger { background-color: var(--danger); color: white; border: none; }
@@ -212,7 +215,7 @@
         }
         .btn-info-pulse:hover { background-color: #0ea5e9 !important; }
 
-        /* KPI Block Configurations */
+        /* Metric KPI Block Configurations */
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -501,6 +504,7 @@
                                 <th>Farm Details</th>
                                 <th>District</th>
                                 <th>Product Action</th>
+                                <th>Notify</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -528,10 +532,20 @@
                                         <span class="status-pill" style="background-color: #475569;">General Consult</span>
                                     {% endfor %}
                                 </td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary notify-whatsapp-btn"
+                                        style="padding: 6px 12px; font-size: 0.8rem;"
+                                        data-visit-id="{{ visit.id }}"
+                                    >
+                                        📲 Notify
+                                    </button>
+                                </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
                                     No operations submitted to data streams yet.
                                 </td>
                             </tr>
@@ -614,6 +628,24 @@
     {{ farm_locations_js|json_script:"farm-locations-data" }}
 
     <script>
+        // Reads the csrftoken cookie Django sets, needed because the
+        // WhatsApp-notify POST below is fired via fetch() rather than a
+        // real <form> submit (no {% csrf_token %} template tag to lean on).
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
         // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
@@ -676,6 +708,51 @@
                     .catch(err => console.error("Filter cascade failed:", err));
                 });
             }
+
+            // WhatsApp "Notify" dispatch buttons in the Realtime Field
+            // Operation Dispatch Stream table.
+            document.querySelectorAll('.notify-whatsapp-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const visitId = btn.dataset.visitId;
+                    const originalText = btn.textContent;
+                    btn.disabled = true;
+                    btn.textContent = '⏳ Sending...';
+                    fetch(`/crm/visits/${visitId}/notify-whatsapp/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                        },
+                    })
+                        .then(function (res) {
+                            return res.json()
+                                .catch(function () { return {}; })
+                                .then(function (data) {
+                                    return { ok: res.ok, data: data };
+                                });
+                        })
+                        .then(function (result) {
+                            if (result.ok) {
+                                btn.textContent = '✅ Sent';
+                                // Brief confirmation, then restore the button
+                                // in case the same visit needs re-sending later.
+                                setTimeout(function () {
+                                    btn.textContent = originalText;
+                                    btn.disabled = false;
+                                }, 3000);
+                            } else {
+                                alert('Notify failed: ' + (result.data.error || 'Unknown error'));
+                                btn.textContent = originalText;
+                                btn.disabled = false;
+                            }
+                        })
+                        .catch(function (err) {
+                            console.error('Notify request failed:', err);
+                            alert('Notify failed: could not reach the server.');
+                            btn.textContent = originalText;
+                            btn.disabled = false;
+                        });
+                });
+            });
 
             // Safe parsing of chart scripts
             const canvasElem = document.getElementById('districtChart');
