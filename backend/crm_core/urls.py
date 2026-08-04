@@ -1,6 +1,7 @@
 from django.urls import path
 from django.views.generic import TemplateView
 from . import views
+
 urlpatterns = [
     # ==========================================
     # 🔐 EXECUTIVE AUTHENTICATION & RECOVERY
@@ -9,6 +10,7 @@ urlpatterns = [
     path('account/signup/', views.register_user, name='executive_signup'),
     path('login/', views.login_user, name='login_user'),
     path('logout/', views.logout_user, name='logout_user'),
+    # --- Password Reset Template View ---
     path(
         'password-reset/',
         TemplateView.as_view(template_name='crm_core/password_reset.html'),
@@ -49,6 +51,7 @@ urlpatterns = [
         views.executive_analytics_view,
         name='executive_analytics_view',
     ),
+    # --- Analytics Report Routing ---
     path(
         'analytics-report/',
         views.executive_analytics_view,
@@ -61,5 +64,19 @@ urlpatterns = [
         'api/get-location-details/',
         views.get_location_details,
         name='reverse_geocode',
+    ),
+    # ==========================================
+    # 📲 WHATSAPP VISIT NOTIFICATION (LOCAL-ONLY)
+    # ==========================================
+    # This route exists in the shared codebase deployed to both Render
+    # and your local machine, but is only *functional* locally — see
+    # the module docstring on views.notify_farm_visit for why. On
+    # Render it will return a clean 500 if hit rather than crash the
+    # whole app, since the Selenium/pyperclip import in that view is
+    # deferred until the view actually runs.
+    path(
+        'visits/<int:visit_id>/notify-whatsapp/',
+        views.notify_farm_visit,
+        name='notify_farm_visit',
     ),
 ]
