@@ -17,14 +17,18 @@ from django.db import transaction
 from django.db.models import Avg, Count, DecimalField, F, FloatField, Max, Q, Sum
 from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
+from .utils.whatsapp_formatter import build_farm_visit_message
+from .utils.whatsapp_routing import get_target_group
+from .utils.whatsapp_selenium import send_whatsapp_group_message
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -960,19 +964,9 @@ def get_dashboard_context(request):
 
         # Sort worst-first: never-visited farms (None) float to the top,
         # then longest-overdue first.
-        #
-        # FIX: the old key sorted the tie-breaker (days_since_visit)
-        # ascending, so among visited farms the *least* overdue ones
-        # came first and the most overdue ones got pushed toward the
-        # bottom — the opposite of "longest-overdue first", and they
-        # could even fall outside the [:25] slice below. Negating the
-        # day count flips that tier to descending while keeping the
-        # never-visited farms in front.
         stale_farms_raw.sort(
-            key=lambda x: (
-                x["days_since_visit"] is not None,  # None (never-visited) sorts first
-                -(x["days_since_visit"] or 0),       # then most-overdue days first
-            )
+            key=lambda x: (x["days_since_visit"] is not None, x["days_since_visit"] or 0),
+            reverse=False,
         )
         stale_farms_count = len(stale_farms_raw)
         stale_farms_table = stale_farms_raw[:25]
@@ -1283,3 +1277,38 @@ def get_location_details(request):
     except Exception as e:
         logger.error(f"Geocoding error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# ==========================================
+# 📲 WHATSAPP VISIT NOTIFICATION
+# ==========================================
+
+@login_required(login_url='/crm/login/')
+@require_POST
+def notify_farm_visit(request, visit_id):
+    """
+    Sends a WhatsApp notification for a given farm visit report to the
+    correct group, based on the executive's assigned WhatsAppGroup.
+    """
+    visit_report = get_object_or_404(
+        FarmVisitReport.objects.select_related(
+            "farm", "executive", "executive__sales_profile__whatsapp_group"
+        ),
+        id=visit_id
+    )
+
+    try:
+        message = build_farm_visit_message(visit_report)
+        group_title = get_target_group(visit_report)
+        send_whatsapp_group_message(group_title, message)
+
+        logger.info(f"WhatsApp notification sent for visit #{visit_id} to group '{group_title}'")
+        return JsonResponse({"status": "sent", "group": group_title})
+
+    except ValueError as e:
+        logger.warning(f"WhatsApp notify skipped for visit #{visit_id}: {e}")
+        return JsonResponse({"status": "error", "detail": str(e)}, status=400)
+
+    except Exception as e:
+        logger.error(f"WhatsApp notify failed for visit #{visit_id}: {e}", exc_info=True)
+        return JsonResponse({"status": "error", "detail": str(e)}, status=500)
