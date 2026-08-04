@@ -501,6 +501,7 @@
                                 <th>Farm Details</th>
                                 <th>District</th>
                                 <th>Product Action</th>
+                                <th>WhatsApp</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -528,10 +529,20 @@
                                         <span class="status-pill" style="background-color: #475569;">General Consult</span>
                                     {% endfor %}
                                 </td>
+                                <td>
+                                    <button
+                                        class="btn-notify-whatsapp"
+                                        data-visit-id="{{ visit.id }}"
+                                        onclick="notifyWhatsApp(this)"
+                                        style="background:#25D366;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;"
+                                    >
+                                        📲 Notify
+                                    </button>
+                                </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
                                     No operations submitted to data streams yet.
                                 </td>
                             </tr>
@@ -614,6 +625,47 @@
     {{ farm_locations_js|json_script:"farm-locations-data" }}
 
     <script>
+        // --- WhatsApp Notify Button Handler ---
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+
+        function notifyWhatsApp(button) {
+            const visitId = button.getAttribute('data-visit-id');
+            const csrftoken = getCookie('csrftoken');
+
+            button.disabled = true;
+            button.innerText = "Sending...";
+
+            fetch(`/crm/visits/${visitId}/notify-whatsapp/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json',
+                },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sent') {
+                        button.innerText = "✅ Sent";
+                        button.style.background = "#128C7E";
+                    } else {
+                        button.innerText = "❌ Failed";
+                        button.style.background = "#d32f2f";
+                        alert("WhatsApp notify failed: " + data.detail);
+                        button.disabled = false;
+                    }
+                })
+                .catch(err => {
+                    button.innerText = "❌ Error";
+                    button.style.background = "#d32f2f";
+                    alert("Request failed: " + err);
+                    button.disabled = false;
+                });
+        }
+
         // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
