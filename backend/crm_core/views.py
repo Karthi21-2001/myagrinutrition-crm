@@ -20,15 +20,11 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
-from .utils.whatsapp_formatter import build_farm_visit_message
-from .utils.whatsapp_routing import get_target_group
-from .utils.whatsapp_selenium import send_whatsapp_group_message
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -475,25 +471,12 @@ def export_visits_to_excel(request):
         product_loop_list = products if products.exists() else [None]
 
         for p in product_loop_list:
-            # FIX (IST bug): visit_date is stored in UTC (USE_TZ=True).
-            # Calling .strftime() directly on it printed the raw UTC
-            # value instead of converting to the local TIME_ZONE
-            # ('Asia/Kolkata'). timezone.localtime() does that
-            # conversion, which is what template date filters do
-            # automatically but raw Python code must do explicitly.
             ws_data.cell(
                 row=current_row,
                 column=1,
                 value=timezone.localtime(v.visit_date).strftime("%Y-%m-%d %H:%M") if v and v.visit_date else ""
             )
 
-            # FIX (Next Visit Date blank in export): this was already
-            # correctly reading getattr(v, 'next_visit_date', None) —
-            # the blank cells were caused by the field not existing on
-            # FarmVisitReport yet (see save_farm_visit's try/except
-            # TypeError fallback), not by this line. Once
-            # next_visit_date is added to models.py and migrated, new
-            # visits will populate here automatically.
             nvd = getattr(v, 'next_visit_date', None) if v else None
             ws_data.cell(row=current_row, column=2, value=nvd.strftime("%Y-%m-%d") if nvd else "")
 
@@ -564,9 +547,6 @@ def get_dashboard_context(request):
 
     for the MyAgriNutrition Analytics Dashboard safely with complete error protection.
     """
-    # ------------------------------------------------------------------
-    # 1. READ FILTER INPUTS FROM REQUEST
-    # ------------------------------------------------------------------
     sel_state = request.GET.get("state", "").strip()
     sel_country = request.GET.get("country", "").strip()
     sel_district = request.GET.get("district", "").strip()
@@ -577,11 +557,7 @@ def get_dashboard_context(request):
     sel_start_date = request.GET.get("start_date", "").strip()
     sel_end_date = request.GET.get("end_date", "").strip()
 
-    # ------------------------------------------------------------------
-    # 2. INITIALIZE SAFE DEFAULT CONTEXT
-    # ------------------------------------------------------------------
     context = {
-        # Numeric KPIs
         "total_revenue": 0.0,
         "total_visits": 0,
         "active_executives": 0,
@@ -590,13 +566,11 @@ def get_dashboard_context(request):
         "paid_orders_count": 0,
         "avg_order_value": 0.0,
         "conversion_rate": 0.0,
-        # Percentages
         "hot_pct": 0.0,
         "warm_pct": 0.0,
         "cold_pct": 0.0,
         "poultry_pct": 0.0,
         "aqua_pct": 0.0,
-        # Pre-Serialized Safe JSON for Chart.js
         "month_wise_labels_js": json.dumps([]),
         "month_wise_data_js": json.dumps([]),
         "year_wise_labels_js": json.dumps([]),
@@ -620,17 +594,14 @@ def get_dashboard_context(request):
             ["Chicks", "Growers", "Layers", "Culling Birds"]
         ),
         "bird_counts_js": json.dumps([0, 0, 0, 0]),
-        # Structured Tables & Querysets
         "pipeline_spread": {"actual": 0, "target": 0, "potential": 0},
         "top_farms": [],
         "recent_visits": [],
-        # Options
         "state_list": [],
         "district_list": [],
         "executive_list": [],
         "year_list": [],
         "country_list": ["India"],
-        # Retention
         "selected_state": sel_state,
         "selected_country": sel_country,
         "selected_district": sel_district,
@@ -643,9 +614,6 @@ def get_dashboard_context(request):
     }
 
     try:
-        # ------------------------------------------------------------------
-        # 3. CONSTRUCT FILTER CONDITIONS
-        # ------------------------------------------------------------------
         farm_filters = Q()
         visit_filters = Q()
         product_filters = Q()
@@ -708,14 +676,10 @@ def get_dashboard_context(request):
             except ValueError:
                 pass
 
-        # Base Querysets
         visit_qs = FarmVisitReport.objects.filter(visit_filters)
         farm_qs = Farm.objects.filter(farm_filters)
         product_qs = VisitedProductDetail.objects.filter(product_filters)
 
-        # ------------------------------------------------------------------
-        # 4. PRIMARY METRICS ACCUMULATION
-        # ------------------------------------------------------------------
         v_count = visit_qs.count()
         total_farms_count = farm_qs.count()
 
@@ -769,9 +733,6 @@ def get_dashboard_context(request):
 
         conversion_rate = hot_pct
 
-        # ------------------------------------------------------------------
-        # 5. CHART DATA SERIES GENERATION
-        # ------------------------------------------------------------------
         month_wise_qs = list(
             product_qs.annotate(month=TruncMonth("visit__visit_date"))
             .values("month")
@@ -845,9 +806,6 @@ def get_dashboard_context(request):
             .annotate(farm_count=Count("id"))
             .exclude(Q(district__isnull=True) | Q(district=""))
         )
-        # Normalize raw taluk/village values into their parent district
-        # before aggregating, so e.g. "Mohanur" and "Rasipuram" counts
-        # merge into the "Namakkal" bar instead of showing separately.
         district_counts = {}
         for d in district_qs:
             normalized = normalize_district(d["district"])
@@ -856,27 +814,6 @@ def get_dashboard_context(request):
         chart_labels = [name for name, _ in sorted_districts]
         chart_counts = [count for _, count in sorted_districts]
 
-        # ------------------------------------------------------------------
-        # 5b. FARM COVERAGE MAP DATA
-        # ------------------------------------------------------------------
-        # Feeds the Leaflet coverage map on dashboard.html — one entry per
-        # farm that has GPS coordinates on file (captured at visit-logging
-        # time in save_farm_visit / the reverse-geocode widget). Farms
-        # without lat/lng are skipped here; the template counts and warns
-        # about them separately via a banner rather than silently omitting
-        # them.
-        #
-        # NOTE: this is built from visit_qs (not farm_qs). farm_qs only
-        # ever applies state/district/executive/sector — it never gained
-        # month/year/start_date/end_date filtering, so date-range picks
-        # from the dashboard toolbar silently had no effect on the map.
-        # visit_qs already has every filter applied (including the date
-        # range), so pulling the distinct set of farms referenced by
-        # those visits makes the map respect the same filters as the
-        # rest of the dashboard. Every Farm row is created alongside its
-        # first FarmVisitReport (see save_farm_visit's get_or_create), so
-        # this is equivalent to farm_qs whenever no date/month/year
-        # filter narrows visit_qs below farm_qs.
         map_farm_ids = visit_qs.values_list("farm_id", flat=True).distinct()
         farm_locations = list(
             Farm.objects.filter(id__in=map_farm_ids)
@@ -893,17 +830,6 @@ def get_dashboard_context(request):
             )
         )
 
-        # ------------------------------------------------------------------
-        # 5c. VISIT STALENESS ("coverage gap") CALCULATION
-        # ------------------------------------------------------------------
-        # This is deliberately computed from ALL of a farm's visit history
-        # (not visit_qs / not scoped to month/year/date-range filters) —
-        # "days since last visit" is a real-world fact about the farm, and
-        # scoping it to the currently selected date range would make a
-        # farm visited yesterday show as "stale" just because the person
-        # happens to be looking at last month's data. State/district/
-        # executive/sector filters still apply (via farm_qs) since those
-        # narrow *which farms* are in view, not *when* they're compared.
         STALE_THRESHOLD_DAYS = 30
         now = timezone.now()
 
@@ -917,7 +843,7 @@ def get_dashboard_context(request):
         def _days_since(farm_id):
             last_visit = last_visit_map.get(farm_id)
             if not last_visit:
-                return None  # never visited
+                return None
             return (now - last_visit).days
 
         farm_locations_data = []
@@ -937,12 +863,6 @@ def get_dashboard_context(request):
                 }
             )
 
-        # Standalone "coverage gap" list — every farm in the current
-        # state/district/executive/sector scope (farm_qs) that hasn't
-        # been visited in STALE_THRESHOLD_DAYS+ days, or has never been
-        # visited at all. Not restricted to farms with GPS coordinates,
-        # since this list is meant to drive follow-up action even before
-        # a farm has a pin on the map.
         stale_farms_raw = []
         for f in farm_qs.values(
             "id", "farm_name", "owner_name", "district", "state",
@@ -962,8 +882,6 @@ def get_dashboard_context(request):
                     }
                 )
 
-        # Sort worst-first: never-visited farms (None) float to the top,
-        # then longest-overdue first.
         stale_farms_raw.sort(
             key=lambda x: (x["days_since_visit"] is not None, x["days_since_visit"] or 0),
             reverse=False,
@@ -980,9 +898,6 @@ def get_dashboard_context(request):
         prob_labels = [p["farm_problem"] for p in prob_qs]
         prob_data = [p["frequency"] for p in prob_qs]
 
-        # ------------------------------------------------------------------
-        # 6. DEMOGRAPHICS & LIST DATA
-        # ------------------------------------------------------------------
         top_farms_raw = (
             product_qs.values(
                 "visit__farm__farm_name", "visit__farm__owner_name"
@@ -991,8 +906,6 @@ def get_dashboard_context(request):
             .filter(revenue__gt=0)
             .order_by("-revenue")[:5]
         )
-        # Re-keyed to plain "name"/"owner"/"revenue" so templates can use
-        # {{ farm.name }} instead of the raw dunder lookup path.
         top_farms_table = [
             {
                 "name": f["visit__farm__farm_name"],
@@ -1030,8 +943,6 @@ def get_dashboard_context(request):
                 "-visit_date"
             )[:10]
         )
-        # analytics_report.html reads visit.calculated_total, which isn't a
-        # model field — attach it here as the visit's total product revenue.
         for rv in recent_visits:
             rv.calculated_total = float(
                 VisitedProductDetail.objects.filter(visit=rv).aggregate(
@@ -1039,13 +950,6 @@ def get_dashboard_context(request):
                 )["total"]
             )
 
-        # --------------------------------------------------------------
-        # Dedup fix: .distinct() only removes EXACT string matches, so
-        # values differing only by casing/whitespace (e.g. "Tamil Nadu"
-        # vs "tamil nadu ") were showing up as separate dropdown entries.
-        # We now normalize (strip + lowercase) for comparison while
-        # keeping the first-seen original casing for display.
-        # --------------------------------------------------------------
         raw_states = Farm.objects.exclude(
             Q(state__isnull=True) | Q(state="")
         ).values_list("state", flat=True)
@@ -1061,24 +965,12 @@ def get_dashboard_context(request):
         ).values_list("district", flat=True)
         seen_districts = {}
         for d in raw_districts:
-            # Normalize taluk/block/village values (e.g. "Mohanur",
-            # "Rasipuram") into their real district ("Namakkal") before
-            # dedup, so the dropdown only ever shows real district names —
-            # not the taluks that sit inside them.
             normalized = normalize_district(d)
             key = normalized.strip().lower()
             if key and key not in seen_districts:
                 seen_districts[key] = normalized
         district_list = sorted(seen_districts.values())
 
-        # --------------------------------------------------------------
-        # FIX: Year dropdown was previously missing entirely — the
-        # template loops over `year_list`, but the view never built or
-        # returned it, so only the static "All Years" option ever showed.
-        # We derive distinct years straight from FarmVisitReport.visit_date
-        # (auto-stamped when an executive logs a visit — there is no
-        # manual date field in the form), newest year first.
-        # --------------------------------------------------------------
         raw_years = (
             FarmVisitReport.objects.exclude(visit_date__isnull=True)
             .annotate(y=TruncYear("visit_date"))
@@ -1088,13 +980,6 @@ def get_dashboard_context(request):
         )
         year_list = [y.year for y in raw_years if y]
 
-        # --------------------------------------------------------------
-        # FIX: Executive dropdown was previously built from ALL active
-        # users (User.objects.filter(is_active=True)), which included
-        # admin/staff accounts like "my_admin" alongside real field
-        # executives. We now explicitly exclude staff and superuser
-        # accounts so only genuine executives appear in the filter.
-        # --------------------------------------------------------------
         executive_list = list(
             User.objects.filter(
                 is_active=True,
@@ -1105,7 +990,6 @@ def get_dashboard_context(request):
             .distinct()
         )
 
-        # Update context dictionary with calculated values
         context.update(
             {
                 "total_revenue": total_rev,
@@ -1157,24 +1041,8 @@ def get_dashboard_context(request):
                 "state_data_js": json.dumps(
                     state_data, cls=DjangoJSONEncoder
                 ),
-                # NOTE: these two are intentionally NOT pre-dumped with
-                # json.dumps() like the other *_js keys above/below. The
-                # dashboard.html template renders them through Django's
-                # {{ chart_labels_js|json_script:"..." }} filter, which
-                # already calls json.dumps() internally. Pre-dumping here
-                # AND running it through json_script double-encodes the
-                # list into a JSON string-of-a-string; JSON.parse() on the
-                # JS side then only unwraps the outer layer and hands back
-                # a plain string, which Chart.js iterates character-by-
-                # character -- producing one bar per letter instead of
-                # one bar per district. Keep these as raw Python lists.
                 "chart_labels_js": chart_labels,
                 "chart_counts_js": chart_counts,
-                # Same rule applies here — dashboard.html renders this
-                # through {{ farm_locations_js|json_script:"..." }}, which
-                # already serializes it. Keep it as a raw Python list of
-                # dicts, NOT json.dumps()'d, or the map JS will try to
-                # JSON.parse() an already-stringified value and fail.
                 "farm_locations_js": farm_locations_data,
                 "stale_farms": stale_farms_table,
                 "stale_farms_count": stale_farms_count,
@@ -1245,9 +1113,6 @@ def clear_dashboard_data(request):
     return redirect('dashboard_home')
 
 
-# Place these at the end of backend/crm_core/views.py
-
-
 @login_required(login_url='/crm/login/')
 def get_location_details(request):
     """
@@ -1277,38 +1142,3 @@ def get_location_details(request):
     except Exception as e:
         logger.error(f"Geocoding error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
-# ==========================================
-# 📲 WHATSAPP VISIT NOTIFICATION
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-@require_POST
-def notify_farm_visit(request, visit_id):
-    """
-    Sends a WhatsApp notification for a given farm visit report to the
-    correct group, based on the executive's assigned WhatsAppGroup.
-    """
-    visit_report = get_object_or_404(
-        FarmVisitReport.objects.select_related(
-            "farm", "executive", "executive__sales_profile__whatsapp_group"
-        ),
-        id=visit_id
-    )
-
-    try:
-        message = build_farm_visit_message(visit_report)
-        group_title = get_target_group(visit_report)
-        send_whatsapp_group_message(group_title, message)
-
-        logger.info(f"WhatsApp notification sent for visit #{visit_id} to group '{group_title}'")
-        return JsonResponse({"status": "sent", "group": group_title})
-
-    except ValueError as e:
-        logger.warning(f"WhatsApp notify skipped for visit #{visit_id}: {e}")
-        return JsonResponse({"status": "error", "detail": str(e)}, status=400)
-
-    except Exception as e:
-        logger.error(f"WhatsApp notify failed for visit #{visit_id}: {e}", exc_info=True)
-        return JsonResponse({"status": "error", "detail": str(e)}, status=500)
