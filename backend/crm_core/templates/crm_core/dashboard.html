@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -16,7 +16,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-    
+
     <style>
         :root {
             --bg-main: #ffffff;       /* White Canvas */
@@ -98,11 +98,11 @@
             margin-left: 2px;
         }
 
-        h2 { 
-            font-size: 2rem; 
-            font-weight: 800; 
-            color: var(--text-main); 
-            letter-spacing: -0.02em; 
+        h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
         }
 
         /* Filter Toolbar Grid */
@@ -179,7 +179,7 @@
             filter: invert(46%) sepia(80%) saturate(1000%) hue-rotate(163deg) brightness(95%);
             cursor: pointer;
         }
-        
+
         .action-buttons {
             display: flex;
             gap: 12px;
@@ -203,7 +203,7 @@
         .btn-secondary:hover { background-color: #334155; }
         .btn-danger { background-color: var(--danger); color: white; border: none; }
         .btn-danger:hover { background-color: #dc2626; }
-        
+
         .btn-info-pulse {
             background-color: #38bdf8 !important;
             color: #111827 !important;
@@ -323,7 +323,7 @@
 <body>
 
     <div class="dashboard-container">
-        
+
         <div class="header-section">
             <div>
                 <!-- Brand Header with Integrated SVG Logo -->
@@ -342,10 +342,10 @@
                     </div>
                 </div>
                 <p style="color: var(--text-muted); margin-top: 4px;">Live Management Performance & Pipeline Telemetry</p>
-                
+
                 <!-- Filter Section -->
                 <div class="filter-toolbar-grid">
-                    
+
                     <div class="filter-group">
                         <label class="filter-label">🗺️ State</label>
                         <select id="filter-state" class="select-filter" onchange="applyLiveFilters()">
@@ -446,7 +446,7 @@
 
                 </div>
             </div>
-            
+
             <div class="action-buttons">
                 <a href="{% url 'analytics_report' %}" class="btn btn-info-pulse">📊 View Advanced Analytics Center</a>
                 <a href="{% url 'export_excel' %}" class="btn btn-secondary">📥 Export CSV Sheet</a>
@@ -501,7 +501,6 @@
                                 <th>Farm Details</th>
                                 <th>District</th>
                                 <th>Product Action</th>
-                                <th>WhatsApp</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -529,20 +528,10 @@
                                         <span class="status-pill" style="background-color: #475569;">General Consult</span>
                                     {% endfor %}
                                 </td>
-                                <td>
-                                    <button
-                                        class="btn-notify-whatsapp"
-                                        data-visit-id="{{ visit.id }}"
-                                        onclick="notifyWhatsApp(this)"
-                                        style="background:#25D366;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;"
-                                    >
-                                        📲 Notify
-                                    </button>
-                                </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
                                     No operations submitted to data streams yet.
                                 </td>
                             </tr>
@@ -625,47 +614,6 @@
     {{ farm_locations_js|json_script:"farm-locations-data" }}
 
     <script>
-        // --- WhatsApp Notify Button Handler ---
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-        }
-
-        function notifyWhatsApp(button) {
-            const visitId = button.getAttribute('data-visit-id');
-            const csrftoken = getCookie('csrftoken');
-
-            button.disabled = true;
-            button.innerText = "Sending...";
-
-            fetch(`/crm/visits/${visitId}/notify-whatsapp/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'Content-Type': 'application/json',
-                },
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'sent') {
-                        button.innerText = "✅ Sent";
-                        button.style.background = "#128C7E";
-                    } else {
-                        button.innerText = "❌ Failed";
-                        button.style.background = "#d32f2f";
-                        alert("WhatsApp notify failed: " + data.detail);
-                        button.disabled = false;
-                    }
-                })
-                .catch(err => {
-                    button.innerText = "❌ Error";
-                    button.style.background = "#d32f2f";
-                    alert("Request failed: " + err);
-                    button.disabled = false;
-                });
-        }
-
         // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
@@ -684,7 +632,7 @@
             }
 
             let url = new URL(window.location.href);
-            
+
             if (state) url.searchParams.set('state', state); else url.searchParams.delete('state');
             if (country) url.searchParams.set('country', country); else url.searchParams.delete('country');
             if (district) url.searchParams.set('district', district); else url.searchParams.delete('district');
@@ -698,7 +646,7 @@
             window.location.href = url.toString();
         }
 
-        // Cascading Dependent Filter Dropdowns Handler via AJAX 
+        // Cascading Dependent Filter Dropdowns Handler via AJAX
         document.addEventListener("DOMContentLoaded", function () {
             const stateSel = document.getElementById('filter-state');
             const districtSel = document.getElementById('filter-district');
@@ -756,7 +704,7 @@
                     datasets: [{
                         label: 'Farms Registered per District',
                         data: finalizedData,
-                        backgroundColor: '#38bdf8', 
+                        backgroundColor: '#38bdf8',
                         borderWidth: 0,
                         borderRadius: 6
                     }]
@@ -766,12 +714,12 @@
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { 
-                            beginAtZero: true, 
+                        y: {
+                            beginAtZero: true,
                             grid: { color: '#334155' },
                             ticks: { color: '#94a3b8', font: { family: 'Inter' } }
                         },
-                        x: { 
+                        x: {
                             grid: { display: false },
                             ticks: { color: '#94a3b8', font: { family: 'Inter', weight: 500 } }
                         }
