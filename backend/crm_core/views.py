@@ -960,9 +960,19 @@ def get_dashboard_context(request):
 
         # Sort worst-first: never-visited farms (None) float to the top,
         # then longest-overdue first.
+        #
+        # FIX: the old key sorted the tie-breaker (days_since_visit)
+        # ascending, so among visited farms the *least* overdue ones
+        # came first and the most overdue ones got pushed toward the
+        # bottom — the opposite of "longest-overdue first", and they
+        # could even fall outside the [:25] slice below. Negating the
+        # day count flips that tier to descending while keeping the
+        # never-visited farms in front.
         stale_farms_raw.sort(
-            key=lambda x: (x["days_since_visit"] is not None, x["days_since_visit"] or 0),
-            reverse=False,
+            key=lambda x: (
+                x["days_since_visit"] is not None,  # None (never-visited) sorts first
+                -(x["days_since_visit"] or 0),       # then most-overdue days first
+            )
         )
         stale_farms_count = len(stale_farms_raw)
         stale_farms_table = stale_farms_raw[:25]
