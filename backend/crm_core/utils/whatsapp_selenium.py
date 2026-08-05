@@ -61,25 +61,50 @@ def send_whatsapp_group_message(group_name: str, message: str, timeout: int = 60
         search_box.click()
         search_box.send_keys(group_name)
         time.sleep(2)
-        # NOTE: clicking the search result's inner <span title="..."> node
-        # directly is unreliable — WhatsApp Web's click handler lives on a
-        # parent row element, so a Selenium click on the span itself often
-        # does nothing (search stays populated, chat pane never opens).
-        # Keyboard navigation is far more robust: arrow down to the first
-        # matching result, then Enter to open it — same as a human using
-        # the search box normally.
+
+        # NOTE: neither clicking the inner <span title="..."> nor sending
+        # ARROW_DOWN/ENTER to the search box reliably opens the chat on
+        # WhatsApp Web — both were tested and the right-hand pane stayed
+        # on the splash screen with no exception raised (the row just
+        # never received the interaction). The fix: locate the actual
+        # clickable row element and force-click it via JavaScript
+        # (element.click() through execute_script), which bypasses
+        # Selenium's native click — native clicks can be silently
+        # swallowed by WhatsApp's virtualized list / overlapping
+        # elements, while a JS-dispatched click still fires the
+        # underlying React handler directly.
         try:
-            search_box.send_keys(Keys.ARROW_DOWN)
-            time.sleep(0.5)
-            search_box.send_keys(Keys.ENTER)
-            time.sleep(2)
-        except Exception:
-            _save_debug(driver, "chat_open_failed")
+            row = WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located(
+                    (By.XPATH,
+                     f'//span[@title="{group_name}"]'
+                     '/ancestor::div[@role="listitem" or @role="row"][1]')
+                )
+            )
+        except TimeoutException:
+            _save_debug(driver, "row_not_found")
             raise
 
-        # Confirm the chat actually opened by waiting for the message
-        # input box to appear (checked again below), rather than trusting
-        # that ENTER worked.
+        driver.execute_script("arguments[0].scrollIntoView(true);", row)
+        time.sleep(0.3)
+        driver.execute_script("arguments[0].click();", row)
+        time.sleep(2)
+
+        # Verify the chat actually opened (chat header showing the group
+        # name) before continuing — if it didn't, save debug info and
+        # fail loudly instead of silently returning True.
+        try:
+            WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, f'//header//span[@title="{group_name}"]')
+                )
+            )
+        except TimeoutException:
+            _save_debug(driver, "chat_did_not_open")
+            raise TimeoutException(
+                f"Clicked search result for '{group_name}' but the chat "
+                "pane never opened (still showing splash screen)."
+            )
         try:
             message_box = WebDriverWait(driver, timeout).until(
                 EC.presence_of_element_located(
