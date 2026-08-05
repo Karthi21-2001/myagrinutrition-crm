@@ -1,6 +1,7 @@
 import csv
 import json
 import logging
+import os
 import openpyxl
 import requests
 import traceback
@@ -592,6 +593,14 @@ def get_dashboard_context(request):
         "cold_pct": 0.0,
         "poultry_pct": 0.0,
         "aqua_pct": 0.0,
+        # Environment flag — controls whether the WhatsApp Notify button
+        # renders at all in dashboard.html. Selenium/Chrome only work on
+        # a local machine with a display and a logged-in WhatsApp Web
+        # session, never on Render, so the button is hidden entirely
+        # there instead of showing an always-fails error popup. Render
+        # automatically sets RENDER=true on every deployment, so this
+        # needs no extra configuration on your end.
+        "is_local_environment": os.environ.get("RENDER") != "true",
         # Pre-Serialized Safe JSON for Chart.js
         "month_wise_labels_js": json.dumps([]),
         "month_wise_data_js": json.dumps([]),
