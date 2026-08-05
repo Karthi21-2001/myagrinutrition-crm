@@ -600,7 +600,7 @@ def get_dashboard_context(request):
         # there instead of showing an always-fails error popup. Render
         # automatically sets RENDER=true on every deployment, so this
         # needs no extra configuration on your end.
-        "is_local_environment": os.environ.get("WHATSAPP_AUTOMATION_ENABLED") == "true",
+        "is_local_environment": os.environ.get("RENDER") != "true",
         # Pre-Serialized Safe JSON for Chart.js
         "month_wise_labels_js": json.dumps([]),
         "month_wise_data_js": json.dumps([]),
