@@ -61,16 +61,25 @@ def send_whatsapp_group_message(group_name: str, message: str, timeout: int = 60
         search_box.click()
         search_box.send_keys(group_name)
         time.sleep(2)
+        # NOTE: clicking the search result's inner <span title="..."> node
+        # directly is unreliable — WhatsApp Web's click handler lives on a
+        # parent row element, so a Selenium click on the span itself often
+        # does nothing (search stays populated, chat pane never opens).
+        # Keyboard navigation is far more robust: arrow down to the first
+        # matching result, then Enter to open it — same as a human using
+        # the search box normally.
         try:
-            chat = WebDriverWait(driver, timeout).until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, f'//span[@title="{group_name}"]')
-                )
-            )
-        except TimeoutException:
-            _save_debug(driver, "chat_click_timeout")
+            search_box.send_keys(Keys.ARROW_DOWN)
+            time.sleep(0.5)
+            search_box.send_keys(Keys.ENTER)
+            time.sleep(2)
+        except Exception:
+            _save_debug(driver, "chat_open_failed")
             raise
-        chat.click()
+
+        # Confirm the chat actually opened by waiting for the message
+        # input box to appear (checked again below), rather than trusting
+        # that ENTER worked.
         try:
             message_box = WebDriverWait(driver, timeout).until(
                 EC.presence_of_element_located(
