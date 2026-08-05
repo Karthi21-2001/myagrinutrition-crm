@@ -120,14 +120,14 @@
     {% for card in report_cards %}
     <div class="report-card">
         <button class="copy-btn" onclick="copyReport(this)">📋 Copy</button>
-        <div class="report-text">🔔 New Farm Visit Update
-👤 Executive: {{ card.executive }}
-🏡 Farm Name: {{ card.farm_name }}
-📍 Location: {{ card.location }}
-📅 Visit Date: {{ card.visit_date }}
-📝 Visit Summary: {{ card.summary }}
-✅ Status: {{ card.status }}
-📌 Next Follow-up: {{ card.next_followup }}
+        <div class="report-text">
+  Executive: {{ card.executive }}
+  Farm Name: {{ card.farm_name }}
+  Location: {{ card.location }}
+  Visit Date: {{ card.visit_date }}
+  Visit Summary: {{ card.summary }}
+  Status: {{ card.status }}
+  Next Follow-up: {{ card.next_followup }}
 
 Thank you,
 MyAgrinutrition CRM Team</div>
