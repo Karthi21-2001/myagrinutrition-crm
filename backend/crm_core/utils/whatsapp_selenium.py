@@ -3,20 +3,33 @@ import os
 import time
 import pyperclip
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
+
 CHROME_PROFILE_PATH = r"C:\Users\USER\whatsapp-chrome-profile"
 os.makedirs(CHROME_PROFILE_PATH, exist_ok=True)
 DEBUG_DIR = r"C:\Users\USER\whatsapp-debug"
 os.makedirs(DEBUG_DIR, exist_ok=True)
+
+
 def get_driver():
     options = webdriver.ChromeOptions()
     options.add_argument(f"user-data-dir={CHROME_PROFILE_PATH}")
-    driver = webdriver.Chrome(options=options)
+    # Explicitly resolve chromedriver via webdriver-manager instead of
+    # relying on Selenium's built-in auto-detection (Selenium Manager),
+    # which was failing with "Unable to obtain driver for chrome" on
+    # this machine. webdriver-manager downloads/caches the chromedriver
+    # build that matches the installed Chrome version.
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
     return driver
+
+
 def _save_debug(driver, label):
     screenshot_path = os.path.join(DEBUG_DIR, f"{label}.png")
     html_path = os.path.join(DEBUG_DIR, f"{label}.html")
@@ -28,6 +41,8 @@ def _save_debug(driver, label):
         print(f"Debug saved: {html_path}")
     except Exception as e:
         print(f"Could not save debug info: {e}")
+
+
 def send_whatsapp_group_message(group_name: str, message: str, timeout: int = 60):
     driver = get_driver()
     try:
