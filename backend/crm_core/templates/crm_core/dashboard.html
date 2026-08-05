@@ -19,14 +19,14 @@
 
     <style>
         :root {
-            --bg-main: #ffffff;       /* White Canvas */
-            --bg-card: #eef7e0;       /* Light Green Card Tiles */
-            --text-main: #1e293b;     /* Dark Text for Contrast on Light BG */
-            --text-muted: #5a7047;    /* Muted Green-Gray Sub-text */
-            --primary: #38bdf8;       /* Power BI Neon Indigo Blue Accent */
-            --border: #cfe6a8;        /* Light Green Grid Lines and Frame Borders */
-            --table-header: #dcefc0;  /* Light Green Header Wrapper */
-            --success: #4ade80;       /* KPI Positives / Revenue Trackers */
+            --bg-main: #ffffff;
+            --bg-card: #eef7e0;
+            --text-main: #1e293b;
+            --text-muted: #5a7047;
+            --primary: #38bdf8;
+            --border: #cfe6a8;
+            --table-header: #dcefc0;
+            --success: #4ade80;
             --warning-bg: #334155;
             --warning-text: #f59e0b;
             --info-bg: #334155;
@@ -58,7 +58,6 @@
             gap: 20px;
         }
 
-        /* Brand & Logo Styling */
         .brand-container {
             display: flex;
             align-items: center;
@@ -105,7 +104,6 @@
             letter-spacing: -0.02em;
         }
 
-        /* Filter Toolbar Grid */
         .filter-toolbar-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -155,7 +153,6 @@
             color: #111827;
         }
 
-        /* Date Range Filter Inputs (styled to match .select-filter) */
         input.date-filter {
             background-color: #ffffff;
             color: #33422a;
@@ -215,7 +212,6 @@
         }
         .btn-info-pulse:hover { background-color: #0ea5e9 !important; }
 
-        /* Metric KPI Block Configurations */
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -234,7 +230,6 @@
         .kpi-title { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
         .kpi-value { font-size: 2rem; font-weight: 700; margin-top: 8px; color: var(--primary); }
 
-        /* Split Row Dashboard Framework */
         .analytics-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -254,14 +249,12 @@
 
         .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: #33422a; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 
-        /* Table Styling */
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
         th { background-color: var(--table-header); color: #33422a; font-weight: 600; padding: 14px 16px; border-bottom: 2px solid var(--border); white-space: nowrap; }
         td { padding: 14px 16px; border-bottom: 1px solid var(--border); color: var(--text-main); vertical-align: middle; }
         tr:hover { background-color: #dcefc0; }
 
-        /* Status Badges */
         .badge-month { background-color: #1e3a8a; color: #93c5fd; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
         .badge-user { background-color: #4c1d95; color: #ddd6fe; font-weight: 600; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
         .status-pill { background: #0369a1; color: #e0f2fe; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; display: inline-block; }
@@ -271,7 +264,6 @@
         .text-right { text-align: right; }
         .revenue-cell { font-weight: 700; color: var(--success); }
 
-        /* Coverage Gap Badges */
         .badge-stale {
             background-color: #fee2e2;
             color: #b91c1c;
@@ -291,7 +283,6 @@
             display: inline-block;
         }
 
-        /* Coverage Map */
         #coverageMap {
             height: 460px;
             width: 100%;
@@ -329,7 +320,6 @@
 
         <div class="header-section">
             <div>
-                <!-- Brand Header with Integrated SVG Logo -->
                 <div class="brand-container">
                     <svg class="brand-icon" viewBox="0 0 823 822" xmlns="http://www.w3.org/2000/svg">
     <path d="M 532.0,201.0 C 530.0,202.0 583.5,249.8 603.0,280.0 C 622.5,310.2 640.7,348.2 649.0,382.0 C 657.3,415.8 657.7,450.8 653.0,483.0 C 648.3,515.2 635.7,548.3 621.0,575.0 C 606.3,601.7 583.5,625.5 565.0,643.0 C 546.5,660.5 531.7,669.7 510.0,680.0 C 488.3,690.3 460.3,700.3 435.0,705.0 C 409.7,709.7 382.5,710.2 358.0,708.0 C 333.5,705.8 312.7,701.8 288.0,692.0 C 263.3,682.2 232.7,666.2 210.0,649.0 C 187.3,631.8 167.5,610.3 152.0,589.0 C 136.5,567.7 114.3,516.5 117.0,521.0 C 119.7,525.5 146.0,588.7 168.0,616.0 C 190.0,643.3 227.3,669.7 249.0,685.0 C 270.7,700.3 279.7,701.7 298.0,708.0 C 316.3,714.3 331.3,721.3 359.0,723.0 C 386.7,724.7 430.2,726.2 464.0,718.0 C 497.8,709.8 538.3,687.8 562.0,674.0 C 585.7,660.2 593.2,649.0 606.0,635.0 C 618.8,621.0 629.8,605.3 639.0,590.0 C 648.2,574.7 655.0,561.0 661.0,543.0 C 667.0,525.0 674.3,510.7 675.0,482.0 C 675.7,453.3 675.0,405.7 665.0,371.0 C 655.0,336.3 637.2,302.3 615.0,274.0 C 592.8,245.7 534.0,200.0 532.0,201.0 Z M 265.0,174.0 C 259.0,177.7 200.3,210.2 178.0,228.0 C 155.7,245.8 143.8,263.0 131.0,281.0 C 118.2,299.0 109.8,309.8 101.0,336.0 C 92.2,362.2 81.2,410.3 78.0,438.0 C 74.8,465.7 78.2,480.5 82.0,502.0 C 85.8,523.5 89.2,542.3 101.0,567.0 C 112.8,591.7 136.0,628.7 153.0,650.0 C 170.0,671.3 185.5,682.3 203.0,695.0 C 220.5,707.7 232.5,716.8 258.0,726.0 C 283.5,735.2 327.3,746.7 356.0,750.0 C 384.7,753.3 406.7,750.0 430.0,746.0 C 453.3,742.0 480.2,731.8 496.0,726.0 C 511.8,720.2 529.8,710.0 525.0,711.0 C 520.2,712.0 486.2,727.2 467.0,732.0 C 447.8,736.8 430.2,739.3 410.0,740.0 C 389.8,740.7 368.2,740.2 346.0,736.0 C 323.8,731.8 297.5,723.7 277.0,715.0 C 256.5,706.3 240.0,696.3 223.0,684.0 C 206.0,671.7 191.7,661.7 175.0,641.0 C 158.3,620.3 135.7,590.3 123.0,560.0 C 110.3,529.7 102.5,486.3 99.0,459.0 C 95.5,431.7 99.2,415.7 102.0,396.0 C 104.8,376.3 104.5,365.8 116.0,341.0 C 127.5,316.2 154.7,269.5 171.0,247.0 C 187.3,224.5 198.3,218.2 214.0,206.0 C 229.7,193.8 271.0,170.3 265.0,174.0 Z" fill="#555b3b" />
@@ -346,7 +336,6 @@
                 </div>
                 <p style="color: var(--text-muted); margin-top: 4px;">Live Management Performance & Pipeline Telemetry</p>
 
-                <!-- Filter Section -->
                 <div class="filter-toolbar-grid">
 
                     <div class="filter-group">
@@ -391,12 +380,6 @@
                         </select>
                     </div>
 
-                    <!-- Sector filter: wires into `sector` GET param already
-                         read/handled server-side in get_dashboard_context()
-                         (sel_sector / farm_filters / visit_filters /
-                         product_filters). Values match Farm.business_type
-                         ("Poultry" / "Aqua") since the backend filters with
-                         business_type__icontains=sel_sector. -->
                     <div class="filter-group">
                         <label class="filter-label">🏭 Sector</label>
                         <select id="filter-sector" class="select-filter" onchange="applyLiveFilters()">
@@ -458,7 +441,6 @@
             </div>
         </div>
 
-        <!-- Metric KPI Cards -->
         <div class="metrics-grid">
             <div class="kpi-card" style="border-top: 4px solid var(--primary);">
                 <div class="kpi-title">Total Registered Farms</div>
@@ -486,7 +468,6 @@
             </div>
         </div>
 
-        <!-- Chart and Dispatch Feed -->
         <div class="analytics-row">
             <div class="card" style="margin-bottom: 0;">
                 <div class="card-title">📈 Regional Farm Penetration Density (Top Districts)</div>
@@ -533,14 +514,18 @@
                                     {% endfor %}
                                 </td>
                                 <td>
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary notify-whatsapp-btn"
-                                        style="padding: 6px 12px; font-size: 0.8rem;"
-                                        data-visit-id="{{ visit.id }}"
-                                    >
-                                        📲 Notify
-                                    </button>
+                                    {% if is_local_environment %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary notify-whatsapp-btn"
+                                            style="padding: 6px 12px; font-size: 0.8rem;"
+                                            data-visit-id="{{ visit.id }}"
+                                        >
+                                            📲 Notify
+                                        </button>
+                                    {% else %}
+                                        <span style="font-size: 0.75rem; color: var(--text-muted);">Local only</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% empty %}
@@ -556,7 +541,6 @@
             </div>
         </div>
 
-        <!-- Coverage Gaps: No Visit in 30+ Days -->
         <div class="card">
             <div class="card-title">⚠️ Coverage Gaps — No Visit in 30+ Days ({{ stale_farms_count|default:"0" }} total{% if stale_farms_count > 25 %}, showing 25 most overdue{% endif %})</div>
             <div class="table-wrapper" style="max-height: 340px; overflow-y: auto;">
@@ -605,7 +589,6 @@
             </div>
         </div>
 
-        <!-- District Coverage Map -->
         <div class="card">
             <div class="card-title">🗺️ Farm Coverage Map (Live Locations by District)</div>
             <div id="mapEmptyBanner" class="map-empty-banner">
@@ -622,15 +605,11 @@
 
     </div>
 
-    <!-- Pass JSON Data Safely to JS -->
     {{ chart_labels_js|json_script:"chart-labels-data" }}
     {{ chart_counts_js|json_script:"chart-counts-data" }}
     {{ farm_locations_js|json_script:"farm-locations-data" }}
 
     <script>
-        // Reads the csrftoken cookie Django sets, needed because the
-        // WhatsApp-notify POST below is fired via fetch() rather than a
-        // real <form> submit (no {% csrf_token %} template tag to lean on).
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -646,7 +625,6 @@
             return cookieValue;
         }
 
-        // Update browser URL query params dynamically upon filter selection
         function applyLiveFilters() {
             const state = document.getElementById('filter-state').value;
             const country = document.getElementById('filter-country').value;
@@ -678,7 +656,6 @@
             window.location.href = url.toString();
         }
 
-        // Cascading Dependent Filter Dropdowns Handler via AJAX
         document.addEventListener("DOMContentLoaded", function () {
             const stateSel = document.getElementById('filter-state');
             const districtSel = document.getElementById('filter-district');
@@ -709,8 +686,9 @@
                 });
             }
 
-            // WhatsApp "Notify" dispatch buttons in the Realtime Field
-            // Operation Dispatch Stream table.
+            // WhatsApp "Notify" dispatch buttons — only present in the DOM
+            // when is_local_environment is true, so this loop is a no-op
+            // on Render (querySelectorAll simply finds zero elements).
             document.querySelectorAll('.notify-whatsapp-btn').forEach(function (btn) {
                 btn.addEventListener('click', function () {
                     const visitId = btn.dataset.visitId;
@@ -733,8 +711,6 @@
                         .then(function (result) {
                             if (result.ok) {
                                 btn.textContent = '✅ Sent';
-                                // Brief confirmation, then restore the button
-                                // in case the same visit needs re-sending later.
                                 setTimeout(function () {
                                     btn.textContent = originalText;
                                     btn.disabled = false;
@@ -754,7 +730,6 @@
                 });
             });
 
-            // Safe parsing of chart scripts
             const canvasElem = document.getElementById('districtChart');
             if (!canvasElem) return;
 
@@ -804,7 +779,6 @@
                 }
             });
 
-            // --- District Coverage Map ---
             const mapElem = document.getElementById('coverageMap');
             if (!mapElem) return;
 
@@ -825,7 +799,6 @@
                 banner.textContent = `⚠️ ${skippedCount} farm(s) don't have GPS coordinates on file and are not shown below. Add latitude/longitude when logging visits to improve coverage accuracy.`;
             }
 
-            // Default center: India, will auto-fit if markers exist
             const map = L.map('coverageMap').setView([22.5, 79.0], 5);
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
