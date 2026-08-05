@@ -437,7 +437,13 @@ def export_visits_to_excel(request):
     wb = openpyxl.Workbook()
     ws_data = wb.active
     ws_data.title = "Field Visit Database Log"
-    ws_data.views.sheetView[0].showGridLines = True
+
+    # FIX: `Worksheet` objects have no `.views` attribute in openpyxl —
+    # this previously raised AttributeError: 'Worksheet' object has no
+    # attribute 'views' the moment this view ran, crashing the export
+    # before a single row was written. The correct API for the sheet's
+    # single SheetView is `ws.sheet_view`.
+    ws_data.sheet_view.showGridLines = True
 
     dark_slate, border_color = "0F172A", "CBD5E1"
     thin_border = Border(
