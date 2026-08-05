@@ -1,0 +1,164 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Visit Report — MY AGRINUTRITION</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #ffffff;
+            --bg-card: #eef7e0;
+            --text-main: #1e293b;
+            --text-muted: #5a7047;
+            --primary: #38bdf8;
+            --border: #cfe6a8;
+            --success: #10b981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            padding: 30px 20px;
+        }
+        .wrap { max-width: 800px; margin: 0 auto; }
+        h2 { font-size: 1.6rem; font-weight: 800; margin-bottom: 4px; }
+        p.sub { color: var(--text-muted); margin-bottom: 20px; }
+
+        .toolbar {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+        .filter-label {
+            font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        select, input[type="date"] {
+            padding: 8px 12px; border: 1px solid #a9cf76; border-radius: 6px;
+            font-family: inherit; font-size: 0.9rem; font-weight: 600;
+            background: #fff; color: #33422a; cursor: pointer;
+        }
+
+        .back-link {
+            margin-left: auto;
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding-bottom: 8px;
+        }
+
+        .report-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 18px;
+            position: relative;
+        }
+        .report-text {
+            white-space: pre-wrap;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: var(--primary);
+            color: #0f172a;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: #0ea5e9; }
+        .copy-btn.copied { background: var(--success); color: white; }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 50px 0;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h2>📝 Daily Visit Report</h2>
+    <p class="sub">Pick a date and executive — the report below regenerates automatically.</p>
+
+    <div class="toolbar">
+        <div class="filter-group">
+            <label class="filter-label">📅 Date</label>
+            <input type="date" id="filter-date" value="{{ selected_date }}" onchange="applyReportFilters()">
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">👤 Executive</label>
+            <select id="filter-executive" onchange="applyReportFilters()">
+                <option value="">All Executives</option>
+                {% for name in executive_list %}
+                    <option value="{{ name }}" {% if selected_executive == name %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a class="back-link" href="{% url 'dashboard_home' %}">← Back to Dashboard</a>
+    </div>
+
+    {% for card in report_cards %}
+    <div class="report-card">
+        <button class="copy-btn" onclick="copyReport(this)">📋 Copy</button>
+        <div class="report-text">🔔 New Farm Visit Update
+👤 Executive: {{ card.executive }}
+🏡 Farm Name: {{ card.farm_name }}
+📍 Location: {{ card.location }}
+📅 Visit Date: {{ card.visit_date }}
+📝 Visit Summary: {{ card.summary }}
+✅ Status: {{ card.status }}
+📌 Next Follow-up: {{ card.next_followup }}
+
+Thank you,
+MyAgrinutrition CRM Team</div>
+    </div>
+    {% empty %}
+    <div class="empty-state">No visits logged for this date{% if selected_executive %} by {{ selected_executive }}{% endif %}.</div>
+    {% endfor %}
+</div>
+
+<script>
+function applyReportFilters() {
+    const date = document.getElementById('filter-date').value;
+    const executive = document.getElementById('filter-executive').value;
+    const url = new URL(window.location.href);
+    if (date) url.searchParams.set('date', date); else url.searchParams.delete('date');
+    if (executive) url.searchParams.set('executive', executive); else url.searchParams.delete('executive');
+    window.location.href = url.toString();
+}
+
+function copyReport(btn) {
+    const text = btn.nextElementSibling.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = '✅ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = original;
+            btn.classList.remove('copied');
+        }, 1500);
+    });
+}
+</script>
+</body>
+</html>
