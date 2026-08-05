@@ -485,7 +485,6 @@
                                 <th>Farm Details</th>
                                 <th>District</th>
                                 <th>Product Action</th>
-                                <th>Notify</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -513,24 +512,10 @@
                                         <span class="status-pill" style="background-color: #475569;">General Consult</span>
                                     {% endfor %}
                                 </td>
-                                <td>
-                                    {% if is_local_environment %}
-                                        <button
-                                            type="button"
-                                            class="btn btn-primary notify-whatsapp-btn"
-                                            style="padding: 6px 12px; font-size: 0.8rem;"
-                                            data-visit-id="{{ visit.id }}"
-                                        >
-                                            📲 Notify
-                                        </button>
-                                    {% else %}
-                                        <span style="font-size: 0.75rem; color: var(--text-muted);">Local only</span>
-                                    {% endif %}
-                                </td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
                                     No operations submitted to data streams yet.
                                 </td>
                             </tr>
@@ -685,50 +670,6 @@
                     .catch(err => console.error("Filter cascade failed:", err));
                 });
             }
-
-            // WhatsApp "Notify" dispatch buttons — only present in the DOM
-            // when is_local_environment is true, so this loop is a no-op
-            // on Render (querySelectorAll simply finds zero elements).
-            document.querySelectorAll('.notify-whatsapp-btn').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    const visitId = btn.dataset.visitId;
-                    const originalText = btn.textContent;
-                    btn.disabled = true;
-                    btn.textContent = '⏳ Sending...';
-                    fetch(`/crm/visits/${visitId}/notify-whatsapp/`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': getCookie('csrftoken'),
-                        },
-                    })
-                        .then(function (res) {
-                            return res.json()
-                                .catch(function () { return {}; })
-                                .then(function (data) {
-                                    return { ok: res.ok, data: data };
-                                });
-                        })
-                        .then(function (result) {
-                            if (result.ok) {
-                                btn.textContent = '✅ Sent';
-                                setTimeout(function () {
-                                    btn.textContent = originalText;
-                                    btn.disabled = false;
-                                }, 3000);
-                            } else {
-                                alert('Notify failed: ' + (result.data.error || 'Unknown error'));
-                                btn.textContent = originalText;
-                                btn.disabled = false;
-                            }
-                        })
-                        .catch(function (err) {
-                            console.error('Notify request failed:', err);
-                            alert('Notify failed: could not reach the server.');
-                            btn.textContent = originalText;
-                            btn.disabled = false;
-                        });
-                });
-            });
 
             const canvasElem = document.getElementById('districtChart');
             if (!canvasElem) return;
