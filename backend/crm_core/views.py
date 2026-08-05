@@ -1,7 +1,6 @@
 import csv
 import json
 import logging
-import os
 import openpyxl
 import requests
 import traceback
@@ -593,14 +592,6 @@ def get_dashboard_context(request):
         "cold_pct": 0.0,
         "poultry_pct": 0.0,
         "aqua_pct": 0.0,
-        # Environment flag — controls whether the WhatsApp Notify button
-        # renders at all in dashboard.html. Selenium/Chrome only work on
-        # a local machine with a display and a logged-in WhatsApp Web
-        # session, never on Render, so the button is hidden entirely
-        # there instead of showing an always-fails error popup. Render
-        # automatically sets RENDER=true on every deployment, so this
-        # needs no extra configuration on your end.
-        "is_local_environment": os.environ.get("RENDER") != "true",
         # Pre-Serialized Safe JSON for Chart.js
         "month_wise_labels_js": json.dumps([]),
         "month_wise_data_js": json.dumps([]),
@@ -1292,73 +1283,3 @@ def get_location_details(request):
     except Exception as e:
         logger.error(f"Geocoding error: {str(e)}")
         return JsonResponse({'error': str(e)}, status=500)
-
-
-# ==========================================
-# 📲 WHATSAPP VISIT NOTIFICATION (LOCAL-ONLY)
-# ==========================================
-#
-# WHY THIS IMPORTS SELENIUM/PYPERCLIP *INSIDE* THE VIEW, NOT AT THE
-# TOP OF THIS FILE:
-# Render has no Chrome binary and no display, so `selenium` and
-# `pyperclip` are deliberately left out of the deployed requirements.
-# If those imports sat at module level, Django would raise
-# ImportError the moment this file loads — which would 500 every
-# single view in the app on Render, not just this one. Importing
-# them only when notify_farm_visit actually runs means:
-#   - Render boots fine even without those packages installed.
-#   - Locally (where you DO have selenium/pyperclip installed and a
-#     real Chrome + WhatsApp Web session), the import succeeds and
-#     the notify button works as expected.
-#   - If someone ever hits this route on Render by mistake, they get
-#     a clean 500 with a clear "WhatsApp automation isn't available
-#     on this server" message instead of the whole app going down.
-@staff_required
-@csrf_exempt
-def notify_farm_visit(request, visit_id):
-    """
-    Sends the given FarmVisitReport as a WhatsApp message to the
-    executive's routed group, via a local Selenium-driven WhatsApp
-    Web session. Only meaningful when run locally — see the module
-    note above for why this can't work on Render.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required.'}, status=405)
-
-    visit = get_object_or_404(
-        FarmVisitReport.objects.select_related('farm', 'executive'),
-        id=visit_id,
-    )
-
-    try:
-        from .utils.whatsapp_routing import get_target_group
-        from .utils.whatsapp_formatter import build_farm_visit_message
-        from .utils.whatsapp_selenium import send_whatsapp_group_message
-    except ImportError as e:
-        logger.error(f"WhatsApp automation unavailable (missing dependency): {e}")
-        return JsonResponse(
-            {'error': 'WhatsApp automation is only available when run locally '
-                      '(selenium/pyperclip not installed on this server).'},
-            status=500,
-        )
-
-    try:
-        group_title = get_target_group(visit)
-    except ValueError as e:
-        # Routing failures (no executive, no profile, no active group)
-        # are expected/user-fixable — 400, not 500, and no browser is
-        # launched at all.
-        logger.warning(f"WhatsApp routing failed for visit {visit_id}: {e}")
-        return JsonResponse({'error': str(e)}, status=400)
-
-    try:
-        message = build_farm_visit_message(visit)
-        send_whatsapp_group_message(group_title, message)
-    except Exception as e:
-        logger.error(f"WhatsApp send failed for visit {visit_id}: {e}", exc_info=True)
-        return JsonResponse(
-            {'error': f'Failed to send WhatsApp message: {str(e)}'},
-            status=500,
-        )
-
-    return JsonResponse({'success': True, 'group': group_title, 'visit_id': visit_id})
