@@ -123,8 +123,10 @@
             font-size: 0.95rem;
             line-height: 1.7;
         }
-        /* Bold the field labels on-screen the same way WhatsApp will
-           render the *asterisk* markup once pasted there. */
+        /* Bold the field labels on-screen only — this is purely visual;
+           the copy functions below strip these tags without adding any
+           asterisk markup, so the clipboard text is plain, unformatted
+           text with no *asterisks* around the labels. */
         .report-text b { font-weight: 800; }
 
         .copy-btn {
@@ -184,15 +186,16 @@
     {% endif %}
 
     <!-- Hidden container holding the full combined text used by "Full Copy (All)".
-         Uses *asterisks* (WhatsApp's own bold syntax) so labels render bold
-         once pasted into a WhatsApp chat, exactly like the report title. -->
-    <div id="full-report-source" style="display:none;">{% for card in report_cards %}*Farm Visiting Report*
-*Executive:* {{ card.executive }}
-*Farm Name:* {{ card.farm_name }}
-*Location:* {{ card.location }}
-*Visit Date:* {{ card.visit_date }}
-*Visit Summary:* {{ card.summary }}
-*Next Follow-up:* {{ card.next_followup }}
+         FIX: previously wrapped each label in *asterisks* (WhatsApp's bold
+         syntax). Removed on request — labels are now copied as plain text
+         with no surrounding markup. -->
+    <div id="full-report-source" style="display:none;">{% for card in report_cards %}Farm Visiting Report
+Executive: {{ card.executive }}
+Farm Name: {{ card.farm_name }}
+Location: {{ card.location }}
+Visit Date: {{ card.visit_date }}
+Visit Summary: {{ card.summary }}
+Next Follow-up: {{ card.next_followup }}
 {% if not forloop.last %}
 ------------------------------------
 
@@ -240,12 +243,12 @@ function copyReport(btn) {
 }
 
 // Converts a .report-text block (which uses <b> tags for on-screen bold)
-// into plain text with *asterisks* around each bold label, since WhatsApp
-// uses *text* — not HTML — for bold formatting.
+// into plain text — the <b> tags are stripped without adding any
+// markup around them, so the copied text has no asterisks.
 function toWhatsAppPlainText(el) {
     const clone = el.cloneNode(true);
     clone.querySelectorAll('b').forEach(b => {
-        b.replaceWith(`*${b.textContent}*`);
+        b.replaceWith(b.textContent);
     });
     return clone.innerText
         .split('\n')
