@@ -26,6 +26,8 @@
             --danger-hover: #dc2626;
             --border: #e2e8f0;
             --border-focus: #60a5fa;
+            --warn: #b45309;
+            --warn-bg: rgba(245, 158, 11, 0.08);
         }
 
         * {
@@ -191,6 +193,10 @@
 
         .btn-primary { background-color: var(--primary); color: white; }
         .btn-primary:hover { background-color: var(--primary-hover); }
+        /* NOTE: this greyed-out disabled look is exactly what sales
+           reps were seeing "stuck" on — the button used to never get
+           released back from `disabled` when the geocode call failed.
+           See the JS fix below (search "FIX (stuck button)"). */
         .btn-primary:disabled { background-color: #475569; cursor: not-allowed; }
 
         .btn-success { background-color: var(--success); color: white; }
@@ -229,6 +235,27 @@
             border-color: rgba(16, 185, 129, 0.3) !important;
             color: #34d399 !important;
             font-weight: 500;
+        }
+
+        /* NEW: styling for the fields once they fall back to manual
+           entry (geocoding failed / unavailable), so it's visually
+           obvious to the field rep that they now need to type it in
+           themselves instead of waiting on it. */
+        .manual-input {
+            background-color: var(--warn-bg) !important;
+            border-color: rgba(245, 158, 11, 0.5) !important;
+            color: var(--text-main) !important;
+            font-weight: 500;
+        }
+
+        .geo-status-note {
+            font-size: 0.8rem;
+            color: var(--warn);
+            margin-top: 8px;
+            display: none;
+        }
+        .geo-status-note.visible {
+            display: block;
         }
 
         /* Dynamic Grid Items styling */
@@ -392,6 +419,9 @@
                 <button type="button" id="locateBtn" class="btn-action btn-primary btn-block">
                     Fetch GPS Verification Coordinate
                 </button>
+                <p class="geo-status-note" id="geoStatusNote">
+                    ⚠️ Couldn't auto-detect the location — please type District / Area / State manually below, then submit as normal.
+                </p>
                 
                 <input type="hidden" id="lat" name="latitude">
                 <input type="hidden" id="lon" name="longitude">
@@ -403,17 +433,17 @@
 
                 <div class="location-box">
                     <div class="form-group-spacing">
-                        <label style="color: var(--text-muted);">Automated District</label>
+                        <label style="color: var(--text-muted);">District</label>
                         <input type="text" id="district" class="auto-input" name="district" readonly required placeholder="Awaiting location access...">
                     </div>
 
                     <div class="form-group-spacing">
-                        <label style="color: var(--text-muted);">Automated Area</label>
+                        <label style="color: var(--text-muted);">Area</label>
                         <input type="text" id="area" class="auto-input" name="area" readonly required placeholder="Awaiting location access...">
                     </div>
 
                     <div>
-                        <label style="color: var(--text-muted);">Automated State</label>
+                        <label style="color: var(--text-muted);">State</label>
                         <input type="text" id="state" class="auto-input" name="state" readonly required placeholder="Awaiting location access...">
                     </div>
                 </div>
@@ -918,77 +948,152 @@
         }
     });
 
+    // ==========================================================
+    // Helpers for the District / Area / State fields
+    // ----------------------------------------------------------
+    // setLocationField()   -> used on a successful auto geocode
+    // enableManualEntry()  -> used whenever auto geocode can't be
+    //                         trusted (network error, timeout, or a
+    //                         response with no usable address), so
+    //                         the rep can just type it in and keep
+    //                         going instead of being stuck.
+    // ==========================================================
+    function setLocationField(id, value) {
+        const el = document.getElementById(id);
+        el.readOnly = true;
+        el.classList.remove('manual-input');
+        el.classList.add('auto-input');
+        el.value = value;
+        el.style.setProperty('border-color', '', '');
+    }
+
+    function enableManualLocationEntry() {
+        ['district', 'area', 'state'].forEach(function(id) {
+            const el = document.getElementById(id);
+            el.readOnly = false;
+            el.classList.remove('auto-input');
+            el.classList.add('manual-input');
+            if (!el.value) {
+                el.placeholder = 'Auto-detect unavailable — type it in';
+            }
+        });
+        const note = document.getElementById('geoStatusNote');
+        if (note) note.classList.add('visible');
+    }
+
+    function clearManualEntryNote() {
+        const note = document.getElementById('geoStatusNote');
+        if (note) note.classList.remove('visible');
+    }
+
     // Geolocation Engine & Automatic Address Fetcher
     document.getElementById('locateBtn').addEventListener('click', function() {
         const btn = this;
         btn.innerText = "⏳ Locating via GPS Grid...";
         btn.disabled = true;
+        clearManualEntryNote();
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    
-                    document.getElementById('lat').value = lat;
-                    document.getElementById('lon').value = lon;
-                    document.getElementById('map-container').style.display = 'block';
-                    
-                    document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-                    
-                    // Render Map
-                    if (!map) {
-                        map = L.map('map').setView([lat, lon], 14);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            attribution: '© OpenStreetMap'
-                        }).addTo(map);
-                        marker = L.marker([lat, lon]).addTo(map);
-                    } else {
-                        const newPos = new L.LatLng(lat, lon);
-                        marker.setLatLng(newPos);
-                        map.setView(newPos, 14);
-                    }
-                    
-                    // Primary Reverse Geocode Attempt via OpenStreetMap (Forced English Output)
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=en`)
-                        .then(res => res.json())
-                        .then(data => {
-                            btn.innerText = "✅ Location Secured";
-                            
-                            if (data && data.address) {
-                                const addr = data.address;
-                                // FIX: county/state_district/district can each return
-                                // a different admin granularity depending on the
-                                // coordinate (real district vs taluk vs village).
-                                // Normalize whichever one comes back so only real
-                                // district names ever reach the input/dropdown.
-                                const rawDistrict = addr.county || addr.state_district || addr.district || '';
-                                const district = normalizeDistrict(rawDistrict);
-                                const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.city || '';
-                                const state = addr.state || '';
-
-                                document.getElementById('district').value = district;
-                                document.getElementById('area').value = area;
-                                document.getElementById('state').value = state;
-                            }
-                        })
-                        .catch(err => {
-                            console.error("Reverse Geocoding Error:", err);
-                            btn.innerText = "⚠️ Location Secured (Geocoding Failed)";
-                        });
-                },
-                function(error) {
-                    btn.disabled = false;
-                    btn.innerText = "Fetch GPS Verification Coordinate";
-                    alert("Unable to retrieve location. Please enable location permissions on your browser.");
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        } else {
+        if (!navigator.geolocation) {
             btn.disabled = false;
             btn.innerText = "Fetch GPS Verification Coordinate";
             alert("Geolocation is not supported by your browser.");
+            return;
         }
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                document.getElementById('lat').value = lat;
+                document.getElementById('lon').value = lon;
+                document.getElementById('map-container').style.display = 'block';
+
+                document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+
+                // Render Map
+                if (!map) {
+                    map = L.map('map').setView([lat, lon], 14);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap'
+                    }).addTo(map);
+                    marker = L.marker([lat, lon]).addTo(map);
+                } else {
+                    const newPos = new L.LatLng(lat, lon);
+                    marker.setLatLng(newPos);
+                    map.setView(newPos, 14);
+                }
+
+                // FIX (stuck button / geocode hang): the reverse-geocode
+                // fetch previously had no timeout at all, so a slow or
+                // unresponsive Nominatim server could leave the button
+                // stuck on "Locating..." indefinitely. AbortController
+                // now forces it to give up after 8s and fall back to
+                // manual entry instead of hanging forever.
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=en`, {
+                    signal: controller.signal
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data && data.address) {
+                            const addr = data.address;
+                            const rawDistrict = addr.county || addr.state_district || addr.district || '';
+                            const district = normalizeDistrict(rawDistrict);
+                            const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.city || '';
+                            const state = addr.state || '';
+
+                            if (district || area || state) {
+                                setLocationField('district', district);
+                                setLocationField('area', area);
+                                setLocationField('state', state);
+                                btn.innerText = "✅ Location Secured";
+                            } else {
+                                // Nominatim responded but gave nothing usable.
+                                enableManualLocationEntry();
+                                btn.innerText = "⚠️ GPS Captured — Enter Location Manually";
+                            }
+                        } else {
+                            enableManualLocationEntry();
+                            btn.innerText = "⚠️ GPS Captured — Enter Location Manually";
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Reverse Geocoding Error:", err);
+                        // FIX (stuck button — root cause): previously, on any
+                        // network failure here, the District/Area/State
+                        // inputs were left empty + readonly with NO way to
+                        // fix them, AND the Locate button was never
+                        // re-enabled (that reset only happened in the
+                        // geolocation *error* callback below, not here).
+                        // Together that permanently "greyed out"/blurred the
+                        // Locate button and silently blocked submission —
+                        // exactly what your sales team was hitting. We now
+                        // unlock manual entry so the visit can still be
+                        // logged even when auto-detect fails.
+                        enableManualLocationEntry();
+                        btn.innerText = "⚠️ GPS Captured — Enter Location Manually";
+                    })
+                    .finally(() => {
+                        clearTimeout(timeoutId);
+                        // FIX (stuck button): ALWAYS release the button here,
+                        // no matter what happened above. This is the actual
+                        // bug — the button used to only get re-enabled from
+                        // the geolocation error callback, so a successful
+                        // GPS fix followed by a failed/slow geocode left it
+                        // permanently disabled (the grey/"blurred" look).
+                        btn.disabled = false;
+                    });
+            },
+            function(error) {
+                btn.disabled = false;
+                btn.innerText = "Fetch GPS Verification Coordinate";
+                alert("Unable to retrieve location. Please enable location permissions on your browser.");
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
     });
     </script>
 </body>
