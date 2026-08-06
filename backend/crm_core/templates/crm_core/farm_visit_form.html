@@ -258,6 +258,21 @@
             display: block;
         }
 
+        /* NEW: small "Optional" tag next to the location fields so
+           reps know they can skip this section entirely and still
+           submit the visit. */
+        .optional-tag {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            background-color: rgba(148, 163, 184, 0.15);
+            padding: 2px 8px;
+            border-radius: 999px;
+            margin-left: 6px;
+        }
+
         /* Dynamic Grid Items styling */
         .grid-item-row {
             background-color: rgba(148, 163, 184, 0.08);
@@ -414,13 +429,15 @@
             </div>
 
             <div class="card">
-                <div class="card-title" style="color: var(--primary);">📍 Geospatial Metrics</div>
+                <div class="card-title" style="color: var(--primary);">
+                    <span>📍 Geospatial Metrics <span class="optional-tag">Optional</span></span>
+                </div>
                 
                 <button type="button" id="locateBtn" class="btn-action btn-primary btn-block">
                     Fetch GPS Verification Coordinate
                 </button>
                 <p class="geo-status-note" id="geoStatusNote">
-                    ⚠️ Couldn't auto-detect the location — please type District / Area / State manually below, then submit as normal.
+                    ⚠️ Couldn't auto-detect the location — you can type District / Area / State manually below, or just leave them blank and submit as normal.
                 </p>
                 
                 <input type="hidden" id="lat" name="latitude">
@@ -431,20 +448,33 @@
                     <a id="externalMapLink" class="map-link" target="_blank" href="#">🗺️ Open Live Route in Google Maps</a>
                 </div>
 
+                <!--
+                    FIX (Location made optional): District / Area / State
+                    previously all had the `required` attribute, which — combined
+                    with the submit-time validator below that walks every
+                    `[required]:not([disabled])` field — blocked form submission
+                    any time GPS/geocoding wasn't used or came back empty. These
+                    fields are informational metadata, not gatekeeping data, so
+                    `required` has been removed from all three. They stay
+                    `readonly` while auto-filled by a successful geocode, and the
+                    existing manual-entry fallback (enableManualLocationEntry())
+                    still works exactly the same for reps who want to type them
+                    in by hand — it's just no longer mandatory either way.
+                -->
                 <div class="location-box">
                     <div class="form-group-spacing">
                         <label style="color: var(--text-muted);">District</label>
-                        <input type="text" id="district" class="auto-input" name="district" readonly required placeholder="Awaiting location access...">
+                        <input type="text" id="district" class="auto-input" name="district" readonly placeholder="Awaiting location access... (optional)">
                     </div>
 
                     <div class="form-group-spacing">
                         <label style="color: var(--text-muted);">Area</label>
-                        <input type="text" id="area" class="auto-input" name="area" readonly required placeholder="Awaiting location access...">
+                        <input type="text" id="area" class="auto-input" name="area" readonly placeholder="Awaiting location access... (optional)">
                     </div>
 
                     <div>
                         <label style="color: var(--text-muted);">State</label>
-                        <input type="text" id="state" class="auto-input" name="state" readonly required placeholder="Awaiting location access...">
+                        <input type="text" id="state" class="auto-input" name="state" readonly placeholder="Awaiting location access... (optional)">
                     </div>
                 </div>
             </div>
@@ -929,6 +959,10 @@
     });
 
     // Mandatory Field Verification
+    // NOTE: District / Area / State no longer carry the `required`
+    // attribute (see the location-box HTML above), so this loop
+    // simply won't see them anymore and they're automatically
+    // excluded from the "please fill out all mandatory fields" check.
     document.getElementById('farmForm').addEventListener('submit', function(e) {
         const requiredInputs = this.querySelectorAll('[required]:not([disabled])');
         let valid = true;
@@ -956,7 +990,9 @@
     //                         trusted (network error, timeout, or a
     //                         response with no usable address), so
     //                         the rep can just type it in and keep
-    //                         going instead of being stuck.
+    //                         going instead of being stuck. Since
+    //                         these fields are optional, the rep can
+    //                         also just leave them blank.
     // ==========================================================
     function setLocationField(id, value) {
         const el = document.getElementById(id);
@@ -974,7 +1010,7 @@
             el.classList.remove('auto-input');
             el.classList.add('manual-input');
             if (!el.value) {
-                el.placeholder = 'Auto-detect unavailable — type it in';
+                el.placeholder = 'Auto-detect unavailable — type it in, or leave blank';
             }
         });
         const note = document.getElementById('geoStatusNote');
@@ -1042,7 +1078,7 @@
                             const addr = data.address;
                             const rawDistrict = addr.county || addr.state_district || addr.district || '';
                             const district = normalizeDistrict(rawDistrict);
-                            const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.city || '';
+                            const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.hamlet || addr.city_district || addr.municipality || addr.city || addr.locality || '';
                             const state = addr.state || '';
 
                             if (district || area || state) {
@@ -1053,11 +1089,11 @@
                             } else {
                                 // Nominatim responded but gave nothing usable.
                                 enableManualLocationEntry();
-                                btn.innerText = "⚠️ GPS Captured — Enter Location Manually";
+                                btn.innerText = "⚠️ GPS Captured — Enter Location Manually (optional)";
                             }
                         } else {
                             enableManualLocationEntry();
-                            btn.innerText = "⚠️ GPS Captured — Enter Location Manually";
+                            btn.innerText = "⚠️ GPS Captured — Enter Location Manually (optional)";
                         }
                     })
                     .catch(err => {
@@ -1072,9 +1108,11 @@
                         // Locate button and silently blocked submission —
                         // exactly what your sales team was hitting. We now
                         // unlock manual entry so the visit can still be
-                        // logged even when auto-detect fails.
+                        // logged even when auto-detect fails — and since
+                        // these fields are optional, the rep isn't blocked
+                        // either way.
                         enableManualLocationEntry();
-                        btn.innerText = "⚠️ GPS Captured — Enter Location Manually";
+                        btn.innerText = "⚠️ GPS Captured — Enter Location Manually (optional)";
                     })
                     .finally(() => {
                         clearTimeout(timeoutId);
@@ -1090,7 +1128,7 @@
             function(error) {
                 btn.disabled = false;
                 btn.innerText = "Fetch GPS Verification Coordinate";
-                alert("Unable to retrieve location. Please enable location permissions on your browser.");
+                alert("Unable to retrieve location. This is optional — you can leave District/Area/State blank and submit as normal.");
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
