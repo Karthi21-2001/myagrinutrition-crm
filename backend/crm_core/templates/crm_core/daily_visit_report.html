@@ -123,6 +123,10 @@
             font-size: 0.95rem;
             line-height: 1.7;
         }
+        /* Bold the field labels on-screen the same way WhatsApp will
+           render the *asterisk* markup once pasted there. */
+        .report-text b { font-weight: 800; }
+
         .copy-btn {
             position: absolute;
             top: 16px;
@@ -179,17 +183,16 @@
     <div class="user-copy-bar" id="user-copy-bar"></div>
     {% endif %}
 
-    <!-- Hidden container holding the full combined text used by "Full Copy (All)" -->
-    <div id="full-report-source" style="display:none;">{% for card in report_cards %}Executive: {{ card.executive }}
-Farm Name: {{ card.farm_name }}
-Location: {{ card.location }}
-Visit Date: {{ card.visit_date }}
-Visit Summary: {{ card.summary }}
-Status: {{ card.status }}
-Next Follow-up: {{ card.next_followup }}
-
-Thank you,
-MyAgrinutrition CRM Team
+    <!-- Hidden container holding the full combined text used by "Full Copy (All)".
+         Uses *asterisks* (WhatsApp's own bold syntax) so labels render bold
+         once pasted into a WhatsApp chat, exactly like the report title. -->
+    <div id="full-report-source" style="display:none;">{% for card in report_cards %}*Farm Visiting Report*
+*Executive:* {{ card.executive }}
+*Farm Name:* {{ card.farm_name }}
+*Location:* {{ card.location }}
+*Visit Date:* {{ card.visit_date }}
+*Visit Summary:* {{ card.summary }}
+*Next Follow-up:* {{ card.next_followup }}
 {% if not forloop.last %}
 ------------------------------------
 
@@ -199,16 +202,13 @@ MyAgrinutrition CRM Team
     <div class="report-card" data-executive="{{ card.executive }}">
         <button class="copy-btn" onclick="copyReport(this)">📋 Copy</button>
         <div class="report-text">
-  Executive: {{ card.executive }}
-  Farm Name: {{ card.farm_name }}
-  Location: {{ card.location }}
-  Visit Date: {{ card.visit_date }}
-  Visit Summary: {{ card.summary }}
-  Status: {{ card.status }}
-  Next Follow-up: {{ card.next_followup }}
-
-Thank you,
-MyAgrinutrition CRM Team</div>
+  <b>Farm Visiting Report</b>
+  <b>Executive:</b> {{ card.executive }}
+  <b>Farm Name:</b> {{ card.farm_name }}
+  <b>Location:</b> {{ card.location }}
+  <b>Visit Date:</b> {{ card.visit_date }}
+  <b>Visit Summary:</b> {{ card.summary }}
+  <b>Next Follow-up:</b> {{ card.next_followup }}</div>
     </div>
     {% empty %}
     <div class="empty-state">No visits logged for this date{% if selected_executive %} by {{ selected_executive }}{% endif %}.</div>
@@ -226,7 +226,8 @@ function applyReportFilters() {
 }
 
 function copyReport(btn) {
-    const text = btn.nextElementSibling.innerText;
+    const el = btn.nextElementSibling;
+    const text = toWhatsAppPlainText(el);
     navigator.clipboard.writeText(text).then(() => {
         const original = btn.textContent;
         btn.textContent = '✅ Copied';
@@ -236,6 +237,21 @@ function copyReport(btn) {
             btn.classList.remove('copied');
         }, 1500);
     });
+}
+
+// Converts a .report-text block (which uses <b> tags for on-screen bold)
+// into plain text with *asterisks* around each bold label, since WhatsApp
+// uses *text* — not HTML — for bold formatting.
+function toWhatsAppPlainText(el) {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('b').forEach(b => {
+        b.replaceWith(`*${b.textContent}*`);
+    });
+    return clone.innerText
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join('\n');
 }
 
 function copyFullReport() {
@@ -283,7 +299,7 @@ function buildUserWiseButtons() {
             groups[exec] = [];
             order.push(exec);
         }
-        groups[exec].push(textEl.innerText.trim());
+        groups[exec].push(toWhatsAppPlainText(textEl));
     });
 
     // Only show per-user buttons when there's more than one executive in view
