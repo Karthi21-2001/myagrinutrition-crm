@@ -1175,6 +1175,17 @@ def clear_dashboard_data(request):
 def get_location_details(request):
     """
     API endpoint for reverse geocoding latitude and longitude into location details.
+
+    FIX (Area shows placeholder / never populates for rural spots):
+    Nominatim's `address` payload shape varies heavily by region — for
+    rural/agricultural areas (e.g. Vedaranyam, TN) the useful value
+    often lands in `hamlet`, `neighbourhood`, `city_district`, or
+    `municipality` instead of the original `suburb`/`village`/`town`/
+    `city` chain, so `area` came back as an empty string and the
+    frontend's "Awaiting location access..." placeholder never got
+    overwritten. This widens the fallback chain and, as a last resort,
+    returns an explicit "Not available" string instead of "" so the
+    frontend always receives a truthy value to render.
     """
     lat = request.GET.get('lat')
     lon = request.GET.get('lon')
@@ -1190,11 +1201,36 @@ def get_location_details(request):
         if res.status_code == 200:
             data = res.json()
             address = data.get('address', {})
-            raw_district = address.get('state_district') or address.get('county') or address.get('district', '')
+
+            raw_district = (
+                address.get('state_district')
+                or address.get('county')
+                or address.get('district', '')
+            )
+
+            # Widened fallback chain: rural/village reverse-geocodes
+            # frequently populate hamlet / neighbourhood / municipality /
+            # city_district / locality instead of the original four keys.
+            area = (
+                address.get('suburb')
+                or address.get('neighbourhood')
+                or address.get('village')
+                or address.get('hamlet')
+                or address.get('town')
+                or address.get('city_district')
+                or address.get('municipality')
+                or address.get('city')
+                or address.get('locality')
+                or ''
+            )
+
             return JsonResponse({
                 'state': address.get('state', ''),
                 'district': normalize_district(raw_district),
-                'area': address.get('suburb') or address.get('village') or address.get('town') or address.get('city', '')
+                # Never send back a blank string — the frontend can't
+                # distinguish "still loading" from "geocoder had nothing"
+                # unless we're explicit here.
+                'area': area.strip() if area else 'Not available',
             })
         return JsonResponse({'error': 'Failed to fetch location data.'}, status=500)
     except Exception as e:
