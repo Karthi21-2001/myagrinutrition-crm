@@ -335,6 +335,15 @@
             background-color: var(--success-hover);
         }
 
+        /* NEW: visual state while the submit is locked (post-click),
+           so it's obvious to the rep that the tap registered instead
+           of looking unresponsive. */
+        .btn-submit:disabled {
+            background-color: #64748b;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
         /* Responsive Breakpoints */
         @media (max-width: 950px) {
             .pipeline-grid, .order-grid {
@@ -958,7 +967,7 @@
         }
     });
 
-    // Mandatory Field Verification
+    // Mandatory Field Verification + Duplicate-Submit Guard
     // NOTE: District / Area / State no longer carry the `required`
     // attribute (see the location-box HTML above), so this loop
     // simply won't see them anymore and they're automatically
@@ -979,7 +988,27 @@
         if (!valid) {
             e.preventDefault();
             alert("Please fill out all mandatory fields before logging data.");
+            return;
         }
+
+        // FIX (duplicate visit submissions): lock the submit button
+        // the instant a valid submit fires, so a double-tap on a
+        // laggy connection — very common for field reps on mobile
+        // data — can't send a second identical POST before the page
+        // navigates away. This is the client-side half of the fix;
+        // views.py also has a server-side guard (skips creating a
+        // second FarmVisitReport if an identical one for the same
+        // farm/executive was logged in the last 15 seconds) in case
+        // a retry still slips through — e.g. a genuine network retry
+        // fired by the browser itself, which this handler can't see.
+        const submitBtn = this.querySelector('.btn-submit');
+        if (submitBtn.disabled) {
+            // Already submitting — block any further attempt outright.
+            e.preventDefault();
+            return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Submitting...";
     });
 
     // ==========================================================
