@@ -186,18 +186,15 @@
     {% endif %}
 
     <!-- Hidden container holding the full combined text used by "Full Copy (All)".
-         Labels are copied as plain text with no surrounding markup.
-         NEW: Aqua visits also carry a "DOC (Days of Culture)" line here,
-         right after Visit Date, only when the farm is Aqua sector AND a
-         DOC value has actually been logged — Poultry visits never show
-         this line at all. -->
+         FIX: previously wrapped each label in *asterisks* (WhatsApp's bold
+         syntax). Removed on request — labels are now copied as plain text
+         with no surrounding markup. -->
     <div id="full-report-source" style="display:none;">{% for card in report_cards %}Farm Visiting Report
 Executive: {{ card.executive }}
 Farm Name: {{ card.farm_name }}
 Location: {{ card.location }}
 Visit Date: {{ card.visit_date }}
-{% if card.is_aqua and card.pond_doc %}DOC (Days of Culture): {{ card.pond_doc }} days
-{% endif %}Visit Summary: {{ card.summary }}
+Visit Summary: {{ card.summary }}
 Next Follow-up: {{ card.next_followup }}
 {% if not forloop.last %}
 ------------------------------------
@@ -213,8 +210,7 @@ Next Follow-up: {{ card.next_followup }}
   <b>Farm Name:</b> {{ card.farm_name }}
   <b>Location:</b> {{ card.location }}
   <b>Visit Date:</b> {{ card.visit_date }}
-  {% if card.is_aqua and card.pond_doc %}<b>DOC (Days of Culture):</b> {{ card.pond_doc }} days
-  {% endif %}<b>Visit Summary:</b> {{ card.summary }}
+  <b>Visit Summary:</b> {{ card.summary }}
   <b>Next Follow-up:</b> {{ card.next_followup }}</div>
     </div>
     {% empty %}
