@@ -264,25 +264,65 @@ def save_farm_visit(request):
 
         try:
             with transaction.atomic():
-                farm_instance, created = Farm.objects.get_or_create(
-                    farm_name=farm_name,
-                    owner_name=owner_name,
-                    contact_number=contact_number,
-                    defaults={
-                        'executive': current_user,
-                        'business_type': business_type,
-                        'sub_segment': sub_segment,
-                        'state': state,
-                        'district': district,
-                        'area': area,
-                        'latitude': latitude,
-                        'longitude': longitude,
-                        'chicks_count': chicks_count,
-                        'grower_count': grower_count,
-                        'layer_count': layer_count,
-                        'culling_bird_count': culling_bird_count,
-                    }
-                )
+                # FIX (Aqua DOC never saved): pond_acre / pond_doc /
+                # fish_variety were parsed from POST above but never
+                # written onto the Farm record, so "Days of Culture"
+                # could never appear anywhere downstream (Daily Visit
+                # Report, Excel export). Added to both the create
+                # defaults and the update branch below. Wrapped in a
+                # try/except TypeError the same way next_visit_date is,
+                # so a not-yet-migrated Farm model degrades gracefully
+                # instead of 500ing the whole visit save.
+                aqua_defaults = {
+                    'pond_acre': pond_acre,
+                    'pond_doc': pond_doc,
+                    'fish_variety': fish_variety,
+                }
+                try:
+                    farm_instance, created = Farm.objects.get_or_create(
+                        farm_name=farm_name,
+                        owner_name=owner_name,
+                        contact_number=contact_number,
+                        defaults={
+                            'executive': current_user,
+                            'business_type': business_type,
+                            'sub_segment': sub_segment,
+                            'state': state,
+                            'district': district,
+                            'area': area,
+                            'latitude': latitude,
+                            'longitude': longitude,
+                            'chicks_count': chicks_count,
+                            'grower_count': grower_count,
+                            'layer_count': layer_count,
+                            'culling_bird_count': culling_bird_count,
+                            **aqua_defaults,
+                        }
+                    )
+                except TypeError:
+                    logger.warning(
+                        "Farm has no pond_acre/pond_doc/fish_variety fields yet — "
+                        "add them to models.py and run migrations. Saving farm without them."
+                    )
+                    farm_instance, created = Farm.objects.get_or_create(
+                        farm_name=farm_name,
+                        owner_name=owner_name,
+                        contact_number=contact_number,
+                        defaults={
+                            'executive': current_user,
+                            'business_type': business_type,
+                            'sub_segment': sub_segment,
+                            'state': state,
+                            'district': district,
+                            'area': area,
+                            'latitude': latitude,
+                            'longitude': longitude,
+                            'chicks_count': chicks_count,
+                            'grower_count': grower_count,
+                            'layer_count': layer_count,
+                            'culling_bird_count': culling_bird_count,
+                        }
+                    )
 
                 if not created:
                     if business_type:
@@ -296,6 +336,17 @@ def save_farm_visit(request):
                     farm_instance.grower_count = grower_count
                     farm_instance.layer_count = layer_count
                     farm_instance.culling_bird_count = culling_bird_count
+                    if business_type and 'aqua' in business_type.lower():
+                        # Only overwrite Aqua fields when this visit is
+                        # actually logged as Aqua, so a Poultry visit on
+                        # a farm that was previously Aqua-tagged can't
+                        # wipe out its existing pond data.
+                        try:
+                            farm_instance.pond_acre = pond_acre
+                            farm_instance.pond_doc = pond_doc
+                            farm_instance.fish_variety = fish_variety
+                        except AttributeError:
+                            pass
                     farm_instance.save()
 
                 # NOTE: requires a `next_visit_date = models.DateField(null=True, blank=True)`
@@ -455,6 +506,7 @@ def export_visits_to_excel(request):
         'Visit Date', 'Next Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number',
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb',
         'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
+        'Pond Acre', 'Pond DOC (Days)', 'Fish Variety',
         'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
         'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
     ]
@@ -516,18 +568,26 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=15, value=getattr(f, 'layer_count', 0) if f else 0)
             ws_data.cell(row=current_row, column=16, value=getattr(f, 'culling_bird_count', 0) if f else 0)
 
-            ws_data.cell(row=current_row, column=17, value=p.product_name if p else "General Consult")
-            ws_data.cell(row=current_row, column=18, value=p.sale_quantity if p else 0)
-            ws_data.cell(row=current_row, column=19, value=float(p.primary_price) if p else 0.0)
-            ws_data.cell(row=current_row, column=20, value=float(p.revenue_generated) if p else 0.0)
+            # Aqua-only fields — blank for Poultry farms rather than 0,
+            # so the export doesn't imply a 0-day / 0-acre pond for
+            # farms that were never an Aqua sector to begin with.
+            is_aqua_farm = bool(f and f.business_type and 'aqua' in f.business_type.lower())
+            ws_data.cell(row=current_row, column=17, value=getattr(f, 'pond_acre', None) if (f and is_aqua_farm) else "")
+            ws_data.cell(row=current_row, column=18, value=getattr(f, 'pond_doc', None) if (f and is_aqua_farm) else "")
+            ws_data.cell(row=current_row, column=19, value=getattr(f, 'fish_variety', '') if (f and is_aqua_farm) else "")
 
-            ws_data.cell(row=current_row, column=21, value=p.potential_quantity if p else 0)
-            ws_data.cell(row=current_row, column=22, value=p.target_quantity if p else 0)
-            ws_data.cell(row=current_row, column=23, value=p.unit_type if p else "N/A")
-            ws_data.cell(row=current_row, column=24, value=p.process_status if p else "N/A")
-            ws_data.cell(row=current_row, column=25, value=f"{p.conversion_percentage}%" if p else "0%")
+            ws_data.cell(row=current_row, column=20, value=p.product_name if p else "General Consult")
+            ws_data.cell(row=current_row, column=21, value=p.sale_quantity if p else 0)
+            ws_data.cell(row=current_row, column=22, value=float(p.primary_price) if p else 0.0)
+            ws_data.cell(row=current_row, column=23, value=float(p.revenue_generated) if p else 0.0)
 
-            gps_cell = ws_data.cell(row=current_row, column=26)
+            ws_data.cell(row=current_row, column=24, value=p.potential_quantity if p else 0)
+            ws_data.cell(row=current_row, column=25, value=p.target_quantity if p else 0)
+            ws_data.cell(row=current_row, column=26, value=p.unit_type if p else "N/A")
+            ws_data.cell(row=current_row, column=27, value=p.process_status if p else "N/A")
+            ws_data.cell(row=current_row, column=28, value=f"{p.conversion_percentage}%" if p else "0%")
+
+            gps_cell = ws_data.cell(row=current_row, column=29)
             if f and f.latitude and f.longitude:
                 gps_cell.value = "View on Map"
                 gps_cell.hyperlink = f"https://maps.google.com/?q={f.latitude},{f.longitude}"
@@ -536,10 +596,10 @@ def export_visits_to_excel(request):
                 gps_cell.value = "No GPS Data"
                 gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-            for c_idx in range(1, 27):
+            for c_idx in range(1, 30):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
-                if c_idx in [13, 14, 15, 16, 18, 21, 22, 25]:
+                if c_idx in [13, 14, 15, 16, 17, 18, 21, 24, 25, 28]:
                     cell_item.alignment = Alignment(horizontal="center")
 
             current_row += 1
@@ -1292,6 +1352,13 @@ def daily_visit_report(request):
 
         nvd = getattr(v, 'next_visit_date', None)
 
+        # Aqua team gets DOC (Days of Culture) surfaced on the report;
+        # Poultry visits simply won't carry this field at all, and
+        # Aqua farms that never had a DOC value logged fall back to
+        # None so the template can skip the line rather than show 0.
+        is_aqua = bool(f and f.business_type and 'aqua' in f.business_type.lower())
+        pond_doc_value = getattr(f, 'pond_doc', None) if (f and is_aqua) else None
+
         report_cards.append({
             'executive': v.executive.username if v.executive else 'Unassigned',
             'farm_name': f.farm_name if f else 'N/A',
@@ -1300,6 +1367,8 @@ def daily_visit_report(request):
             'summary': summary,
             'status': 'Completed',
             'next_followup': nvd.strftime('%d-%b-%Y') if nvd else 'Not scheduled',
+            'is_aqua': is_aqua,
+            'pond_doc': pond_doc_value,
         })
 
     executive_list = list(
