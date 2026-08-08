@@ -76,13 +76,4 @@ urlpatterns = [
         views.get_location_details,
         name='reverse_geocode',
     ),
-
-    # ==========================================
-    # 📲 WHATSAPP VISIT NOTIFICATION
-    # ==========================================
-    path(
-        'visits/<int:visit_id>/notify-whatsapp/',
-        views.notify_farm_visit,
-        name='notify_farm_visit',
-    ),
 ]

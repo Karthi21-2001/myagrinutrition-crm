@@ -29,9 +29,6 @@ from openpyxl.utils import get_column_letter
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
 from django.views.decorators.http import require_POST
-from .utils.whatsapp_formatter import build_farm_visit_message
-from .utils.whatsapp_routing import get_target_group
-from .utils.whatsapp_selenium import send_whatsapp_group_message
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -1437,36 +1434,3 @@ def daily_visit_report(request):
     return render(request, 'crm_core/daily_visit_report.html', context)
 
 
-# ==========================================
-# 📲 WHATSAPP VISIT NOTIFICATION
-# ==========================================
-
-@login_required(login_url='/crm/login/')
-@require_POST
-def notify_farm_visit(request, visit_id):
-    """
-    Sends a WhatsApp notification for a given farm visit report to the
-    correct group, based on the executive's assigned WhatsAppGroup.
-    """
-    visit_report = get_object_or_404(
-        FarmVisitReport.objects.select_related(
-            "farm", "executive", "executive__sales_profile__whatsapp_group"
-        ),
-        id=visit_id
-    )
-
-    try:
-        message = build_farm_visit_message(visit_report)
-        group_title = get_target_group(visit_report)
-        send_whatsapp_group_message(group_title, message)
-
-        logger.info(f"WhatsApp notification sent for visit #{visit_id} to group '{group_title}'")
-        return JsonResponse({"status": "sent", "group": group_title})
-
-    except ValueError as e:
-        logger.warning(f"WhatsApp notify skipped for visit #{visit_id}: {e}")
-        return JsonResponse({"status": "error", "detail": str(e)}, status=400)
-
-    except Exception as e:
-        logger.error(f"WhatsApp notify failed for visit #{visit_id}: {e}", exc_info=True)
-        return JsonResponse({"status": "error", "detail": str(e)}, status=500)
