@@ -24,7 +24,18 @@ class Farm(models.Model):
     farm_name = models.CharField(max_length=255)
     owner_name = models.CharField(max_length=255)
     contact_number = models.CharField(max_length=20, blank=True, null=True)
-    
+
+    # NEW: Distributor supplying/servicing this farm account. Treated as
+    # a farm-level attribute (like owner_name) rather than a per-visit
+    # field, since the distributor tied to a farm doesn't usually change
+    # visit-to-visit.
+    distributor_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Distributor associated with this farm account."
+    )
+
     business_type = models.CharField(
         max_length=50, 
         choices=BUSINESS_TYPE_CHOICES, 
