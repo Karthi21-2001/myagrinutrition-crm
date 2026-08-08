@@ -16,3 +16,9 @@ __pycache__/
 *.bak
 .env
 db.sqlite3
+backup_before_migration.json
+backend/backup_before_migration.json
+check_models.txt
+backend/check_models.txt
+recovered_db.sqlite3
+*.sqlite3
