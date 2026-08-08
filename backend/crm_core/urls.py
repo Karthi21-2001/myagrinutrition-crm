@@ -61,12 +61,15 @@ urlpatterns = [
         views.executive_analytics_view,
         name='analytics_report',
     ),
+<<<<<<< Updated upstream
     # --- Daily WhatsApp-style Visit Report Generator ---
     path(
         'daily-report/',
         views.daily_visit_report,
         name='daily_visit_report',
     ),
+=======
+>>>>>>> Stashed changes
 
     # ==========================================
     # 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES
@@ -75,5 +78,14 @@ urlpatterns = [
         'api/get-location-details/',
         views.get_location_details,
         name='reverse_geocode',
+    ),
+
+    # ==========================================
+    # 📲 WHATSAPP VISIT NOTIFICATION
+    # ==========================================
+    path(
+        'visits/<int:visit_id>/notify-whatsapp/',
+        views.notify_farm_visit,
+        name='notify_farm_visit',
     ),
 ]
