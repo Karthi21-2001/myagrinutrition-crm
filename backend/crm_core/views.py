@@ -301,6 +301,14 @@ def save_farm_visit(request):
         contact_number = request.POST.get('contact_number')
         business_type = request.POST.get('business_type', 'Poultry')
 
+        # Distributor associated with this farm account. Farm-level
+        # attribute (like owner_name/contact_number) rather than a
+        # per-visit field — only overwritten on an existing farm when
+        # the rep actually typed a new value (see the update block
+        # below), so re-logging a visit without retyping it won't
+        # blank out a distributor that was already on file.
+        distributor_name = request.POST.get('distributor_name', '').strip()
+
         # FIX: the form field's `name` attribute is `sub_business_type`
         # (the old key `sub_business_type_select` was actually the
         # element's `id`, not its POST name, so this always returned
@@ -357,6 +365,7 @@ def save_farm_visit(request):
                         'executive': current_user,
                         'business_type': business_type,
                         'sub_segment': sub_segment,
+                        'distributor_name': distributor_name,
                         'state': state,
                         'district': district,
                         'area': area,
@@ -374,6 +383,8 @@ def save_farm_visit(request):
                         farm_instance.business_type = business_type
                     if sub_segment:
                         farm_instance.sub_segment = sub_segment
+                    if distributor_name:
+                        farm_instance.distributor_name = distributor_name
                     farm_instance.state = state
                     farm_instance.district = district
                     farm_instance.area = area
@@ -536,12 +547,17 @@ def export_visits_to_excel(request):
         top=Side(style='thin', color=border_color), bottom=Side(style='thin', color=border_color)
     )
 
+    # NOTE: 'Distributor' is appended at the END of the headers list
+    # (and written to column 27 below) rather than inserted next to
+    # 'Contact Number', so none of the existing hardcoded column
+    # numbers for columns 1-26 had to be renumbered.
     headers = [
         'Visit Date', 'Next Visit Date', 'Executive Name', 'Farm Name', 'Owner Name', 'Contact Number',
         'Sector Segment', 'Sub-Segment', 'State', 'District', 'Area / Suburb',
         'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
         'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
-        'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link'
+        'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link',
+        'Distributor'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -621,7 +637,10 @@ def export_visits_to_excel(request):
                 gps_cell.value = "No GPS Data"
                 gps_cell.font = Font(name="Segoe UI", size=11, color="64748B", italic=True)
 
-            for c_idx in range(1, 27):
+            # NEW: Distributor column (appended at the end, column 27).
+            ws_data.cell(row=current_row, column=27, value=f.distributor_name if (f and f.distributor_name) else "")
+
+            for c_idx in range(1, 28):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
                 if c_idx in [13, 14, 15, 16, 18, 21, 22, 25]:
