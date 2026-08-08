@@ -186,16 +186,18 @@
     {% endif %}
 
     <!-- Hidden container holding the full combined text used by "Full Copy (All)".
-         FIX: previously wrapped each label in *asterisks* (WhatsApp's bold
-         syntax). Removed on request — labels are now copied as plain text
-         with no surrounding markup. -->
+         Distributor is always included; DOC is only included for Aqua-team
+         visits (card.is_aqua and card.doc both truthy) — Poultry visits
+         never show a DOC line, so no "DOC: " blank/None text leaks in. -->
     <div id="full-report-source" style="display:none;">{% for card in report_cards %}Farm Visiting Report
 Executive: {{ card.executive }}
 Farm Name: {{ card.farm_name }}
 Location: {{ card.location }}
 Visit Date: {{ card.visit_date }}
 Visit Summary: {{ card.summary }}
-Next Follow-up: {{ card.next_followup }}
+Distributor: {{ card.distributor }}
+{% if card.is_aqua and card.doc %}DOC: {{ card.doc }}
+{% endif %}Next Follow-up: {{ card.next_followup }}
 {% if not forloop.last %}
 ------------------------------------
 
@@ -211,6 +213,8 @@ Next Follow-up: {{ card.next_followup }}
   <b>Location:</b> {{ card.location }}
   <b>Visit Date:</b> {{ card.visit_date }}
   <b>Visit Summary:</b> {{ card.summary }}
+  <b>Distributor:</b> {{ card.distributor }}
+  {% if card.is_aqua and card.doc %}<b>DOC:</b> {{ card.doc }}{% endif %}
   <b>Next Follow-up:</b> {{ card.next_followup }}</div>
     </div>
     {% empty %}
@@ -244,7 +248,9 @@ function copyReport(btn) {
 
 // Converts a .report-text block (which uses <b> tags for on-screen bold)
 // into plain text — the <b> tags are stripped without adding any
-// markup around them, so the copied text has no asterisks.
+// markup around them, so the copied text has no asterisks. Blank
+// lines (e.g. from a Poultry card's DOC line evaluating to nothing)
+// are filtered out here so no stray empty line appears in the copy.
 function toWhatsAppPlainText(el) {
     const clone = el.cloneNode(true);
     clone.querySelectorAll('b').forEach(b => {
