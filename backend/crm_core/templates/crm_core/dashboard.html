@@ -248,6 +248,17 @@
         }
 
         .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; color: #33422a; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .card-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .card-title-row .card-title { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
 
         .table-wrapper { width: 100%; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
@@ -260,6 +271,7 @@
         .status-pill { background: #0369a1; color: #e0f2fe; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; display: inline-block; }
         .badge-sector-poultry { background: var(--warning-bg); color: var(--warning-text); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block; margin-top: 4px; border: 1px solid var(--warning-text); }
         .badge-sector-aqua { background: var(--info-bg); color: var(--info-text); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; display: inline-block; margin-top: 4px; border: 1px solid var(--info-text); }
+        .badge-km { background: #0f172a; color: #4ade80; font-weight: 700; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; display: inline-block; }
 
         .text-right { text-align: right; }
         .revenue-cell { font-weight: 700; color: var(--success); }
@@ -301,6 +313,7 @@
         }
         .map-legend-item { display: flex; align-items: center; gap: 6px; }
         .map-legend-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .map-legend-line { width: 18px; height: 0; border-top: 3px dashed #ef4444; display: inline-block; }
         .map-empty-banner {
             background-color: #fff7e0;
             border: 1px solid #f0d38a;
@@ -311,6 +324,11 @@
             font-weight: 600;
             margin-bottom: 14px;
             display: none;
+        }
+        .route-hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 600;
         }
     </style>
 </head>
@@ -576,7 +594,10 @@
         </div>
 
         <div class="card">
-            <div class="card-title">🗺️ Farm Coverage Map (Live Locations by District)</div>
+            <div class="card-title-row">
+                <div class="card-title" style="margin-bottom:0;">🗺️ Farm Coverage Map (Live Locations by District)</div>
+                <div class="route-hint" id="routeHint">Pick an Executive in the filter above to draw their farm-to-farm travel route ↑</div>
+            </div>
             <div id="mapEmptyBanner" class="map-empty-banner">
                 ⚠️ Some farms don't have GPS coordinates on file and are not shown below. Add latitude/longitude when logging visits to improve coverage accuracy.
             </div>
@@ -586,6 +607,31 @@
                 <div class="map-legend-item"><span class="map-legend-dot" style="background:#38bdf8;"></span> Aqua Farms</div>
                 <div class="map-legend-item"><span class="map-legend-dot" style="background:#94a3b8;"></span> Clustered Group (click to expand)</div>
                 <div class="map-legend-item"><span class="map-legend-dot" style="background:transparent;border:3px solid #ef4444;"></span> No Visit in 30+ Days</div>
+                <div class="map-legend-item"><span class="map-legend-line"></span> Executive's Travel Route (select above)</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🚗 Executive Travel Distance — Farm to Farm (km)</div>
+            <p class="route-hint" style="margin-bottom: 14px;">Straight-line distance between consecutively visited farms, grouped by executive and day. Real road distance will be a bit higher than shown here.</p>
+            <div class="table-wrapper" style="max-height: 340px; overflow-y: auto;">
+                <table id="routeSummaryTable">
+                    <thead>
+                        <tr>
+                            <th>Executive</th>
+                            <th>Date</th>
+                            <th>Farms Visited</th>
+                            <th class="text-right">Distance Traveled</th>
+                        </tr>
+                    </thead>
+                    <tbody id="routeSummaryBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                No GPS-tagged visits in the current filter to calculate travel distance from.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -594,6 +640,7 @@
     {{ chart_labels_js|json_script:"chart-labels-data" }}
     {{ chart_counts_js|json_script:"chart-counts-data" }}
     {{ farm_locations_js|json_script:"farm-locations-data" }}
+    {{ executive_routes_js|json_script:"executive-routes-data" }}
 
     <script>
         function getCookie(name) {
@@ -732,6 +779,17 @@
                 console.warn("Farm location data parse error:", e);
             }
 
+            // -----------------------------------------------------
+            // Executive travel-route data (km between farms)
+            // -----------------------------------------------------
+            let executiveRoutes = [];
+            try {
+                const routeElem = document.getElementById('executive-routes-data');
+                if (routeElem) executiveRoutes = JSON.parse(routeElem.textContent) || [];
+            } catch (e) {
+                console.warn("Executive route data parse error:", e);
+            }
+
             const validFarms = farmLocations.filter(f => f.lat && f.lng);
             const skippedCount = farmLocations.length - validFarms.length;
 
@@ -787,6 +845,101 @@
             } else {
                 document.getElementById('mapEmptyBanner').style.display = 'block';
                 document.getElementById('mapEmptyBanner').textContent = '⚠️ No farm GPS coordinates on file yet. Add latitude/longitude when logging visits to populate the coverage map.';
+            }
+
+            // -----------------------------------------------------
+            // Draw the selected executive's farm-to-farm route
+            // -----------------------------------------------------
+            let routeLayer = null;
+
+            function drawExecutiveRoute(executiveName) {
+                if (routeLayer) {
+                    map.removeLayer(routeLayer);
+                    routeLayer = null;
+                }
+
+                const hint = document.getElementById('routeHint');
+
+                if (!executiveName) {
+                    hint.textContent = "Pick an Executive in the filter above to draw their farm-to-farm travel route ↑";
+                    return;
+                }
+
+                const execRoutes = executiveRoutes.filter(r => r.executive === executiveName);
+
+                if (execRoutes.length === 0) {
+                    hint.textContent = `No GPS-tagged visits found for ${executiveName} to draw a route from.`;
+                    return;
+                }
+
+                routeLayer = L.layerGroup();
+                let grandTotalKm = 0;
+
+                execRoutes.forEach(route => {
+                    grandTotalKm += route.total_km;
+                    const latlngs = route.stops.map(s => [s.lat, s.lng]);
+
+                    if (latlngs.length > 1) {
+                        const line = L.polyline(latlngs, {
+                            color: '#ef4444',
+                            weight: 3,
+                            dashArray: '6 6'
+                        }).bindPopup(`<strong>${route.executive}</strong> — ${route.date}<br>${route.stop_count} farms visited · <strong>${route.total_km} km</strong> traveled`);
+                        routeLayer.addLayer(line);
+                    }
+
+                    route.stops.forEach((s, i) => {
+                        L.marker([s.lat, s.lng], {
+                            icon: L.divIcon({
+                                className: '',
+                                html: `<div style="background:#ef4444;color:white;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.5);">${i + 1}</div>`,
+                                iconSize: [18, 18],
+                                iconAnchor: [9, 9]
+                            })
+                        }).bindPopup(`<strong>${i + 1}. ${s.farm_name}</strong><br>${s.district || ''}<br>Visited at ${s.time} on ${route.date}`)
+                          .addTo(routeLayer);
+                    });
+                });
+
+                routeLayer.addTo(map);
+
+                const dayCount = execRoutes.length;
+                hint.innerHTML = `<span class="badge-km">${grandTotalKm.toFixed(1)} km</span> traveled by ${executiveName} across ${dayCount} day${dayCount !== 1 ? 's' : ''} in this filter`;
+
+                const allPoints = execRoutes.flatMap(r => r.stops.map(s => [s.lat, s.lng]));
+                if (allPoints.length > 0) {
+                    map.fitBounds(L.latLngBounds(allPoints), { padding: [40, 40] });
+                }
+            }
+
+            const execFilterElem = document.getElementById('filter-executive');
+            if (execFilterElem) {
+                // Draw immediately if an executive is already selected via
+                // URL query params (page loaded with ?executive=... set).
+                if (execFilterElem.value) {
+                    drawExecutiveRoute(execFilterElem.value);
+                }
+                execFilterElem.addEventListener('change', function () {
+                    drawExecutiveRoute(this.value);
+                });
+            }
+
+            // -----------------------------------------------------
+            // Build the "Executive Travel Distance" summary table
+            // -----------------------------------------------------
+            const routeSummaryBody = document.getElementById('routeSummaryBody');
+            if (routeSummaryBody && executiveRoutes.length > 0) {
+                routeSummaryBody.innerHTML = '';
+                executiveRoutes.forEach(route => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><span class="badge-user">${route.executive}</span></td>
+                        <td>${route.date}</td>
+                        <td>${route.stop_count} farm${route.stop_count !== 1 ? 's' : ''}</td>
+                        <td class="text-right"><span class="badge-km">${route.total_km} km</span></td>
+                    `;
+                    routeSummaryBody.appendChild(tr);
+                });
             }
         });
     </script>
