@@ -229,8 +229,4 @@ class SalesExecutiveProfile(models.Model):
         verbose_name_plural = "Sales Executive Profiles"
 
     def __str__(self):
-<<<<<<< Updated upstream
         return f"{self.user.get_full_name() or self.user.username} ({self.employee_id})"
-=======
-        return f"{self.user.get_full_name() or self.user.username} ({self.employee_id})"
->>>>>>> Stashed changes
