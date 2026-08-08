@@ -5,6 +5,8 @@ import openpyxl
 import requests
 import traceback
 
+from math import radians, sin, cos, sqrt, atan2
+
 from datetime import timedelta
 from functools import wraps
 
@@ -105,6 +107,89 @@ def build_district_q(field_path, selected_district):
     for val in district_filter_values(selected_district):
         q |= Q(**{f"{field_path}__iexact": val})
     return q
+
+
+# ==========================================================
+# 🚗 EXECUTIVE TRAVEL-DISTANCE CALCULATION
+# ------------------------------------------------------------
+# Groups each executive's visits by local calendar day, in the order
+# they actually logged them (visit_date), and works out how far they
+# traveled farm-to-farm that day. Distance is straight-line
+# ("as the crow flies") using the Haversine formula — it's fast and
+# needs no external API, but will under-count real road distance
+# since roads curve. If you need actual road-driving distance, swap
+# the leg-distance call inside build_executive_routes() for a request
+# to a routing API (e.g. OSRM: https://router.project-osrm.org) per
+# consecutive pair of stops — see notes at the bottom of this block.
+# ==========================================================
+
+def haversine_km(lat1, lon1, lat2, lon2):
+    """Straight-line ('as the crow flies') distance between two GPS
+    points, in kilometers.
+    """
+    R = 6371.0  # Earth's radius in km
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = (
+        sin(dlat / 2) ** 2
+        + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    )
+    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+
+def build_executive_routes(visit_qs):
+    """Given a filtered FarmVisitReport queryset, groups visits by
+    (executive, local visit date) ordered by visit_date, and returns
+    one entry per executive-day containing the ordered list of farm
+    stops plus the total km traveled between them.
+
+    Visits whose farm has no GPS coordinates on file are skipped
+    (they can't be placed on the route), and executives with fewer
+    than 2 usable stops on a given day are still included (with
+    total_km = 0) so the UI can show "1 farm visited, no travel to
+    calculate" rather than silently dropping that day.
+    """
+    routes = {}  # key: (executive_username, 'YYYY-MM-DD') -> list of stop dicts
+
+    visits = (
+        visit_qs.select_related('farm', 'executive')
+        .exclude(Q(farm__latitude__isnull=True) | Q(farm__longitude__isnull=True))
+        .order_by('visit_date')
+    )
+
+    for v in visits:
+        if not v.executive or not v.farm:
+            continue
+        local_dt = timezone.localtime(v.visit_date)
+        key = (v.executive.username, local_dt.strftime('%Y-%m-%d'))
+        routes.setdefault(key, []).append({
+            'farm_name': v.farm.farm_name,
+            'district': normalize_district(v.farm.district),
+            'lat': float(v.farm.latitude),
+            'lng': float(v.farm.longitude),
+            'time': local_dt.strftime('%H:%M'),
+        })
+
+    route_list = []
+    for (executive, date_str), stops in routes.items():
+        total_km = 0.0
+        for i in range(1, len(stops)):
+            total_km += haversine_km(
+                stops[i - 1]['lat'], stops[i - 1]['lng'],
+                stops[i]['lat'], stops[i]['lng'],
+            )
+        route_list.append({
+            'executive': executive,
+            'date': date_str,
+            'stops': stops,
+            'total_km': round(total_km, 1),
+            'stop_count': len(stops),
+        })
+
+    # Most recent day first, then busiest route first, so the summary
+    # table below the map reads naturally without extra client-side sorting.
+    route_list.sort(key=lambda r: (r['date'], r['total_km']), reverse=True)
+    return route_list
 
 
 def staff_required(view_func):
@@ -616,6 +701,7 @@ def get_dashboard_context(request):
         "farm_locations_js": [],
         "stale_farms": [],
         "stale_farms_count": 0,
+        "executive_routes_js": json.dumps([]),
         "prob_labels_js": json.dumps([]),
         "prob_data_js": json.dumps([]),
         "bird_labels_js": json.dumps(
@@ -941,6 +1027,11 @@ def get_dashboard_context(request):
         stale_farms_count = len(stale_farms_raw)
         stale_farms_table = stale_farms_raw[:25]
 
+        # ------------------------------------------------------------------
+        # 5d. EXECUTIVE TRAVEL ROUTES (km between farms, per exec per day)
+        # ------------------------------------------------------------------
+        executive_routes = build_executive_routes(visit_qs)
+
         prob_qs = (
             visit_qs.values("farm_problem")
             .annotate(frequency=Count("id"))
@@ -1101,6 +1192,9 @@ def get_dashboard_context(request):
                 "farm_locations_js": farm_locations_data,
                 "stale_farms": stale_farms_table,
                 "stale_farms_count": stale_farms_count,
+                "executive_routes_js": json.dumps(
+                    executive_routes, cls=DjangoJSONEncoder
+                ),
                 "prob_labels_js": json.dumps(
                     prob_labels, cls=DjangoJSONEncoder
                 ),
