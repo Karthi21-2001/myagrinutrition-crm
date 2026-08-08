@@ -61,15 +61,12 @@ urlpatterns = [
         views.executive_analytics_view,
         name='analytics_report',
     ),
-<<<<<<< Updated upstream
     # --- Daily WhatsApp-style Visit Report Generator ---
     path(
         'daily-report/',
         views.daily_visit_report,
         name='daily_visit_report',
     ),
-=======
->>>>>>> Stashed changes
 
     # ==========================================
     # 🛰️ GEOLOCATION & DEPENDENT FILTER UTILITIES

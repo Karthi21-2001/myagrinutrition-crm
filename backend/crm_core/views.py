@@ -28,6 +28,7 @@ from openpyxl.utils import get_column_letter
 
 from .forms import ExecutiveSignUpForm
 from .models import Farm, FarmVisitReport, VisitedProductDetail
+from django.views.decorators.http import require_POST
 from .utils.whatsapp_formatter import build_farm_visit_message
 from .utils.whatsapp_routing import get_target_group
 from .utils.whatsapp_selenium import send_whatsapp_group_message
@@ -1356,7 +1357,7 @@ def get_location_details(request):
 
 
 # ==========================================
-<<<<<<< Updated upstream
+# ==========================================
 # 📝 DAILY VISIT REPORT GENERATOR
 # ==========================================
 
@@ -1434,7 +1435,9 @@ def daily_visit_report(request):
         'executive_list': executive_list,
     }
     return render(request, 'crm_core/daily_visit_report.html', context)
-=======
+
+
+# ==========================================
 # 📲 WHATSAPP VISIT NOTIFICATION
 # ==========================================
 
@@ -1467,4 +1470,3 @@ def notify_farm_visit(request, visit_id):
     except Exception as e:
         logger.error(f"WhatsApp notify failed for visit #{visit_id}: {e}", exc_info=True)
         return JsonResponse({"status": "error", "detail": str(e)}, status=500)
->>>>>>> Stashed changes
