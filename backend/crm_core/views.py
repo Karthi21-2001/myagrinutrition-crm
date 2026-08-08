@@ -1354,7 +1354,6 @@ def get_location_details(request):
 
 
 # ==========================================
-# ==========================================
 # 📝 DAILY VISIT REPORT GENERATOR
 # ==========================================
 
@@ -1364,6 +1363,11 @@ def daily_visit_report(request):
     logged on the selected date by the selected executive. Changing
     either dropdown reloads this view with the new filters (see
     applyReportFilters() in the template).
+
+    Distributor Name is shown on every card (both Aqua and Poultry).
+    DOC (initial stocking count for a pond) is shown only on Aqua-team
+    cards — Poultry farms don't have this field, so it's conditionally
+    added rather than always rendered as blank.
     """
     selected_date = request.GET.get('date', '').strip()
     selected_executive = request.GET.get('executive', '').strip()
@@ -1408,6 +1412,15 @@ def daily_visit_report(request):
 
         nvd = getattr(v, 'next_visit_date', None)
 
+        # NEW: Distributor — shown on every card, Aqua and Poultry alike.
+        distributor = f.distributor_name if (f and f.distributor_name) else 'Not specified'
+
+        # NEW: DOC — Aqua-team only. Detected via business_type, same
+        # convention already used on the dashboard (icontains "Aqua"),
+        # so it still matches values like "Aqua" or "Aquaculture".
+        is_aqua = bool(f and f.business_type and 'aqua' in f.business_type.lower())
+        doc_value = getattr(f, 'pond_doc', None) if (f and is_aqua) else None
+
         report_cards.append({
             'executive': v.executive.username if v.executive else 'Unassigned',
             'farm_name': f.farm_name if f else 'N/A',
@@ -1416,6 +1429,9 @@ def daily_visit_report(request):
             'summary': summary,
             'status': 'Completed',
             'next_followup': nvd.strftime('%d-%b-%Y') if nvd else 'Not scheduled',
+            'distributor': distributor,
+            'is_aqua': is_aqua,
+            'doc': doc_value,
         })
 
     executive_list = list(
@@ -1432,5 +1448,3 @@ def daily_visit_report(request):
         'executive_list': executive_list,
     }
     return render(request, 'crm_core/daily_visit_report.html', context)
-
-
