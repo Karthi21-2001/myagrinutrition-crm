@@ -598,7 +598,7 @@ def export_visits_to_excel(request):
         'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
         'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
         'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link',
-        'Distributor'
+        'Distributor', 'Acre (Pond Size)', 'DOC (Days of Culture)', 'Fish Variety'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -681,10 +681,18 @@ def export_visits_to_excel(request):
             # NEW: Distributor column (appended at the end, column 27).
             ws_data.cell(row=current_row, column=27, value=f.distributor_name if (f and f.distributor_name) else "")
 
-            for c_idx in range(1, 28):
+            # NEW: Aqua Pond Tracking columns (appended at the end,
+            # columns 28-30). Written for every row regardless of
+            # sector - blank/zero for Poultry farms since those
+            # fields simply won't have been set on save.
+            ws_data.cell(row=current_row, column=28, value=float(f.pond_acre) if (f and f.pond_acre) else 0.0)
+            ws_data.cell(row=current_row, column=29, value=f.pond_doc if (f and f.pond_doc) else 0)
+            ws_data.cell(row=current_row, column=30, value=f.fish_variety if (f and f.fish_variety) else "")
+
+            for c_idx in range(1, 31):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
-                if c_idx in [13, 14, 15, 16, 18, 21, 22, 25]:
+                if c_idx in [13, 14, 15, 16, 18, 21, 22, 25, 28, 29]:
                     cell_item.alignment = Alignment(horizontal="center")
 
             current_row += 1
