@@ -357,6 +357,11 @@ def save_farm_visit(request):
         state = request.POST.get('state', '').strip()
         farm_problem = request.POST.get('farm_problem')
 
+        # Free-text status note, Aqua sector only (form hides/disables
+        # this field for Poultry, so it will normally arrive blank
+        # there). Requires FarmVisitReport.farm_status - see models.py.
+        farm_status = request.POST.get('farm_status', '').strip()
+
         # Planned follow-up date captured on the "Next Visit Date"
         # field in the form. Stored on the visit record it was logged
         # from, since it's a per-visit follow-up plan rather than a
@@ -598,7 +603,7 @@ def export_visits_to_excel(request):
         'Farm Problem Observed', 'Chicks Count', 'Grower Count', 'Layer Count', 'Culling Bird',
         'Product Name', 'Sale Qty', 'Price (INR)', 'Revenue Generated',
         'Poten. Qty', 'Target Qty', 'Units', 'Process Stage', 'conv (%)', 'Live GPS Link',
-        'Distributor', 'Acre (Pond Size)', 'DOC (Days of Culture)', 'Fish Variety'
+        'Distributor', 'Acre (Pond Size)', 'DOC (Days of Culture)', 'Fish Variety', 'Farm Status'
     ]
 
     for col_idx, text in enumerate(headers, 1):
@@ -689,7 +694,14 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=29, value=f.pond_doc if (f and f.pond_doc) else 0)
             ws_data.cell(row=current_row, column=30, value=f.fish_variety if (f and f.fish_variety) else "")
 
-            for c_idx in range(1, 31):
+            # NEW: Farm Status (column 31). Per-visit field (Aqua-only
+            # on the logging form), so it comes off , not .
+            # getattr guards against a not-yet-migrated field, same
+            # convention as next_visit_date above.
+            farm_status_val = getattr(v, 'farm_status', None) if v else None
+            ws_data.cell(row=current_row, column=31, value=farm_status_val if farm_status_val else "")
+
+            for c_idx in range(1, 32):
                 cell_item = ws_data.cell(row=current_row, column=c_idx)
                 cell_item.border = thin_border
                 if c_idx in [13, 14, 15, 16, 18, 21, 22, 25, 28, 29]:
@@ -1468,6 +1480,8 @@ def daily_visit_report(request):
         is_aqua = bool(f and f.business_type and 'aqua' in f.business_type.lower())
         doc_value = getattr(f, 'pond_doc', None) if (f and is_aqua) else None
 
+        farm_status_val = getattr(v, 'farm_status', None) if is_aqua else None
+
         report_cards.append({
             'executive': v.executive.username if v.executive else 'Unassigned',
             'farm_name': f.farm_name if f else 'N/A',
@@ -1479,6 +1493,7 @@ def daily_visit_report(request):
             'distributor': distributor,
             'is_aqua': is_aqua,
             'doc': doc_value,
+            'farm_status': farm_status_val,
         })
 
     executive_list = list(

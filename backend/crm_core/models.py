@@ -120,7 +120,7 @@ class FarmVisitReport(models.Model):
     # form for the Aqua sector only (water quality, stocking health,
     # feeding behavior, mortality, etc.). Kept as its own field rather
     # than folded into farm_problem since "problem observed" and
-    # "general status" are logically distinct — a visit can have a
+    # "general status" are logically distinct - a visit can have a
     # status note with no problem reported, or vice versa.
     farm_status = models.TextField(blank=True, null=True)
 
