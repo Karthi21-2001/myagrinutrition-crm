@@ -53,6 +53,10 @@ class Farm(models.Model):
     grower_count = models.IntegerField(default=0, verbose_name="Grower Population")
     layer_count = models.IntegerField(default=0, verbose_name="Layer Population")
     culling_bird_count = models.IntegerField(default=0, verbose_name="Culling Bird Population")
+    # Aqua Pond Tracking Inventory Metrics
+    pond_acre = models.FloatField(default=0.0, verbose_name="Pond Size (Acres)")
+    pond_doc = models.IntegerField(default=0, verbose_name="Days of Culture (DOC)")
+    fish_variety = models.CharField(max_length=100, blank=True, default="", verbose_name="Fish/Shrimp Variety")
     
     # Hierarchical Regional Parameters for Dashboard Analytics
     country = models.CharField(max_length=100, default="India")

@@ -377,6 +377,9 @@ def save_farm_visit(request):
                         'grower_count': grower_count,
                         'layer_count': layer_count,
                         'culling_bird_count': culling_bird_count,
+                        'pond_acre': pond_acre,
+                        'pond_doc': pond_doc,
+                        'fish_variety': fish_variety,
                     }
                 )
 
@@ -394,6 +397,10 @@ def save_farm_visit(request):
                     farm_instance.grower_count = grower_count
                     farm_instance.layer_count = layer_count
                     farm_instance.culling_bird_count = culling_bird_count
+                    farm_instance.pond_acre = pond_acre
+                    farm_instance.pond_doc = pond_doc
+                    if fish_variety:
+                        farm_instance.fish_variety = fish_variety
                     farm_instance.save()
 
                 # NOTE: requires a `next_visit_date = models.DateField(null=True, blank=True)`
