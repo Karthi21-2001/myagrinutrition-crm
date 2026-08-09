@@ -116,6 +116,14 @@ class FarmVisitReport(models.Model):
     )
     farm_problem = models.TextField(blank=True, null=True)
 
+    # NEW: Free-text farm status/condition note, captured on the visit
+    # form for the Aqua sector only (water quality, stocking health,
+    # feeding behavior, mortality, etc.). Kept as its own field rather
+    # than folded into farm_problem since "problem observed" and
+    # "general status" are logically distinct — a visit can have a
+    # status note with no problem reported, or vice versa.
+    farm_status = models.TextField(blank=True, null=True)
+
     visit_status = models.CharField(
         max_length=50,
         choices=STATUS_CHOICES,
