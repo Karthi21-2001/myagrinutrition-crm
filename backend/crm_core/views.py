@@ -139,11 +139,47 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
 
+def road_distance_km(stops):
+    """Actual road (driving) distance in km for an ordered list of
+    stops, using the OSRM public routing API (start-to-end route
+    through every stop in order, not straight-line).
+
+    Falls back to the haversine straight-line sum if OSRM is
+    unreachable, times out, or returns an error/rate-limit response -
+    the public OSRM demo server has no uptime guarantee, so a network
+    hiccup here must never break the dashboard.
+    """
+    if len(stops) < 2:
+        return 0.0, False
+
+    coords = ";".join(f"{s['lng']},{s['lat']}" for s in stops)
+    url = f"https://router.project-osrm.org/route/v1/driving/{coords}?overview=false"
+
+    try:
+        res = requests.get(url, timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get('code') == 'Ok' and data.get('routes'):
+                meters = data['routes'][0]['distance']
+                return round(meters / 1000.0, 1), True
+    except Exception as e:
+        logger.warning(f"OSRM road-distance lookup failed, falling back to straight-line: {e}")
+
+    total_km = 0.0
+    for i in range(1, len(stops)):
+        total_km += haversine_km(
+            stops[i - 1]['lat'], stops[i - 1]['lng'],
+            stops[i]['lat'], stops[i]['lng'],
+        )
+    return round(total_km, 1), False
+
+
 def build_executive_routes(visit_qs):
     """Given a filtered FarmVisitReport queryset, groups visits by
     (executive, local visit date) ordered by visit_date, and returns
     one entry per executive-day containing the ordered list of farm
-    stops plus the total km traveled between them.
+    stops plus the total km traveled between them (real road distance
+    via OSRM when available, straight-line haversine as a fallback).
 
     Visits whose farm has no GPS coordinates on file are skipped
     (they can't be placed on the route), and executives with fewer
@@ -174,17 +210,13 @@ def build_executive_routes(visit_qs):
 
     route_list = []
     for (executive, date_str), stops in routes.items():
-        total_km = 0.0
-        for i in range(1, len(stops)):
-            total_km += haversine_km(
-                stops[i - 1]['lat'], stops[i - 1]['lng'],
-                stops[i]['lat'], stops[i]['lng'],
-            )
+        total_km, is_road_distance = road_distance_km(stops)
         route_list.append({
             'executive': executive,
             'date': date_str,
             'stops': stops,
-            'total_km': round(total_km, 1),
+            'total_km': total_km,
+            'is_road_distance': is_road_distance,
             'stop_count': len(stops),
         })
 

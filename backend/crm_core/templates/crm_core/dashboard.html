@@ -635,6 +635,31 @@
             </div>
         </div>
 
+        <div class="card">
+            <div class="card-title">Executive Coverage Summary - Area and Total Distance</div>
+            <p class="route-hint" style="margin-bottom: 14px;">Total straight-line distance traveled and districts covered by each executive across the current filter. Click View on Map to draw that executive route above.</p>
+            <div class="table-wrapper" style="max-height: 340px; overflow-y: auto;">
+                <table id="execCoverageTable">
+                    <thead>
+                        <tr>
+                            <th>Executive</th>
+                            <th>Coverage Area (Districts)</th>
+                            <th>Days Active</th>
+                            <th class="text-right">Total Distance</th>
+                            <th class="text-right">Map</th>
+                        </tr>
+                    </thead>
+                    <tbody id="execCoverageBody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 40px 0;">
+                                No GPS-tagged visits in the current filter to summarize.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     {{ chart_labels_js|json_script:"chart-labels-data" }}
@@ -932,13 +957,65 @@
                 routeSummaryBody.innerHTML = '';
                 executiveRoutes.forEach(route => {
                     const tr = document.createElement('tr');
+                    const distLabel = route.is_road_distance
+                        ? '<span style="font-size:0.7rem;color:#4ade80;font-weight:700;margin-left:6px;">ROAD</span>'
+                        : '<span style="font-size:0.7rem;color:#94a3b8;font-weight:700;margin-left:6px;" title="OSRM unavailable, showing straight-line estimate">APPROX</span>';
                     tr.innerHTML = `
                         <td><span class="badge-user">${route.executive}</span></td>
                         <td>${route.date}</td>
                         <td>${route.stop_count} farm${route.stop_count !== 1 ? 's' : ''}</td>
-                        <td class="text-right"><span class="badge-km">${route.total_km} km</span></td>
+                        <td class="text-right"><span class="badge-km">${route.total_km} km</span>${distLabel}</td>
                     `;
                     routeSummaryBody.appendChild(tr);
+                });
+            }
+
+            const execCoverageBody = document.getElementById('execCoverageBody');
+            if (execCoverageBody && executiveRoutes.length > 0) {
+                const coverageMap = {};
+
+                executiveRoutes.forEach(route => {
+                    if (!coverageMap[route.executive]) {
+                        coverageMap[route.executive] = { totalKm: 0, days: new Set(), districts: new Set(), hasApprox: false };
+                    }
+                    const entry = coverageMap[route.executive];
+                    entry.totalKm += route.total_km;
+                    entry.days.add(route.date);
+                    if (!route.is_road_distance) entry.hasApprox = true;
+                    route.stops.forEach(s => {
+                        if (s.district) entry.districts.add(s.district);
+                    });
+                });
+
+                execCoverageBody.innerHTML = '';
+                Object.keys(coverageMap)
+                    .sort((a, b) => coverageMap[b].totalKm - coverageMap[a].totalKm)
+                    .forEach(execName => {
+                        const entry = coverageMap[execName];
+                        const districtsList = Array.from(entry.districts).sort().join(', ') || 'N/A';
+                        const tr = document.createElement('tr');
+                        const anyApprox = coverageMap[execName].hasApprox;
+                        const distLabel = anyApprox
+                            ? '<span style="font-size:0.7rem;color:#94a3b8;font-weight:700;margin-left:6px;" title="Some days used straight-line estimate (OSRM unavailable)">~APPROX</span>'
+                            : '<span style="font-size:0.7rem;color:#4ade80;font-weight:700;margin-left:6px;">ROAD</span>';
+                        tr.innerHTML = `
+                            <td><span class="badge-user">${execName}</span></td>
+                            <td>${districtsList}</td>
+                            <td>${entry.days.size} day${entry.days.size !== 1 ? 's' : ''}</td>
+                            <td class="text-right"><span class="badge-km">${entry.totalKm.toFixed(1)} km</span>${distLabel}</td>
+                            <td class="text-right"><button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:0.8rem;" data-exec="${execName}">View on Map</button></td>
+                        `;
+                        execCoverageBody.appendChild(tr);
+                    });
+
+                execCoverageBody.querySelectorAll('button[data-exec]').forEach(btn => {
+                    btn.addEventListener('click', function () {
+                        const name = this.getAttribute('data-exec');
+                        const execSelect = document.getElementById('filter-executive');
+                        if (execSelect) execSelect.value = name;
+                        drawExecutiveRoute(name);
+                        document.getElementById('coverageMap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    });
                 });
             }
         });
