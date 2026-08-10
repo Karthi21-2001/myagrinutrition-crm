@@ -427,6 +427,19 @@ def save_farm_visit(request):
                         farm_instance.sub_segment = sub_segment
                     if distributor_name:
                         farm_instance.distributor_name = distributor_name
+                    # FIX: latitude/longitude were only ever set via
+                    # get_or_create()'s defaults= (first-visit only).
+                    # If a farm's first-ever visit failed to capture
+                    # GPS (denied permission, no signal, etc.), the
+                    # farm was stuck with no location forever - even
+                    # after later visits successfully got a GPS fix.
+                    # Only overwrite when this visit actually sent a
+                    # real coordinate, so a visit logged without GPS
+                    # never blanks out a location already on file.
+                    if latitude is not None:
+                        farm_instance.latitude = latitude
+                    if longitude is not None:
+                        farm_instance.longitude = longitude
                     farm_instance.state = state
                     farm_instance.district = district
                     farm_instance.area = area
