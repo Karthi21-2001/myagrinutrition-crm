@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import json
 import logging
 import openpyxl
@@ -7,6 +8,7 @@ import traceback
 
 from math import radians, sin, cos, sqrt, atan2
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 from functools import wraps
 
@@ -14,6 +16,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
+from django.core.cache import cache
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Avg, Count, DecimalField, F, FloatField, Max, Q, Sum
@@ -174,6 +177,18 @@ def road_distance_km(stops):
     return round(total_km, 1), False
 
 
+def _route_cache_key(executive, date_str, stops):
+    """Stable cache key for one executive-day route, derived from the
+    executive, date, and exact stop coordinates. Two visits on the
+    same day with the same stops always hash to the same key, so a
+    repeat dashboard load can skip hitting OSRM entirely.
+    """
+    raw = f"{executive}|{date_str}|" + "|".join(
+        f"{s['lat']:.5f},{s['lng']:.5f}" for s in stops
+    )
+    return f"road_km:{hashlib.md5(raw.encode()).hexdigest()}"
+
+
 def build_executive_routes(visit_qs):
     """Given a filtered FarmVisitReport queryset, groups visits by
     (executive, local visit date) ordered by visit_date, and returns
@@ -186,6 +201,15 @@ def build_executive_routes(visit_qs):
     than 2 usable stops on a given day are still included (with
     total_km = 0) so the UI can show "1 farm visited, no travel to
     calculate" rather than silently dropping that day.
+
+    PERFORMANCE NOTE: road_distance_km() makes a blocking network call
+    per executive-day (up to 8s each). With many executive-day groups
+    in a filtered view, doing this sequentially can take well over a
+    minute and exceed gunicorn's worker timeout, causing the worker to
+    be killed mid-request. To avoid that, the per-route lookups below
+    run concurrently in a small thread pool (they're I/O-bound waits,
+    so threads help despite the GIL), and each result is cached for a
+    few hours so repeat loads of the same data skip OSRM entirely.
     """
     routes = {}  # key: (executive_username, 'YYYY-MM-DD') -> list of stop dicts
 
@@ -208,17 +232,35 @@ def build_executive_routes(visit_qs):
             'time': local_dt.strftime('%H:%M'),
         })
 
-    route_list = []
-    for (executive, date_str), stops in routes.items():
-        total_km, is_road_distance = road_distance_km(stops)
-        route_list.append({
+    def _resolve(item):
+        (executive, date_str), stops = item
+        cache_key = _route_cache_key(executive, date_str, stops)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            total_km, is_road_distance = cached
+        else:
+            total_km, is_road_distance = road_distance_km(stops)
+            # Cache for 6 hours - a past day's visit history never
+            # changes, so this is safe and eliminates repeat-load
+            # latency (and repeat OSRM load) entirely.
+            cache.set(cache_key, (total_km, is_road_distance), 60 * 60 * 6)
+        return {
             'executive': executive,
             'date': date_str,
             'stops': stops,
             'total_km': total_km,
             'is_road_distance': is_road_distance,
             'stop_count': len(stops),
-        })
+        }
+
+    route_list = []
+    # max_workers=6: kept modest - the public OSRM demo server rate-limits
+    # aggressive concurrent traffic from a single source, and this still
+    # cuts worst-case wall-clock time roughly 6x versus sequential calls.
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = [executor.submit(_resolve, item) for item in routes.items()]
+        for fut in as_completed(futures):
+            route_list.append(fut.result())
 
     # Most recent day first, then busiest route first, so the summary
     # table below the map reads naturally without extra client-side sorting.
@@ -708,7 +750,7 @@ def export_visits_to_excel(request):
             ws_data.cell(row=current_row, column=30, value=f.fish_variety if (f and f.fish_variety) else "")
 
             # NEW: Farm Status (column 31). Per-visit field (Aqua-only
-            # on the logging form), so it comes off , not .
+            # on the logging form), so it comes off , not .
             # getattr guards against a not-yet-migrated field, same
             # convention as next_visit_date above.
             farm_status_val = getattr(v, 'farm_status', None) if v else None
