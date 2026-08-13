@@ -1471,7 +1471,7 @@ def get_location_details(request):
 # 📝 DAILY VISIT REPORT GENERATOR
 # ==========================================
 
-@staff_required
+@login_required(login_url='/crm/login/')
 def daily_visit_report(request):
     """Renders a WhatsApp-style visit summary card for every visit
     logged on the selected date by the selected executive. Changing
