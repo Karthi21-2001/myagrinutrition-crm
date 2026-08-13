@@ -151,20 +151,16 @@
             resize: vertical;
         }
 
-        /* Remove number input spinner arrows (Chrome, Safari, Edge) —
-           user wants plain simple entry, no increment/decrement steppers */
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
 
-        /* Remove number input spinner arrows (Firefox) */
         input[type="number"] {
             -moz-appearance: textfield;
         }
 
-        /* Location Section Specifics */
         .location-box {
             background-color: rgba(148, 163, 184, 0.08);
             border: 1px dashed var(--border);
@@ -193,10 +189,6 @@
 
         .btn-primary { background-color: var(--primary); color: white; }
         .btn-primary:hover { background-color: var(--primary-hover); }
-        /* NOTE: this greyed-out disabled look is exactly what sales
-           reps were seeing "stuck" on — the button used to never get
-           released back from `disabled` when the geocode call failed.
-           See the JS fix below (search "FIX (stuck button)"). */
         .btn-primary:disabled { background-color: #475569; cursor: not-allowed; }
 
         .btn-success { background-color: var(--success); color: white; }
@@ -207,6 +199,15 @@
 
         .btn-danger { background-color: var(--danger); color: white; padding: 10px 12px; }
         .btn-danger:hover { background-color: var(--danger-hover); }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        .btn-secondary:hover {
+            background-color: rgba(59, 130, 246, 0.08);
+        }
 
         #map-container {
             display: none;
@@ -237,10 +238,6 @@
             font-weight: 500;
         }
 
-        /* NEW: styling for the fields once they fall back to manual
-           entry (geocoding failed / unavailable), so it's visually
-           obvious to the field rep that they now need to type it in
-           themselves instead of waiting on it. */
         .manual-input {
             background-color: var(--warn-bg) !important;
             border-color: rgba(245, 158, 11, 0.5) !important;
@@ -258,9 +255,33 @@
             display: block;
         }
 
-        /* NEW: small "Optional" tag next to the location fields so
-           reps know they can skip this section entirely and still
-           submit the visit. */
+        .geo-required-note {
+            font-size: 0.8rem;
+            color: var(--danger);
+            margin-top: 8px;
+            display: none;
+            font-weight: 600;
+        }
+        .geo-required-note.visible {
+            display: block;
+        }
+
+        .manual-coord-box {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border);
+        }
+        .manual-coord-box.visible {
+            display: block;
+        }
+        .manual-coord-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
         .optional-tag {
             font-size: 0.7rem;
             font-weight: 600;
@@ -273,7 +294,6 @@
             margin-left: 6px;
         }
 
-        /* Dynamic Grid Items styling */
         .grid-item-row {
             background-color: rgba(148, 163, 184, 0.08);
             border: 1px solid var(--border);
@@ -296,7 +316,6 @@
             align-items: end;
         }
 
-        /* Poultry & Aqua Grid Layout Configurations */
         .poultry-grid, .aqua-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -335,16 +354,12 @@
             background-color: var(--success-hover);
         }
 
-        /* NEW: visual state while the submit is locked (post-click),
-           so it's obvious to the rep that the tap registered instead
-           of looking unresponsive. */
         .btn-submit:disabled {
             background-color: #64748b;
             box-shadow: none;
             cursor: not-allowed;
         }
 
-        /* Responsive Breakpoints */
         @media (max-width: 950px) {
             .pipeline-grid, .order-grid {
                 grid-template-columns: 1fr 1fr;
@@ -396,6 +411,9 @@
             #map {
                 height: 200px;
             }
+            .manual-coord-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -408,6 +426,9 @@
             <div>
                 <p><strong>Executive:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
             </div>
+            {% if request.user.is_staff or request.user.is_superuser %}
+            <a href="{% url 'daily_visit_report' %}" class="export-btn">📝 Daily Report</a>
+            {% endif %}
         </div>
 
         <form id="farmForm" method="POST" action="/crm/save-visit/" novalidate>
@@ -445,15 +466,19 @@
             <div class="card">
                 <div class="card-title" style="color: var(--primary);">
                     <span>📍 Geospatial Metrics</span>
+                    <span class="optional-tag" style="background-color: rgba(59,130,246,0.12); color: var(--primary);">Recommended</span>
                 </div>
                 
                 <button type="button" id="locateBtn" class="btn-action btn-primary btn-block">
                     Fetch GPS Verification Coordinate
                 </button>
                 <p class="geo-status-note" id="geoStatusNote">
-                    ⚠️ Couldn't auto-detect the location — you can type District / Area / State manually below, or just leave them blank and submit as normal.
+                    ⚠️ Couldn't auto-detect the address — you can type District / Area / State manually below, or just leave them blank. Your GPS coordinate is already saved.
                 </p>
-                
+                <p class="geo-required-note" id="geoRequiredNote">
+                    ⚠️ No GPS signal available. Enter coordinates manually below, or tap the map, before submitting.
+                </p>
+
                 <input type="hidden" id="lat" name="latitude">
                 <input type="hidden" id="lon" name="longitude">
 
@@ -463,18 +488,23 @@
                 </div>
 
                 <!--
-                    FIX (Location made optional): District / Area / State
-                    previously all had the `required` attribute, which — combined
-                    with the submit-time validator below that walks every
-                    `[required]:not([disabled])` field — blocked form submission
-                    any time GPS/geocoding wasn't used or came back empty. These
-                    fields are informational metadata, not gatekeeping data, so
-                    `required` has been removed from all three. They stay
-                    `readonly` while auto-filled by a successful geocode, and the
-                    existing manual-entry fallback (enableManualLocationEntry())
-                    still works exactly the same for reps who want to type them
-                    in by hand — it's just no longer mandatory either way.
+                    Manual coordinate fallback: shown only after GPS capture
+                    fails outright (no fix / permission denied / all retries
+                    exhausted). Tapping the map (once shown) or typing values
+                    here fills the same hidden #lat/#lon fields the automatic
+                    flow uses, so the visit still gets a real coordinate.
                 -->
+                <div class="manual-coord-box" id="manualCoordBox">
+                    <label style="margin-bottom:8px;">Enter Coordinates Manually</label>
+                    <div class="manual-coord-grid">
+                        <input type="number" step="any" id="manualLat" placeholder="Latitude e.g. 11.2789">
+                        <input type="number" step="any" id="manualLon" placeholder="Longitude e.g. 77.8931">
+                    </div>
+                    <button type="button" id="useManualCoordBtn" class="btn-action btn-secondary btn-block">
+                        Use These Coordinates
+                    </button>
+                </div>
+
                 <div class="location-box">
                     <div class="form-group-spacing">
                         <label style="color: var(--text-muted);">District</label>
@@ -663,24 +693,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     let map, marker;
+    let manualPlacementMode = false;
 
-    // ==========================================================
-    // DISTRICT NORMALIZATION MAP
-    // ----------------------------------------------------------
-    // WHY THIS EXISTS: Nominatim's reverse-geocode response does not
-    // return a consistent admin level for every coordinate. For some
-    // points `county` holds the real district; for others it's a
-    // taluk/block name; for rural points it can fall through to a
-    // town/village name. Saving that raw value directly is why the
-    // District filter dropdown on the dashboard showed a mix of real
-    // districts (e.g. Namakkal) alongside taluks/villages that sit
-    // *inside* those districts (Mohanur, Musiri, Rasipuram, Thottiyam,
-    // Tiruchengode, Kilvelur, Manachanallur, Agiripalle, Gannavaram,
-    // Nuzvid, Unguturu, etc).
-    //
-    // This mirrors crm_core/district_data.py (TALUK_TO_DISTRICT) on
-    // the backend. Keep both lists in sync when you add new mappings.
-    // ==========================================================
     const TALUK_TO_DISTRICT = {
         "mohanur": "Namakkal",
         "musiri": "Tiruchirappalli",
@@ -693,8 +707,6 @@
         "gannavaram": "NTR",
         "nuzvid": "Eluru",
         "unguturu": "Eluru"
-        // Add more taluk/block/village -> district mappings as you spot
-        // new noisy values appearing in the District filter dropdown.
     };
 
     function normalizeDistrict(rawValue) {
@@ -703,62 +715,24 @@
         if (TALUK_TO_DISTRICT[key]) {
             return TALUK_TO_DISTRICT[key];
         }
-        // Unknown value: keep it (trimmed) instead of dropping data,
-        // so it's visible in the dropdown and a mapping can be added.
         return rawValue.trim();
     }
 
-    // ==========================================================
-    // PRODUCT LISTS PER SECTOR
-    // ----------------------------------------------------------
-    // Drives the "Product Name" dropdown in both the Pipeline
-    // Projections and Orders sections. Swaps automatically whenever
-    // the Business Sector Segment (Poultry / Aqua) changes.
-    // ==========================================================
     const PRODUCT_LISTS = {
         Poultry: [
-            "Alpha Engrow NGP®",
-            "Bio-Org+® FD Cluster",
-            "Bio-Org+® FD Ultra",
-            "Bio-Org+® WS",
-            "Bio-Org+® Gel",
-            "Calvin® D3+ Liquid",
-            "Calvin® D3+ Dry",
-            "Dr. Yes® WS",
-            "Dr. Yes® FD",
-            "ElectroMet Rx® FD",
-            "ElectroMet Rx® Liquid",
-            "ElectroMet Rx® Gel",
-            "Herbipro® OLP Dry",
-            "Herbipro® OLP Liquid",
-            "Hazyfix® Penta Dry",
-            "Hazyfix® Optima Dry",
-            "Hazyfix® NT Dry",
-            "Triangle Chick Program",
-            "Immunofight®",
-            "Wet-Lock®",
-            "EstroMax®",
-            "OrgoMax® GIT Liquid",
-            "Bio-Matt® Presto",
-            "Bio-Matt® Nurture"
+            "Alpha Engrow NGP®","Bio-Org+® FD Cluster","Bio-Org+® FD Ultra","Bio-Org+® WS",
+            "Bio-Org+® Gel","Calvin® D3+ Liquid","Calvin® D3+ Dry","Dr. Yes® WS","Dr. Yes® FD",
+            "ElectroMet Rx® FD","ElectroMet Rx® Liquid","ElectroMet Rx® Gel","Herbipro® OLP Dry",
+            "Herbipro® OLP Liquid","Hazyfix® Penta Dry","Hazyfix® Optima Dry","Hazyfix® NT Dry",
+            "Triangle Chick Program","Immunofight®","Wet-Lock®","EstroMax®","OrgoMax® GIT Liquid",
+            "Bio-Matt® Presto","Bio-Matt® Nurture"
         ],
         Aqua: [
-            "Attracta",
-            "Bio-Org+ Aqua",
-            "Blue-Vital M25+",
-            "Dr. Yes",
-            "Licy-Ban",
-            "Herbipro OLP Aqua",
-            "ElectroMet Rx Aqua",
-            "Stocky-Min",
-            "Hazyfix Aqua"
+            "Attracta","Bio-Org+ Aqua","Blue-Vital M25+","Dr. Yes","Licy-Ban","Herbipro OLP Aqua",
+            "ElectroMet Rx Aqua","Stocky-Min","Hazyfix Aqua"
         ]
     };
 
-    // Fills a single <select class="product-select"> with the
-    // product list for the currently selected sector, preserving
-    // its previous selection when that product still exists in the
-    // new list.
     function populateProductSelect(selectEl, sector) {
         const previousValue = selectEl.value;
         const products = PRODUCT_LISTS[sector] || [];
@@ -784,16 +758,12 @@
         }
     }
 
-    // Refreshes every product dropdown currently on the page (both
-    // the Pipeline Projections and Orders sections) for the given
-    // sector.
     function refreshAllProductSelects(sector) {
         document.querySelectorAll('select.product-select').forEach(function(sel) {
             populateProductSelect(sel, sector);
         });
     }
 
-    // Sector & Sub-Sector Switching Logic
     document.addEventListener('DOMContentLoaded', function() {
         const sectorSelect = document.getElementById('business_type_select');
         const subSectorSelect = document.getElementById('sub_business_type_select');
@@ -849,8 +819,6 @@
                 farmStatusInput.value = '';
             }
 
-            // Swap the Product Name dropdown options to match the
-            // newly selected sector.
             refreshAllProductSelects(selectedSector);
         }
 
@@ -865,7 +833,6 @@
         dynamicSectorToggle();
     });
 
-    // Dynamic Row Multiplier: Confirmed Orders
     document.getElementById('add-order-btn').addEventListener('click', function() {
         const container = document.getElementById('order-sheet-container');
         const newRow = document.createElement('div');
@@ -902,7 +869,6 @@
         populateProductSelect(newRow.querySelector('select.product-select'), currentSector);
     });
 
-    // Dynamic Row Multiplier: Pipeline Items
     document.getElementById('add-pipeline-btn').addEventListener('click', function() {
         const container = document.getElementById('pipeline-sheet-container');
         const newRow = document.createElement('div');
@@ -951,7 +917,6 @@
         populateProductSelect(newRow.querySelector('select.product-select'), currentSector);
     });
 
-    // Row Cleaner Event Delegations
     document.getElementById('order-sheet-container').addEventListener('click', function(e) {
         if (e.target.classList.contains('remove-order-btn') || e.target.parentElement.classList.contains('remove-order-btn')) {
             const btn = e.target.classList.contains('remove-order-btn') ? e.target : e.target.parentElement;
@@ -987,10 +952,9 @@
     });
 
     // Mandatory Field Verification + Duplicate-Submit Guard
-    // NOTE: District / Area / State no longer carry the `required`
-    // attribute (see the location-box HTML above), so this loop
-    // simply won't see them anymore and they're automatically
-    // excluded from the "please fill out all mandatory fields" check.
+    // GPS is OPTIONAL: capturing a coordinate is encouraged (it feeds the
+    // dashboard's travel-distance/coverage widgets), but a rep can submit
+    // a visit with no GPS data at all — no block, no forced alert.
     document.getElementById('farmForm').addEventListener('submit', function(e) {
         const requiredInputs = this.querySelectorAll('[required]:not([disabled])');
         let valid = true;
@@ -1003,26 +967,15 @@
                 input.style.setProperty('border-color', '', '');
             }
         });
-        
+
         if (!valid) {
             e.preventDefault();
             alert("Please fill out all mandatory fields before logging data.");
             return;
         }
 
-        // FIX (duplicate visit submissions): lock the submit button
-        // the instant a valid submit fires, so a double-tap on a
-        // laggy connection — very common for field reps on mobile
-        // data — can't send a second identical POST before the page
-        // navigates away. This is the client-side half of the fix;
-        // views.py also has a server-side guard (skips creating a
-        // second FarmVisitReport if an identical one for the same
-        // farm/executive was logged in the last 15 seconds) in case
-        // a retry still slips through — e.g. a genuine network retry
-        // fired by the browser itself, which this handler can't see.
         const submitBtn = this.querySelector('.btn-submit');
         if (submitBtn.disabled) {
-            // Already submitting — block any further attempt outright.
             e.preventDefault();
             return;
         }
@@ -1030,18 +983,6 @@
         submitBtn.innerText = "Submitting...";
     });
 
-    // ==========================================================
-    // Helpers for the District / Area / State fields
-    // ----------------------------------------------------------
-    // setLocationField()   -> used on a successful auto geocode
-    // enableManualEntry()  -> used whenever auto geocode can't be
-    //                         trusted (network error, timeout, or a
-    //                         response with no usable address), so
-    //                         the rep can just type it in and keep
-    //                         going instead of being stuck. Since
-    //                         these fields are optional, the rep can
-    //                         also just leave them blank.
-    // ==========================================================
     function setLocationField(id, value) {
         const el = document.getElementById(id);
         el.readOnly = true;
@@ -1070,116 +1011,164 @@
         if (note) note.classList.remove('visible');
     }
 
-    // Geolocation Engine & Automatic Address Fetcher
-    document.getElementById('locateBtn').addEventListener('click', function() {
-        const btn = this;
-        btn.innerText = "⏳ Locating via GPS Grid...";
-        btn.disabled = true;
-        clearManualEntryNote();
+    // CHANGE: renders/updates the map + hidden lat/lon fields regardless
+    // of whether the point came from device GPS or manual entry, so both
+    // paths converge on the same "coordinate saved" state.
+    function setCoordinate(lat, lon, fromManual) {
+        document.getElementById('lat').value = lat;
+        document.getElementById('lon').value = lon;
+        document.getElementById('map-container').style.display = 'block';
+        document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+        document.getElementById('geoRequiredNote').classList.remove('visible');
+        document.getElementById('locateBtn').style.removeProperty('border');
 
-        if (!navigator.geolocation) {
-            btn.disabled = false;
-            btn.innerText = "Fetch GPS Verification Coordinate";
-            alert("Geolocation is not supported by your browser.");
-            return;
+        if (!map) {
+            map = L.map('map').setView([lat, lon], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            marker = L.marker([lat, lon], { draggable: true }).addTo(map);
+            marker.on('dragend', function() {
+                const pos = marker.getLatLng();
+                setCoordinate(pos.lat, pos.lng, true);
+                reverseGeocode(pos.lat, pos.lng);
+            });
+            map.on('click', function(ev) {
+                if (!manualPlacementMode) return;
+                marker.setLatLng(ev.latlng);
+                setCoordinate(ev.latlng.lat, ev.latlng.lng, true);
+                reverseGeocode(ev.latlng.lat, ev.latlng.lng);
+            });
+        } else {
+            const newPos = new L.LatLng(lat, lon);
+            marker.setLatLng(newPos);
+            map.setView(newPos, 14);
         }
+
+        if (fromManual) {
+            document.getElementById('manualLat').value = lat;
+            document.getElementById('manualLon').value = lon;
+        }
+    }
+
+    // CHANGE: reverse-geocode is now its own function so both the GPS
+    // flow and the manual/drag/tap flow can reuse it, with the same
+    // 8s timeout + manual-entry fallback as before.
+    function reverseGeocode(lat, lon) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        return fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=en`, {
+            signal: controller.signal
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.address) {
+                    const addr = data.address;
+                    const rawDistrict = addr.county || addr.state_district || addr.district || '';
+                    const district = normalizeDistrict(rawDistrict);
+                    const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.hamlet || addr.city_district || addr.municipality || addr.city || addr.locality || '';
+                    const state = addr.state || '';
+
+                    if (district || area || state) {
+                        setLocationField('district', district);
+                        setLocationField('area', area);
+                        setLocationField('state', state);
+                    } else {
+                        enableManualLocationEntry();
+                    }
+                } else {
+                    enableManualLocationEntry();
+                }
+            })
+            .catch(err => {
+                console.error("Reverse Geocoding Error:", err);
+                enableManualLocationEntry();
+            })
+            .finally(() => {
+                clearTimeout(timeoutId);
+            });
+    }
+
+    // CHANGE: two-stage geolocation attempt.
+    //   1) high-accuracy GPS fix, longer timeout, accepts a recent
+    //      cached fix (maximumAge) so it can return instantly on a
+    //      weak connection instead of waiting for a fresh satellite lock.
+    //   2) on failure/timeout, retries once with enableHighAccuracy:false
+    //      (coarse network/cell-tower location), which works far more
+    //      often with no/weak data signal.
+    //   3) if both fail, unlocks the manual coordinate box + map-tap
+    //      placement instead of leaving the rep stuck.
+    function attemptGeolocation(highAccuracy, isRetry) {
+        const btn = document.getElementById('locateBtn');
 
         navigator.geolocation.getCurrentPosition(
             function(position) {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
-
-                document.getElementById('lat').value = lat;
-                document.getElementById('lon').value = lon;
-                document.getElementById('map-container').style.display = 'block';
-
-                document.getElementById('externalMapLink').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
-
-                // Render Map
-                if (!map) {
-                    map = L.map('map').setView([lat, lon], 14);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap'
-                    }).addTo(map);
-                    marker = L.marker([lat, lon]).addTo(map);
-                } else {
-                    const newPos = new L.LatLng(lat, lon);
-                    marker.setLatLng(newPos);
-                    map.setView(newPos, 14);
-                }
-
-                // FIX (stuck button / geocode hang): the reverse-geocode
-                // fetch previously had no timeout at all, so a slow or
-                // unresponsive Nominatim server could leave the button
-                // stuck on "Locating..." indefinitely. AbortController
-                // now forces it to give up after 8s and fall back to
-                // manual entry instead of hanging forever.
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-                fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=en`, {
-                    signal: controller.signal
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data && data.address) {
-                            const addr = data.address;
-                            const rawDistrict = addr.county || addr.state_district || addr.district || '';
-                            const district = normalizeDistrict(rawDistrict);
-                            const area = addr.suburb || addr.village || addr.town || addr.neighbourhood || addr.hamlet || addr.city_district || addr.municipality || addr.city || addr.locality || '';
-                            const state = addr.state || '';
-
-                            if (district || area || state) {
-                                setLocationField('district', district);
-                                setLocationField('area', area);
-                                setLocationField('state', state);
-                                btn.innerText = "✅ Location Secured";
-                            } else {
-                                // Nominatim responded but gave nothing usable.
-                                enableManualLocationEntry();
-                                btn.innerText = "⚠️ GPS Captured — Enter Location Manually (optional)";
-                            }
-                        } else {
-                            enableManualLocationEntry();
-                            btn.innerText = "⚠️ GPS Captured — Enter Location Manually (optional)";
-                        }
-                    })
-                    .catch(err => {
-                        console.error("Reverse Geocoding Error:", err);
-                        // FIX (stuck button — root cause): previously, on any
-                        // network failure here, the District/Area/State
-                        // inputs were left empty + readonly with NO way to
-                        // fix them, AND the Locate button was never
-                        // re-enabled (that reset only happened in the
-                        // geolocation *error* callback below, not here).
-                        // Together that permanently "greyed out"/blurred the
-                        // Locate button and silently blocked submission —
-                        // exactly what your sales team was hitting. We now
-                        // unlock manual entry so the visit can still be
-                        // logged even when auto-detect fails — and since
-                        // these fields are optional, the rep isn't blocked
-                        // either way.
-                        enableManualLocationEntry();
-                        btn.innerText = "⚠️ GPS Captured — Enter Location Manually (optional)";
-                    })
-                    .finally(() => {
-                        clearTimeout(timeoutId);
-                        // FIX (stuck button): ALWAYS release the button here,
-                        // no matter what happened above. This is the actual
-                        // bug — the button used to only get re-enabled from
-                        // the geolocation error callback, so a successful
-                        // GPS fix followed by a failed/slow geocode left it
-                        // permanently disabled (the grey/"blurred" look).
-                        btn.disabled = false;
-                    });
+                setCoordinate(lat, lon, false);
+                reverseGeocode(lat, lon).finally(function() {
+                    btn.disabled = false;
+                    btn.innerText = "✅ Location Secured";
+                });
             },
             function(error) {
+                if (!isRetry) {
+                    // First attempt failed — retry once with coarse/network
+                    // location, which needs far less signal than a GPS fix.
+                    attemptGeolocation(false, true);
+                    return;
+                }
+                // Both attempts failed — hand off to manual entry.
                 btn.disabled = false;
-                btn.innerText = "Fetch GPS Verification Coordinate";
-                alert("Unable to retrieve location. This is optional — you can leave District/Area/State blank and submit as normal.");
+                btn.innerText = "⚠️ GPS Unavailable — Enter Manually Below";
+                document.getElementById('geoRequiredNote').classList.add('visible');
+                document.getElementById('manualCoordBox').classList.add('visible');
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            {
+                enableHighAccuracy: highAccuracy,
+                timeout: highAccuracy ? 15000 : 8000,
+                maximumAge: 300000 // accept a fix cached up to 5 minutes ago
+            }
         );
+    }
+
+    document.getElementById('locateBtn').addEventListener('click', function() {
+        const btn = this;
+        btn.innerText = "⏳ Locating via GPS Grid...";
+        btn.disabled = true;
+        btn.style.removeProperty('border');
+        clearManualEntryNote();
+        document.getElementById('geoRequiredNote').classList.remove('visible');
+
+        if (!navigator.geolocation) {
+            btn.disabled = false;
+            btn.innerText = "⚠️ GPS Unavailable — Enter Manually Below";
+            document.getElementById('manualCoordBox').classList.add('visible');
+            document.getElementById('geoRequiredNote').classList.add('visible');
+            return;
+        }
+
+        attemptGeolocation(true, false);
+    });
+
+    // Manual coordinate entry — last-resort path when device GPS keeps
+    // failing (no signal, permission denied, etc). Also enables
+    // "tap the map to place your pin" once a map is on screen.
+    document.getElementById('useManualCoordBtn').addEventListener('click', function() {
+        const latInput = document.getElementById('manualLat');
+        const lonInput = document.getElementById('manualLon');
+        const lat = parseFloat(latInput.value);
+        const lon = parseFloat(lonInput.value);
+
+        if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            alert("Enter a valid latitude (-90 to 90) and longitude (-180 to 180), or tap your location on the map once it appears.");
+            return;
+        }
+
+        setCoordinate(lat, lon, true);
+        manualPlacementMode = true;
+        reverseGeocode(lat, lon);
     });
     </script>
 </body>
